@@ -41,4 +41,4 @@ class Product extends Model
     {
         return $this->hasMany(ProductVariant::class);
     }
-}
+}code database\migrations\2026_07_15_230732_create_product_variants_table.php
