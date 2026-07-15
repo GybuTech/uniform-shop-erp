@@ -36,7 +36,7 @@ A Laravel-based ERP and Point of Sale (POS) system for managing school uniform p
 
 ## Project Status
 
-🚧 Currently under development.
+Currently under development.
 
 ---
 
