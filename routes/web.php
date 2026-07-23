@@ -26,6 +26,17 @@ Route::middleware('auth')->group(function () {
             'update' => 'permission:edit-categories',
             'destroy' => 'permission:delete-categories',
         ]);
+    Route::resource('products', \App\Http\Controllers\ProductController::class)
+    ->except(['show'])
+    ->middleware([
+        'index' => 'permission:view-products',
+        'create' => 'permission:create-products',
+        'store' => 'permission:create-products',
+        'edit' => 'permission:edit-products',
+        'update' => 'permission:edit-products',
+        'destroy' => 'permission:delete-products',
+    
+        ]);
 });
 
 require __DIR__.'/auth.php';
