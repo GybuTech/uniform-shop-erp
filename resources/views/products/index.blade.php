@@ -43,11 +43,15 @@
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $product->sku_prefix }}</td>
                             <td class="px-6 py-4 text-sm space-x-2">
-                                @can('edit-products')
-                                <a href="{{ route('products.edit', $product) }}"
-                                   class="text-blue-600 hover:underline">Edit</a>
-                                @endcan
-                                @can('delete-products')
+                                    @can('view-product-variants')
+                                    <a href="{{ route('products.variants.index', $product) }}"
+                                    class="text-indigo-600 hover:underline font-medium">Variants</a>
+                                    @endcan
+                                    @can('edit-products')
+                                    <a href="{{ route('products.edit', $product) }}"
+                                    class="text-blue-600 hover:underline">Edit</a>
+                                    @endcan
+                                    @can('delete-products')
                                 <form method="POST" action="{{ route('products.destroy', $product) }}"
                                       class="inline"
                                       onsubmit="return confirm('Delete this product?')">
