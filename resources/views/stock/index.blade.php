@@ -2,17 +2,16 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Stock Entries</h2>
-            @can('create-stock-entries')
             <a href="{{ route('stock-entries.create') }}"
                class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700">
                 Record Stock Entry
             </a>
-            @endcan
         </div>
     </x-slot>
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+
             @if(session('success'))
                 <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
                     {{ session('success') }}
@@ -35,16 +34,10 @@
                         @forelse($stockEntries as $entry)
                         <tr>
                             <td class="px-6 py-4 text-sm text-gray-900">{{ $loop->iteration }}</td>
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900">
-                                {{ $entry->reference_no ?? '—' }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
-                                {{ $entry->items->count() }} variant(s)
-                            </td>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $entry->reference_no ?? '—' }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ $entry->items->count() }} variant(s)</td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $entry->user->name }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
-                                {{ $entry->created_at->format('M d, Y H:i') }}
-                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ $entry->created_at->format('M d, Y H:i') }}</td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $entry->notes ?? '—' }}</td>
                         </tr>
                         @empty
@@ -54,7 +47,9 @@
                         @endforelse
                     </tbody>
                 </table>
-                <div class="px-6 py-4">{{ $stockEntries->links() }}</div>
+                <div class="px-6 py-4">
+                    {{ $stockEntries->links() }}
+                </div>
             </div>
         </div>
     </div>
