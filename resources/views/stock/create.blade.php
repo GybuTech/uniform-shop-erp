@@ -1,49 +1,117 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Record Stock Intake (Finished Goods)') }}
-        </h2>
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Record Stock Entry</h2>
     </x-slot>
 
-    <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-sm">
-        <form method="POST" action="{{ route('stock-entries.store') }}" class="space-y-4">
-            @csrf
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <div class="bg-white shadow rounded-lg p-6">
+                <form method="POST" action="{{ route('stock-entries.store') }}" id="stockForm">
+                    @csrf
 
-            <div>
-                <label for="product_variant_id" class="block text-sm font-medium text-gray-700">Select Product Variant *</label>
-                <select name="product_variant_id" id="product_variant_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <option value="">-- Choose Variant --</option>
-                    @foreach($variants as $variant)
-                        <option value="{{ $variant->id }}" {{ old('product_variant_id') == $variant->id ? 'selected' : '' }}>
-                            {{ $variant->product->name ?? 'N/A' }} — {{ $variant->sku }} ({{ $variant->size }} / {{ $variant->colour }}) [Current Stock: {{ $variant->stock_quantity }}]
-                        </option>
-                    @endforeach
-                </select>
-                @error('product_variant_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-            </div>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <x-input-label for="reference_no" value="Reference / Batch No." />
+                            <x-text-input id="reference_no" name="reference_no" type="text"
+                                class="mt-1 block w-full"
+                                value="{{ old('reference_no') }}"
+                                placeholder="e.g. BATCH-2026-07-001" />
+                        </div>
+                        <div>
+                            <x-input-label for="notes" value="Notes (Optional)" />
+                            <textarea id="notes" name="notes"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                rows="2">{{ old('notes') }}</textarea>
+                        </div>
+                    </div>
 
-            <div>
-                <label for="quantity" class="block text-sm font-medium text-gray-700">Intake Quantity *</label>
-                <input type="number" min="1" name="quantity" id="quantity" value="{{ old('quantity') }}" required placeholder="e.g. 50" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                @error('quantity') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-            </div>
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-semibold text-gray-700">Stock Items</h3>
+                            <button type="button" onclick="addRow()"
+                                class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">
+                                + Add Item
+                            </button>
+                        </div>
 
-            <div>
-                <label for="reference_no" class="block text-sm font-medium text-gray-700">Production Batch / Reference No.</label>
-                <input type="text" name="reference_no" id="reference_no" value="{{ old('reference_no') }}" placeholder="e.g. BATCH-2026-07-001" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                @error('reference_no') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-            </div>
+                        <table class="min-w-full divide-y divide-gray-200" id="itemsTable">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product Variant</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                                    <th class="px-4 py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="itemsBody">
+                                <tr id="row_0">
+                                    <td class="px-4 py-2">
+                                        <select name="items[0][product_variant_id]"
+                                            class="block w-full border-gray-300 rounded-md shadow-sm text-sm">
+                                            <option value="">Select variant</option>
+                                            @foreach($variants as $variant)
+                                                <option value="{{ $variant->id }}">
+                                                    {{ $variant->product->name }} — {{ $variant->sku }} (Stock: {{ $variant->stock_quantity }})
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <input type="number" name="items[0][quantity]" min="1"
+                                            class="block w-full border-gray-300 rounded-md shadow-sm text-sm"
+                                            placeholder="Qty">
+                                    </td>
+                                    <td class="px-4 py-2"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
-            <div>
-                <label for="notes" class="block text-sm font-medium text-gray-700">Notes / Remarks</label>
-                <textarea name="notes" id="notes" rows="3" placeholder="Additional details..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('notes') }}</textarea>
-                @error('notes') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                    <div class="flex items-center gap-4 mt-6">
+                        <x-primary-button>Save Stock Entry</x-primary-button>
+                        <a href="{{ route('stock-entries.index') }}" class="text-gray-600 hover:underline">Cancel</a>
+                    </div>
+                </form>
             </div>
-
-            <div class="flex justify-end space-x-3 pt-4 border-t">
-                <a href="{{ route('stock-entries.index') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Cancel</a>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Add Stock</button>
-            </div>
-        </form>
+        </div>
     </div>
+
+    <script>
+        let rowCount = 1;
+        const variants = @json($variants->map(fn($v) => ['id' => $v->id, 'label' => $v->product->name . ' — ' . $v->sku . ' (Stock: ' . $v->stock_quantity . ')']));
+
+        function addRow() {
+            const tbody = document.getElementById('itemsBody');
+            const row = document.createElement('tr');
+            row.id = 'row_' + rowCount;
+
+            let options = '<option value="">Select variant</option>';
+            variants.forEach(v => {
+                options += `<option value="${v.id}">${v.label}</option>`;
+            });
+
+            row.innerHTML = `
+                <td class="px-4 py-2">
+                    <select name="items[${rowCount}][product_variant_id]"
+                        class="block w-full border-gray-300 rounded-md shadow-sm text-sm">
+                        ${options}
+                    </select>
+                </td>
+                <td class="px-4 py-2">
+                    <input type="number" name="items[${rowCount}][quantity]" min="1"
+                        class="block w-full border-gray-300 rounded-md shadow-sm text-sm"
+                        placeholder="Qty">
+                </td>
+                <td class="px-4 py-2">
+                    <button type="button" onclick="removeRow('row_${rowCount}')"
+                        class="text-red-600 hover:text-red-800 text-sm">Remove</button>
+                </td>`;
+
+            tbody.appendChild(row);
+            rowCount++;
+        }
+
+        function removeRow(id) {
+            document.getElementById(id).remove();
+        }
+    </script>
 </x-app-layout>
