@@ -1,26 +1,37 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+namespace App\Models;
 
-return new class extends Migration
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Sale extends Model
 {
-    public function up(): void
+    use HasFactory;
+
+    protected $fillable = [
+        'customer_id',
+        'user_id',
+        'receipt_number',
+        'total_amount',
+        'payment_method',
+        'payment_status',
+    ];
+
+    public function customer(): BelongsTo
     {
-        Schema::create('sale_items', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('sale_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_variant_id')->constrained()->restrictOnDelete();
-            $table->unsignedInteger('quantity');
-            $table->decimal('unit_price', 10, 2);
-            $table->decimal('line_total', 10, 2);
-            $table->timestamps();
-        });
+        return $this->belongsTo(Customer::class);
     }
 
-    public function down(): void
+    public function user(): BelongsTo
     {
-        Schema::dropIfExists('sale_items');
+        return $this->belongsTo(User::class);
     }
-};
+
+    public function saleItems(): HasMany
+    {
+        return $this->hasMany(SaleItem::class);
+    }
+}
