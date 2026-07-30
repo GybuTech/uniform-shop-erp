@@ -50,10 +50,10 @@ class PosController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'items'          => ['required', 'array', 'min:1'],
+            'items'              => ['required', 'array', 'min:1'],
             'items.*.variant_id' => ['required', 'exists:product_variants,id'],
             'items.*.quantity'   => ['required', 'integer', 'min:1'],
-            'payment_method' => ['required', 'string'],
+            'payment_method'     => ['required', 'string'],
         ]);
 
         DB::transaction(function () use ($request) {
@@ -119,6 +119,29 @@ class PosController extends Controller
             'user'
         ])->findOrFail($saleId);
 
+        return view('pos.receipt', compact('sale'));
+    }
+
+    public function salesIndex(Request $request)
+    {
+        $search = $request->get('search');
+        $query = Sale::with(['customer', 'user'])->withCount('saleItems');
+
+        if ($search) {
+            $query->where('receipt_number', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function($q) use ($search) {
+                      $q->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%");
+                  });
+        }
+
+        $sales = $query->latest()->paginate(15);
+        return view('sales.index', compact('sales', 'search'));
+    }
+
+    public function salesShow(Sale $sale)
+    {
+        $sale->load(['customer', 'user', 'saleItems.productVariant.product']);
         return view('pos.receipt', compact('sale'));
     }
 }
