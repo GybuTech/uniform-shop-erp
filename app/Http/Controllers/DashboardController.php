@@ -30,7 +30,7 @@ class DashboardController extends Controller
         $lowStockCount = ProductVariant::where('stock_quantity', '<=', 5)->count();
 
         // 3. Recent transactions
-        $recentSales = Sale::with(['customer', 'user', 'items'])
+        $recentSales = Sale::with(['customer', 'user', 'saleItems'])
             ->latest()
             ->take(5)
             ->get();
