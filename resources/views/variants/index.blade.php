@@ -5,10 +5,16 @@
                 {{ $product->name }} — Variants
             </h2>
             @can('create-product-variants')
-            <a href="{{ route('products.variants.create', $product) }}"
-               class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700">
-                Add Variant
-            </a>
+            <div class="space-x-2">
+                <a href="{{ route('products.variants.bulk-create', $product) }}"
+                   class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-bold shadow-sm transition">
+                    ⚡ Bulk Matrix Creator
+                </a>
+                <a href="{{ route('products.variants.create', $product) }}"
+                   class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm font-semibold">
+                    + Add Single Variant
+                </a>
+            </div>
             @endcan
         </div>
     </x-slot>
@@ -34,32 +40,34 @@
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Colour</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         @forelse($variants as $variant)
-                        <tr>
+                        <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 text-sm text-gray-900">{{ $loop->iteration }}</td>
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $variant->sku }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">{{ $variant->size }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">{{ $variant->colour }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
+                            <td class="px-6 py-4 text-sm font-mono font-bold text-gray-900">{{ $variant->sku }}</td>
+                            <td class="px-6 py-4 text-sm font-mono text-gray-500">{{ $variant->barcode }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-700 font-semibold">{{ $variant->size }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-700 font-semibold">{{ $variant->colour }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-900 font-extrabold">
                                 KES {{ number_format($variant->selling_price, 2) }}
                             </td>
                             <td class="px-6 py-4 text-sm">
-                                <span class="{{ $variant->stock_quantity <= 5 ? 'text-red-600 font-semibold' : 'text-gray-900' }}">
+                                <span class="{{ $variant->stock_quantity <= 5 ? 'text-red-600 font-extrabold' : 'text-emerald-700 font-extrabold' }}">
                                     {{ $variant->stock_quantity }}
                                 </span>
                             </td>
-                            <td class="px-6 py-4 text-sm space-x-2">
+                            <td class="px-6 py-4 text-sm text-right space-x-2">
                                 @can('edit-product-variants')
                                 <a href="{{ route('products.variants.edit', [$product, $variant]) }}"
-                                   class="text-blue-600 hover:underline">Edit</a>
+                                   class="text-blue-600 hover:underline font-semibold">Edit</a>
                                 @endcan
                                 @can('delete-product-variants')
                                 <form method="POST"
@@ -68,15 +76,15 @@
                                       onsubmit="return confirm('Delete this variant?')">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="text-red-600 hover:underline">Delete</button>
+                                    <button type="submit" class="text-red-600 hover:underline font-semibold">Delete</button>
                                 </form>
                                 @endcan
                             </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-4 text-center text-gray-500">
-                                No variants found. Add the first variant for this product.
+                            <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                                No variants found for {{ $product->name }}. Use <strong>Bulk Matrix Creator</strong> to generate all size/colour combinations quickly!
                             </td>
                         </tr>
                         @endforelse

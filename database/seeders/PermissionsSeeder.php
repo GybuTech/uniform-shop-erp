@@ -81,20 +81,11 @@ class PermissionsSeeder extends Seeder
             );
         }
 
+        $allPermissions = Permission::all()->pluck('name')->toArray();
+
         $rolePermissions = [
-            'owner' => [
-                'view-dashboard',
-                'view-categories', 'create-categories', 'edit-categories', 'delete-categories',
-                'view-products', 'create-products', 'edit-products', 'delete-products',
-                'view-product-variants', 'create-product-variants', 'edit-product-variants', 'delete-product-variants',
-                'view-customers', 'create-customers', 'edit-customers', 'delete-customers',
-                'view-sales', 'create-sales', 'refund-sales', 'void-sales',
-                'view-stock-entries', 'create-stock-entries', 'edit-stock-entries', 'delete-stock-entries',
-                'view-inventory', 'adjust-inventory',
-                'view-reports', 'view-sales-reports', 'view-inventory-reports', 'view-financial-reports',
-                'view-user-management',
-                'view-audit-logs',
-            ],
+            'owner'                => $allPermissions,
+            'system_administrator' => $allPermissions,
             'manager' => [
                 'view-dashboard',
                 'view-categories', 'create-categories', 'edit-categories',
@@ -129,19 +120,6 @@ class PermissionsSeeder extends Seeder
                 'view-sales',
                 'view-inventory',
                 'view-reports', 'view-sales-reports', 'view-financial-reports',
-            ],
-            'system_administrator' => [
-                'view-dashboard',
-                'view-categories', 'create-categories', 'edit-categories', 'delete-categories',
-                'view-products', 'create-products', 'edit-products', 'delete-products',
-                'view-product-variants', 'create-product-variants', 'edit-product-variants', 'delete-product-variants',
-                'view-customers', 'create-customers', 'edit-customers', 'delete-customers',
-                'view-sales', 'void-sales',
-                'view-stock-entries', 'delete-stock-entries',
-                'view-inventory',
-                'view-user-management', 'create-users', 'edit-users', 'delete-users',
-                'assign-roles', 'assign-permissions',
-                'manage-system-settings', 'view-audit-logs', 'perform-backups', 'restore-backups',
             ],
         ];
 
