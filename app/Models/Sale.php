@@ -18,6 +18,7 @@ class Sale extends Model
         'total_amount',
         'payment_method',
         'payment_status',
+        'branch_name',
     ];
 
     public function customer(): BelongsTo
@@ -31,6 +32,11 @@ class Sale extends Model
     }
 
     public function saleItems(): HasMany
+    {
+        return $this->hasMany(SaleItem::class);
+    }
+
+    public function items(): HasMany
     {
         return $this->hasMany(SaleItem::class);
     }

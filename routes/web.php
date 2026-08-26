@@ -67,14 +67,16 @@ Route::middleware(['auth'])->group(function () {
             'destroy' => 'permission:delete-product-variants',
         ]);
 
-    // Stock Entries
+    // Stock Entries (Intake & Recalculating Corrections)
     Route::resource('stock-entries', StockEntryController::class)
-        ->only(['index', 'create', 'store', 'show'])
         ->middleware([
-            'index'  => 'permission:view-stock-entries',
-            'create' => 'permission:create-stock-entries',
-            'store'  => 'permission:create-stock-entries',
-            'show'   => 'permission:view-stock-entries',
+            'index'   => 'permission:view-stock-entries',
+            'create'  => 'permission:create-stock-entries',
+            'store'   => 'permission:create-stock-entries',
+            'show'    => 'permission:view-stock-entries',
+            'edit'    => 'permission:edit-stock-entries',
+            'update'  => 'permission:edit-stock-entries',
+            'destroy' => 'permission:delete-stock-entries',
         ]);
 
     // Customers
