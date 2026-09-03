@@ -49,13 +49,17 @@ Route::middleware(['auth'])->group(function () {
             'destroy' => 'permission:delete-products',
         ]);
 
-    // Variants
+    // Variants & Price Tier Manager
     Route::get('/products/{product}/variants/bulk-create', [ProductVariantController::class, 'bulkCreate'])
         ->name('products.variants.bulk-create')
         ->middleware('permission:create-product-variants');
     Route::post('/products/{product}/variants/bulk-store', [ProductVariantController::class, 'bulkStore'])
         ->name('products.variants.bulk-store')
         ->middleware('permission:create-product-variants');
+    Route::post('/products/{product}/variants/batch-price-update', [ProductVariantController::class, 'batchPriceUpdate'])
+        ->name('products.variants.batch-price-update')
+        ->middleware('permission:edit-product-variants');
+
     Route::resource('products.variants', ProductVariantController::class)
         ->except(['show'])
         ->middleware([
