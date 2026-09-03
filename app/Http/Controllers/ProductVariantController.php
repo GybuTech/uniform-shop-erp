@@ -11,8 +11,9 @@ class ProductVariantController extends Controller
 {
     public function index(Product $product)
     {
-        $variants = $product->variants()->latest()->paginate(15);
-        return view('variants.index', compact('product', 'variants'));
+        $variants = $product->variants()->latest()->paginate(25);
+        $availableSizes = $product->variants()->distinct()->pluck('size')->toArray();
+        return view('variants.index', compact('product', 'variants', 'availableSizes'));
     }
 
     public function create(Product $product)
@@ -52,14 +53,11 @@ class ProductVariantController extends Controller
     }
 
     public function bulkCreate(Product $product)
-{
-    $product->load('category');
-    
-    $defaultSizes = ['22', '24', '26', '28', '30', '32', '34', '36', '38'];
+    {
+        // Sizes from 22 up to 38 (even numbers) for primary & secondary school uniforms
+        $defaultSizes = ['22', '24', '26', '28', '30', '32', '34', '36', '38'];
 
-    $categoryName = strtolower($product->category->name ?? '');
-
-    if (str_contains($categoryName, 'sweater') || str_contains($categoryName, 'tracksuit')) {
+        // Preset T-Sharprint Solutions uniform colours & stripes
         $presetColours = [
             'Navy Blue Plain',
             'Navy Strip White',
@@ -70,45 +68,20 @@ class ProductVariantController extends Controller
             'Red Strip Navy',
             'Maroon Plain',
             'Maroon Strip White',
-            'Sky Blue Plain',
-            'Sky Blue Strip Navy',
+            'Brown Plain',
             'Green Plain',
-            'Green Strip White',
         ];
-    } elseif (str_contains($categoryName, 'fleece')) {
-        $presetColours = [
-            'Navy Blue',
-            'Red',
-            'Maroon',
-            'Green',
-            'Sky Blue',
-            'Brown',
-            'Black',
-            'Grey',
-        ];
-    } else {
-        $presetColours = [
-            'White',
-            'Navy Blue',
-            'Red',
-            'Maroon',
-            'Green',
-            'Sky Blue',
-            'Black',
-            'Grey',
-        ];
-    }
 
-    return view('variants.bulk_create', compact('product', 'defaultSizes', 'presetColours'));
-}
+        return view('variants.bulk_create', compact('product', 'defaultSizes', 'presetColours'));
+    }
 
     public function bulkStore(Request $request, Product $product)
     {
         $validated = $request->validate([
-            'sizes'          => ['required', 'array', 'min:1'],
+            'sizes'                   => ['required', 'array', 'min:1'],
             'selected_preset_colours' => ['nullable', 'array'],
-            'custom_colours' => ['nullable', 'string'],
-            'selling_price'  => ['required', 'numeric', 'min:0'],
+            'custom_colours'          => ['nullable', 'string'],
+            'selling_price'           => ['required', 'numeric', 'min:0'],
         ]);
 
         $presetColours = $validated['selected_preset_colours'] ?? [];
@@ -159,6 +132,32 @@ class ProductVariantController extends Controller
 
         return redirect()->route('products.variants.index', $product)
             ->with('success', $message);
+    }
+
+    public function batchPriceUpdate(Request $request, Product $product)
+    {
+        $request->validate([
+            'sizes'         => ['nullable', 'array'],
+            'variant_ids'   => ['nullable', 'array'],
+            'selling_price' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        if (empty($request->sizes) && empty($request->variant_ids)) {
+            return back()->withErrors(['price_error' => 'Please select at least one size range or variant to update prices.']);
+        }
+
+        $query = $product->variants();
+
+        if ($request->filled('variant_ids')) {
+            $query->whereIn('id', $request->variant_ids);
+        } elseif ($request->filled('sizes')) {
+            $query->whereIn('size', $request->sizes);
+        }
+
+        $updatedCount = $query->update(['selling_price' => $request->selling_price]);
+
+        return redirect()->route('products.variants.index', $product)
+            ->with('success', "Successfully updated selling price for {$updatedCount} variant(s) to KES " . number_format($request->selling_price, 2));
     }
 
     public function edit(Product $product, ProductVariant $variant)
