@@ -1185,11 +1185,6 @@ class RealStockSheetsSeeder extends Seeder
                 $variant->selling_price  = $data['price'];
                 $variant->stock_quantity = $data['stock'];
                 $variant->save();
-            } else {
-                $variant->update([
-                    'stock_quantity' => $data['stock'],
-                    'selling_price'  => $data['price'],
-                ]);
             }
         }
     }
