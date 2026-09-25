@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust Railway HTTPS reverse proxies
+        $middleware->trustProxies(at: '*');
+
         $middleware->appendToGroup('web', \App\Http\Middleware\EnsureUserIsActive::class);
 
         $middleware->alias([
