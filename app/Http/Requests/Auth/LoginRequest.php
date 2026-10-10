@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,31 +29,51 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'login' => ['required', 'string'],
             'password' => ['required', 'string'],
         ];
     }
 
     /**
-     * Attempt to authenticate the request's credentials.
+     * Attempt to authenticate the request's credentials using username or email.
      *
      * @throws ValidationException
      */
     public function authenticate(): void
     {
-    $this->ensureIsNotRateLimited();
+        $this->ensureIsNotRateLimited();
 
-    if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
-        RateLimiter::hit($this->throttleKey());
-        throw ValidationException::withMessages([
-            'email' => trans('auth.failed'),
-        ]);
+        $loginInput = $this->input('login');
+        $password   = $this->input('password');
+
+        // Determine if input is email or username
+        $fieldType = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+        $credentials = [
+            $fieldType => $loginInput,
+            'password' => $password,
+        ];
+
+        if (! Auth::attempt($credentials, $this->boolean('remember'))) {
+            // Fallback attempt for username if email failed or vice versa
+            $altFieldType = ($fieldType === 'email') ? 'username' : 'email';
+            $altCredentials = [
+                $altFieldType => $loginInput,
+                'password'    => $password,
+            ];
+
+            if (! Auth::attempt($altCredentials, $this->boolean('remember'))) {
+                RateLimiter::hit($this->throttleKey());
+                throw ValidationException::withMessages([
+                    'login' => trans('auth.failed'),
+                ]);
+            }
         }
 
         if (! Auth::user()->is_active) {
             Auth::logout();
             throw ValidationException::withMessages([
-                'email' => 'Your account has been deactivated. Please contact the System Administrator.',
+                'login' => 'Your account has been deactivated. Please contact the System Administrator.',
             ]);
         }
 
@@ -75,7 +96,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
+            'login' => trans('auth.throttle', [
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),
@@ -87,6 +108,6 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(Str::lower($this->string('login')).'|'.$this->ip());
     }
 }
