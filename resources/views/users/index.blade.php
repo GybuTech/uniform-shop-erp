@@ -17,8 +17,10 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Username</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Email</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Assigned Role</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Assigned Branch</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Account Status</th>
                     <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
                 </tr>
@@ -28,6 +30,7 @@
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 text-sm text-gray-900">{{ $loop->iteration }}</td>
                     <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $user->name }}</td>
+                    <td class="px-6 py-4 text-sm font-mono font-bold text-indigo-600">{{ $user->username ?? '—' }}</td>
                     <td class="px-6 py-4 text-sm text-gray-600">{{ $user->email }}</td>
                     <td class="px-6 py-4 text-sm">
                         @forelse($user->roles as $role)
@@ -37,6 +40,17 @@
                         @empty
                             <span class="text-xs text-gray-400 italic">No role</span>
                         @endforelse
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        @if($user->branch_name)
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                {{ $user->branch_name }}
+                            </span>
+                        @else
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                All Branches (HQ)
+                            </span>
+                        @endif
                     </td>
                     <td class="px-6 py-4 text-sm">
                         @if($user->is_active)
@@ -54,6 +68,17 @@
                                 {{ $user->is_active ? 'Deactivate' : 'Activate' }}
                             </button>
                         </form>
+                        @can('delete-users')
+                            @if(auth()->id() !== $user->id && !in_array('owner', $user->roles->pluck('name')->toArray()))
+                            <form method="POST" action="{{ route('users.destroy', $user) }}" class="inline" onsubmit="return confirm('WARNING: Are you sure you want to permanently delete staff account {{ $user->name }}?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="font-medium hover:underline ml-1" style="color: #dc2626 !important;">
+                                    Delete
+                                </button>
+                            </form>
+                            @endif
+                        @endcan
                     </td>
                 </tr>
                 @empty
