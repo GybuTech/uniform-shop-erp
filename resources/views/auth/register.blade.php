@@ -1,5 +1,8 @@
 <x-guest-layout>
-    <form method="POST" action="{{ route('register') }}">
+    <div class="mb-4 text-xs font-semibold text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+        Direct public registration is disabled. Staff accounts are provisioned by the Store Administrator.
+    </div>
+    <form method="POST" action="{{ route('login') }}">
         @csrf
 
         <!-- Name -->

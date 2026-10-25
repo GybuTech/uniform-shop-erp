@@ -39,7 +39,7 @@
                                     <select name="items[{{ $index }}][product_variant_id]" required class="w-full text-sm border-gray-300 rounded-md">
                                         @foreach($variants as $variant)
                                             <option value="{{ $variant->id }}" {{ $item->product_variant_id == $variant->id ? 'selected' : '' }}>
-                                                {{ $variant->product->name }} — {{ $variant->sku }} (Size {{ $variant->size }} | {{ $variant->colour }})
+                                                {{ $variant->product?->name ?? 'Uniform' }} — {{ $variant->sku }} (Size {{ $variant->size }} | {{ $variant->colour }})
                                             </option>
                                         @endforeach
                                     </select>
@@ -73,7 +73,7 @@
                     <select name="items[${rowIdx}][product_variant_id]" required class="w-full text-sm border-gray-300 rounded-md">
                         @foreach($variants as $variant)
                             <option value="{{ $variant->id }}">
-                                {{ $variant->product->name }} — {{ $variant->sku }} (Size {{ $variant->size }} | {{ $variant->colour }})
+                                {{ $variant->product?->name ?? 'Uniform' }} — {{ $variant->sku }} (Size {{ $variant->size }} | {{ $variant->colour }})
                             </option>
                         @endforeach
                     </select>

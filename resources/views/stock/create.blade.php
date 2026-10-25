@@ -50,7 +50,7 @@
                                             <option value="">Select variant</option>
                                             @foreach($variants as $variant)
                                                 <option value="{{ $variant->id }}">
-                                                    {{ $variant->product->name }} — {{ $variant->sku }} (Stock: {{ $variant->stock_quantity }})
+                                                    {{ $variant->product?->name ?? 'Uniform' }} — {{ $variant->sku }} (Stock: {{ $variant->stock_quantity }})
                                                 </option>
                                             @endforeach
                                         </select>
@@ -77,7 +77,7 @@
 
     <script>
         let rowCount = 1;
-        const variants = @json($variants->map(fn($v) => ['id' => $v->id, 'label' => $v->product->name . ' — ' . $v->sku . ' (Stock: ' . $v->stock_quantity . ')']));
+        const variants = @json($variants->map(fn($v) => ['id' => $v->id, 'label' => ($v->product?->name ?? 'Uniform') . ' — ' . $v->sku . ' (Stock: ' . $v->stock_quantity . ')']));
 
         function addRow() {
             const tbody = document.getElementById('itemsBody');

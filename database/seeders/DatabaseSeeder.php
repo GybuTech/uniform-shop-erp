@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
             RolesSeeder::class,
             PermissionsSeeder::class,
             AdminUserSeeder::class,
+            BranchAndUserBackfillSeeder::class,
         ]);
 
         // 2. Seed initial catalog & stock ONLY on fresh setup when catalog is empty

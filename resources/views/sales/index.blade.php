@@ -16,12 +16,19 @@
                 <form method="GET" action="{{ route('sales.index') }}" class="flex flex-wrap items-center gap-3">
                     <input type="text" name="search" value="{{ $search }}" placeholder="Search by receipt number or customer name..." class="rounded-md border-gray-300 shadow-sm text-sm w-72 focus:ring-indigo-500 focus:border-indigo-500">
                     
-                    <select name="branch" class="rounded-md border-gray-300 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500">
-                        <option value="">All Branches</option>
-                        @foreach($branches as $b)
-                            <option value="{{ $b }}" {{ $branchFilter === $b ? 'selected' : '' }}>{{ $b }}</option>
-                        @endforeach
-                    </select>
+                    @if(!empty($lockedBranch))
+                        <div class="flex items-center space-x-1.5 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-xs font-semibold text-blue-900">
+                            <span class="text-blue-500 uppercase text-[10px]">Your Branch:</span>
+                            <span>{{ $lockedBranch }}</span>
+                        </div>
+                    @else
+                        <select name="branch" class="rounded-md border-gray-300 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">All Branches</option>
+                            @foreach($branches as $b)
+                                <option value="{{ $b }}" {{ $branchFilter === $b ? 'selected' : '' }}>{{ $b }}</option>
+                            @endforeach
+                        </select>
+                    @endif
 
                     <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-md hover:bg-indigo-700">Filter</button>
                     @if($search || $branchFilter)

@@ -11,7 +11,7 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         $user = User::firstOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'admin@tsharprint.com')],
+            ['email' => env('ADMIN_EMAIL', 'admin@tshaprint.co.ke')],
             [
                 'name' => 'System Administrator',
                 'password' => Hash::make(env('ADMIN_PASSWORD', 'ChangeMe@123')),

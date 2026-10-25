@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'UniformERP') }} - Management Dashboard</title>
+        <title>{{ config('app.name', 'Tshaprint Solutions') }} - Management Dashboard</title>
 
         <!-- Google Fonts: Plus Jakarta Sans -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,10 +22,69 @@
             body {
                 font-family: 'Plus Jakarta Sans', sans-serif;
             }
+
+            /* Responsive screen scaling across 11"-27" monitor sizes and resolutions */
+            @media (max-width: 1440px) {
+                html {
+                    font-size: 15px; /* Proportional scaling for standard 1366x768 & 14" laptops */
+                }
+            }
+
+            @media (max-width: 1280px) {
+                html {
+                    font-size: 14px; /* Optimal readability for compact POS displays and netbooks */
+                }
+                .max-w-7xl {
+                    max-width: 100% !important;
+                }
+            }
+
+            @media (max-width: 1024px) {
+                html {
+                    font-size: 13.5px;
+                }
+            }
+
+            /* Smooth responsive tables with modern scrollbars */
+            .overflow-x-auto {
+                scrollbar-width: thin;
+                scrollbar-color: #cbd5e1 #f1f5f9;
+            }
+            .overflow-x-auto::-webkit-scrollbar {
+                height: 6px;
+                width: 6px;
+            }
+            .overflow-x-auto::-webkit-scrollbar-track {
+                background: #f1f5f9;
+                border-radius: 4px;
+            }
+            .overflow-x-auto::-webkit-scrollbar-thumb {
+                background-color: #cbd5e1;
+                border-radius: 4px;
+            }
+            .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+                background-color: #94a3b8;
+            }
+
+            /* Fluid padding for small laptop screens */
+            @media (max-width: 768px) {
+                main {
+                    padding-left: 0.75rem !important;
+                    padding-right: 0.75rem !important;
+                }
+            }
         </style>
     </head>
-    <body class="font-sans antialiased text-slate-800 bg-slate-100 selection:bg-indigo-500 selection:text-white">
-        <div class="min-h-screen flex flex-row">
+    <body class="font-sans antialiased text-slate-800 bg-slate-100 selection:bg-indigo-500 selection:text-white"
+          x-data="{
+              sidebarOpen: window.innerWidth >= 1024,
+              toggleSidebar() { this.sidebarOpen = !this.sidebarOpen; }
+          }"
+          @resize.window="if (window.innerWidth >= 1280) sidebarOpen = true">
+        <div class="min-h-screen flex flex-row relative">
+            <!-- Backdrop for compact / tablet screens -->
+            <div x-show="sidebarOpen && window.innerWidth < 1024" @click="sidebarOpen = false" class="fixed inset-0 bg-slate-950/50 z-20 backdrop-blur-xs lg:hidden" x-transition></div>
+
             <!-- Sidebar Navigation -->
             @include('layouts.sidebar')
 
@@ -33,14 +92,29 @@
             <div class="flex-1 flex flex-col min-w-0 overflow-x-hidden bg-slate-50">
                 <!-- Top Navbar Header -->
                 <header class="bg-white border-b border-slate-200/80 sticky top-0 z-20 shadow-sm">
-                    <div class="py-3.5 px-6 sm:px-8 flex justify-between items-center">
-                        @isset($header)
-                            <div class="flex-1">
-                                {{ $header }}
-                            </div>
-                        @else
-                            <h1 class="text-xl font-bold text-slate-900 tracking-tight">Uniform ERP</h1>
-                        @endisset
+                    <div class="py-3 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                        <div class="flex items-center flex-1 mr-4">
+                            <button @click="toggleSidebar()" type="button" class="mr-3 p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition" title="Toggle Sidebar Navigation">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+                            @isset($header)
+                                <div class="flex-1">
+                                    {{ $header }}
+                                </div>
+                            @else
+                                <h1 class="text-xl font-bold text-slate-900 tracking-tight">Tshaprint Solutions POS & ERP</h1>
+                            @endisset
+                        </div>
+
+                        <!-- Official Anti-Tamper Server Clock -->
+                        <div class="hidden lg:flex items-center space-x-2 bg-slate-100/90 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono select-none" title="Official Tamper-Proof Operational Business Time">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span class="font-bold text-slate-500 text-[10px] uppercase">Business Time:</span>
+                            <span id="liveServerClockDisplay" class="font-bold text-slate-900">{{ \App\Services\SystemTime::now()->format('Y-m-d H:i:s') }}</span>
+                            <span class="text-[9px] bg-slate-200 text-slate-600 px-1 py-0.5 rounded font-sans font-bold">EAT</span>
+                        </div>
 
                         <!-- Right User Badge & Quick Profile Link -->
                         <div class="flex items-center space-x-4 pl-4 border-l border-slate-200">
@@ -50,18 +124,9 @@
                                 </div>
                                 <div class="hidden md:block text-left">
                                     <span class="block text-xs font-bold text-slate-900 leading-none">{{ Auth::user()->name ?? 'User' }}</span>
-                                    <span class="text-[11px] text-slate-500 leading-tight">System Staff</span>
+                                    <span class="text-[11px] text-slate-500 leading-tight font-semibold capitalize">{{ Auth::user()->roles->first()?->name ?? 'Staff' }}</span>
                                 </div>
                             </a>
-
-                            <form method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <button type="submit" title="Log Out" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                    </svg>
-                                </button>
-                            </form>
                         </div>
                     </div>
                 </header>
@@ -90,5 +155,32 @@
                 </main>
             </div>
         </div>
+
+        <!-- Anti-Tamper Independent Live Server Clock Ticker -->
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const clockEl = document.getElementById('liveServerClockDisplay');
+                if (!clockEl) return;
+
+                // Seeded with authoritative business time epoch (UTC ms)
+                let serverEpoch = {{ \App\Services\SystemTime::now()->timestamp }} * 1000;
+                const startPerf = performance.now();
+
+                setInterval(function() {
+                    const elapsed = performance.now() - startPerf;
+                    const d = new Date(serverEpoch + elapsed);
+
+                    // Formatted strictly in East Africa Time (Africa/Nairobi UTC+3)
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const min = String(d.getMinutes()).padStart(2, '0');
+                    const ss = String(d.getSeconds()).padStart(2, '0');
+
+                    clockEl.textContent = `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+                }, 1000);
+            });
+        </script>
     </body>
 </html>

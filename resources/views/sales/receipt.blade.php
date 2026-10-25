@@ -6,7 +6,7 @@
             </h2>
             <div class="space-x-2">
                 <button onclick="window.print()" class="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-medium text-sm">
-                    🖨️ Print Receipt
+                    Print Receipt
                 </button>
                 <a href="{{ route('pos.index') }}" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm">
                     + New Sale
@@ -18,9 +18,9 @@
     <!-- Receipt Container -->
     <div class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg border border-gray-200 font-mono text-sm print:shadow-none print:border-none print:w-full print:p-0">
         <div class="text-center border-b pb-4 mb-4">
-            <h1 class="text-xl font-extrabold uppercase tracking-wider text-gray-900">Uniform Shop ERP</h1>
-            <p class="text-xs text-gray-500">Official Sales Receipt</p>
-            <p class="text-xs text-gray-500 mt-1">Tel: +254 700 000 000 | Email: sales@uniformerp.co.ke</p>
+            <h1 class="text-xl font-extrabold uppercase tracking-wider text-gray-900">{{ strtoupper(\App\Models\BusinessSetting::get('business_name', 'TSHAPRINT SOLUTIONS')) }}</h1>
+            <p class="text-xs text-gray-500">Official Sales Receipt &bull; {{ $sale->branch_name ?? 'Main Shop' }}</p>
+            <p class="text-xs text-gray-500 mt-1">Tel: {{ \App\Models\BusinessSetting::get('business_phone', '+254 700 000 000') }} | Email: {{ \App\Models\BusinessSetting::get('business_email', 'sales@tshaprint.co.ke') }}</p>
         </div>
 
         <div class="space-y-1 text-xs text-gray-600 mb-4 border-b pb-4">
