@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Imports\StockImport;
 use App\Models\ProductVariant;
 use App\Models\StockEntry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
+
 
 class StockEntryController extends Controller
 {
@@ -15,6 +18,87 @@ class StockEntryController extends Controller
             ->latest()
             ->paginate(15);
         return view('stock.index', compact('stockEntries'));
+    }
+
+    public function importForm()
+    {
+        $today         = \App\Services\SystemTime::now()->format('Y-m-d');
+        $totalVariants = ProductVariant::count();
+        $totalUnits    = ProductVariant::sum('stock_quantity');
+        $branches      = \App\Models\Branch::where('is_active', true)->pluck('name')->toArray();
+        if (empty($branches)) {
+            $branches = ['Main Branch', 'Branch 2 Sweaters', 'Branch 3 Sweaters'];
+        }
+
+        return view('stock.import', compact('today', 'totalVariants', 'totalUnits', 'branches'));
+    }
+
+    public function downloadTemplate()
+    {
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="tshaprint_opening_stock_template.csv"',
+            'Pragma'              => 'no-cache',
+            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires'             => '0',
+        ];
+
+        return response()->stream(function () {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM for Excel
+
+            // Column Header
+            fputcsv($out, ['sku', 'product_name', 'size', 'quantity', 'selling_price']);
+
+            // Prefill with real sample variants from DB
+            $samples = ProductVariant::with('product')->limit(15)->get();
+            if ($samples->isNotEmpty()) {
+                foreach ($samples as $s) {
+                    fputcsv($out, [
+                        $s->sku,
+                        $s->product?->name ?? 'Uniform Item',
+                        $s->size,
+                        10,
+                        $s->selling_price,
+                    ]);
+                }
+            } else {
+                fputcsv($out, ['ACC-SW-22', 'Accurate Sweater', '22', 15, 500.00]);
+                fputcsv($out, ['ACC-SW-24', 'Accurate Sweater', '24', 12, 500.00]);
+            }
+
+            fclose($out);
+        }, 200, $headers);
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'stock_file'   => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:5120'],
+            'intake_date'  => ['nullable', 'date'],
+            'branch_name'  => ['nullable', 'string'],
+            'notes'        => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $customNotes = $request->input('notes', 'Spreadsheet Stock Intake');
+        if ($request->filled('branch_name')) {
+            $customNotes .= " | Branch: " . $request->input('branch_name');
+        }
+        if ($request->filled('intake_date')) {
+            $customNotes .= " | Date: " . $request->input('intake_date');
+        }
+
+        $importer = new StockImport(auth()->id(), $customNotes);
+        Excel::import($importer, $request->file('stock_file'));
+
+        $message = "Opening Stock Intake complete: {$importer->imported} items updated successfully.";
+        if ($importer->skipped > 0) {
+            $message .= " ({$importer->skipped} rows were skipped).";
+        }
+
+        return redirect()->route('stock-entries.index')
+            ->with('success', $message)
+            ->with('import_errors', $importer->errors);
     }
 
     public function create()

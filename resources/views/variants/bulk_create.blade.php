@@ -15,7 +15,7 @@
             <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100 space-y-6">
 
                 <div class="bg-indigo-50 border-l-4 border-indigo-600 p-4 text-sm text-indigo-900 rounded-r-lg">
-                    <p class="font-bold mb-1">⚡ Matrix Generation Principle</p>
+                    <p class="font-bold mb-1"> Matrix Generation Principle</p>
                     <p>Instead of manually creating dozens of variants one by one, select your sizes (22 to 38) and uniform colours below. The system automatically computes the Cartesian Product ($\text{Sizes} \times \text{Colours}$), generates uniform SKUs (e.g. <code>{{ $product->sku_prefix }}-22-NAVY-STRIP-WHITE</code>) and barcodes, and batch-creates all combinations in a single database transaction!</p>
                 </div>
 

@@ -260,14 +260,14 @@ class RealStockSheetsSeeder extends Seeder
             ['category' => 'School Sweaters', 'product' => 'P.C.E.A Sosian Sweaters', 'prefix' => 'SW', 'colour' => 'P.C.E.A SOSIAN SWEATERS', 'size' => '32', 'price' => 1200.0, 'stock' => 2],
             ['category' => 'School Sweaters', 'product' => 'P.C.E.A Sosian Sweaters', 'prefix' => 'SW', 'colour' => 'P.C.E.A SOSIAN SWEATERS', 'size' => '34', 'price' => 1200.0, 'stock' => 4],
             ['category' => 'School Sweaters', 'product' => 'P.C.E.A Sosian Sweaters', 'prefix' => 'SW', 'colour' => 'P.C.E.A SOSIAN SWEATERS', 'size' => '36', 'price' => 1200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '22', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '24', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '26', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '28', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '30', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '32', 'price' => 2200.0, 'stock' => 1],
-            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '34', 'price' => 2200.0, 'stock' => 2],
-            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '36', 'price' => 2200.0, 'stock' => 2],
+            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '22', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '24', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '26', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '28', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '30', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '32', 'price' => 2200.0, 'stock' => 1],
+            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '34', 'price' => 2200.0, 'stock' => 2],
+            ['category' => 'Tracksuits', 'product' => 'Imara Junior Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'IMARA JUNIOR SLEEVELESS', 'size' => '36', 'price' => 2200.0, 'stock' => 2],
             ['category' => 'Tracksuits', 'product' => 'Edelvale Junior Sweaters Tracksuit', 'prefix' => 'TS', 'colour' => 'EDELVALE JUNIOR SWEATERS', 'size' => '22', 'price' => 2200.0, 'stock' => 0],
             ['category' => 'Tracksuits', 'product' => 'Edelvale Junior Sweaters Tracksuit', 'prefix' => 'TS', 'colour' => 'EDELVALE JUNIOR SWEATERS', 'size' => '24', 'price' => 2200.0, 'stock' => 0],
             ['category' => 'Tracksuits', 'product' => 'Edelvale Junior Sweaters Tracksuit', 'prefix' => 'TS', 'colour' => 'EDELVALE JUNIOR SWEATERS', 'size' => '26', 'price' => 2200.0, 'stock' => 0],
@@ -999,14 +999,14 @@ class RealStockSheetsSeeder extends Seeder
             ['category' => 'Tracksuits', 'product' => 'Accurate Jss Girls Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE JSS GIRLS', 'size' => '32', 'price' => 2200.0, 'stock' => 0],
             ['category' => 'Tracksuits', 'product' => 'Accurate Jss Girls Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE JSS GIRLS', 'size' => '34', 'price' => 2200.0, 'stock' => 0],
             ['category' => 'Tracksuits', 'product' => 'Accurate Jss Girls Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE JSS GIRLS', 'size' => '36', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '22', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '24', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '26', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '28', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '30', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '32', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '34', 'price' => 2200.0, 'stock' => 0],
-            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Tracksuit', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '36', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '22', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '24', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '26', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '28', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '30', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '32', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '34', 'price' => 2200.0, 'stock' => 0],
+            ['category' => 'Tracksuits', 'product' => 'Accurate Sleeveless Sweater', 'prefix' => 'TS', 'colour' => 'ACCURATE SLEEVELESS', 'size' => '36', 'price' => 2200.0, 'stock' => 0],
             ['category' => 'School Sweaters', 'product' => 'Komarock South Sweater', 'prefix' => 'SW', 'colour' => 'KOMAROCK SOUTH', 'size' => '22', 'price' => 1200.0, 'stock' => 0],
             ['category' => 'School Sweaters', 'product' => 'Komarock South Sweater', 'prefix' => 'SW', 'colour' => 'KOMAROCK SOUTH', 'size' => '24', 'price' => 1200.0, 'stock' => 0],
             ['category' => 'School Sweaters', 'product' => 'Komarock South Sweater', 'prefix' => 'SW', 'colour' => 'KOMAROCK SOUTH', 'size' => '26', 'price' => 1200.0, 'stock' => 0],
@@ -1143,20 +1143,32 @@ class RealStockSheetsSeeder extends Seeder
             // Clean product name
             $prodName = preg_replace('/\s+/', ' ', trim($data['product']));
 
-            // Generate clean unique SKU prefix for products
-            $skuPrefix = strtoupper(Str::slug($prodName));
-            if (strlen($skuPrefix) > 35) {
-                $skuPrefix = substr($skuPrefix, 0, 35);
+            // Generate clean concise SKU prefix for products
+            $cleanProd = preg_replace('/(\bSchool\b|\bUniform\b|\bOfficial\b)/i', '', $prodName);
+            $cleanProd = trim(preg_replace('/[^A-Za-z0-9\s]/', ' ', $cleanProd));
+            $words = array_values(array_filter(preg_split('/\s+/', $cleanProd)));
+
+            $skuPrefix = '';
+            if (count($words) === 1) {
+                $skuPrefix = strtoupper(substr($words[0], 0, 5));
+            } elseif (count($words) === 2) {
+                $skuPrefix = strtoupper(substr($words[0], 0, 3) . '-' . substr($words[1], 0, 2));
+            } else {
+                $abbr = '';
+                foreach ($words as $w) {
+                    $abbr .= strtoupper(substr($w, 0, 1));
+                }
+                $skuPrefix = strlen($abbr) >= 3 ? $abbr : strtoupper(substr($words[0], 0, 3) . '-' . substr($words[1], 0, 2));
             }
 
-            $product = Product::where('sku_prefix', $skuPrefix)->first();
+            $product = Product::where('name', $prodName)->orWhere('sku_prefix', $skuPrefix)->first();
 
             if (!$product) {
                 $product = Product::create([
                     'category_id' => $category->id,
                     'name'        => $prodName,
                     'sku_prefix'  => $skuPrefix,
-                    'description' => 'Official T-Sharprint ' . $prodName,
+                    'description' => 'Official Tshaprint Solutions ' . $prodName,
                 ]);
             } else {
                 if ($product->category_id !== $category->id) {
@@ -1164,13 +1176,21 @@ class RealStockSheetsSeeder extends Seeder
                 }
             }
 
-            $cleanSize   = strtoupper(Str::slug($data['size']));
-            $cleanColour = strtoupper(Str::slug($data['colour']));
-            
-            $sku = strtoupper($product->sku_prefix . '-' . $cleanSize . '-' . $cleanColour);
-            if (strlen($sku) > 60) {
-                $sku = substr($sku, 0, 60);
+            $cleanSize   = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $data['size']));
+            $normColour  = strtolower(preg_replace('/[^a-z0-9]/', '', $data['colour']));
+            $normProd    = strtolower(preg_replace('/[^a-z0-9]/', '', $prodName));
+
+            $clrSuffix = '';
+            if (!empty($normColour) && $normColour !== $normProd && !str_contains($normProd, $normColour)) {
+                $cWords = array_values(array_filter(preg_split('/\s+/', preg_replace('/[^A-Za-z0-9\s]/', ' ', $data['colour']))));
+                $cAbbr = '';
+                foreach ($cWords as $cw) {
+                    $cAbbr .= strtoupper(substr($cw, 0, 1));
+                }
+                $clrSuffix = '-' . substr($cAbbr, 0, 3);
             }
+
+            $sku = strtoupper($product->sku_prefix . '-' . $cleanSize . $clrSuffix);
             $barcode = 'BC-' . $sku;
 
             $variant = ProductVariant::where('sku', $sku)->first();

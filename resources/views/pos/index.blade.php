@@ -45,15 +45,36 @@
                             <button onclick="clearCart()" class="text-xs text-red-500 hover:underline font-normal">Clear</button>
                         </h3>
 
-                        {{-- Branch Selection --}}
-                        <div class="mb-3">
-                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Selling Branch *</label>
-                            <select id="branchSelect" class="block w-full border-gray-300 rounded-md shadow-sm text-xs font-bold text-indigo-900 bg-indigo-50/50 focus:ring-indigo-500 focus:border-indigo-500">
-                                @foreach($branches as $branch)
-                                    <option value="{{ $branch }}">{{ $branch }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        {{-- Branch Indicator / Selector --}}
+                        @if($isLockedBranch)
+                            <div class="mb-3 p-3 bg-blue-50/80 border border-blue-200 rounded-lg">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Terminal Branch</span>
+                                    <span class="text-[10px] bg-blue-200 text-blue-900 font-bold px-2 py-0.5 rounded-full">Assigned</span>
+                                </div>
+                                <p class="text-sm font-extrabold text-blue-950 mt-1 flex items-center space-x-1.5">
+                                    <svg class="w-4 h-4 text-blue-600 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                    <span>{{ $currentBranchName }}</span>
+                                </p>
+                                <input type="hidden" id="branchSelect" value="{{ $currentBranchName }}">
+                            </div>
+                        @else
+                            <div class="mb-3">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Selling Branch *</label>
+                                    <span class="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded">Owner Override</span>
+                                </div>
+                                <select id="branchSelect" class="block w-full border-gray-300 rounded-md shadow-sm text-xs font-bold text-indigo-900 bg-indigo-50/50 focus:ring-indigo-500 focus:border-indigo-500">
+                                    @foreach($branches as $branch)
+                                        <option value="{{ $branch->name }}" {{ ($currentBranchName == $branch->name) ? 'selected' : '' }}>
+                                            {{ $branch->name }} {{ $branch->code ? '('.$branch->code.')' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
 
                         {{-- Customer Selection --}}
                         <div class="mb-3">
@@ -144,12 +165,20 @@
                 return;
             }
 
-            container.innerHTML = variants.map(v => `
+            container.innerHTML = variants.map(v => {
+                const normColour = (v.colour || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const normName = (v.product_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const showColour = v.colour && normColour !== normName && !normName.includes(normColour);
+                const colourTag = showColour ? ` &bull; <span class="text-indigo-600 font-medium">${v.colour}</span>` : '';
+                const safeName = (v.product_name || '').replace(/'/g, "\\'");
+                const safeColour = (v.colour || '').replace(/'/g, "\\'");
+
+                return `
                 <div class="flex items-center justify-between p-3 border rounded-lg hover:bg-indigo-50 transition cursor-pointer"
-                     onclick="addToCart(${v.id}, '${v.product_name}', '${v.size}', '${v.colour}', ${v.selling_price}, ${v.stock_quantity})">
+                     onclick="addToCart(${v.id}, '${safeName}', '${v.size}', '${safeColour}', ${v.selling_price}, ${v.stock_quantity})">
                     <div>
                         <p class="font-bold text-gray-900 text-sm">${v.product_name}</p>
-                        <p class="text-xs text-gray-500 font-mono">${v.sku} &bull; Size: ${v.size} &bull; ${v.colour}</p>
+                        <p class="text-xs text-gray-500 font-mono"><span class="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-semibold">${v.sku}</span> &bull; Size: <strong class="text-gray-800">${v.size}</strong>${colourTag}</p>
                         <p class="text-xs font-bold ${v.stock_quantity <= 5 ? 'text-red-600' : 'text-emerald-600'}">In Stock: ${v.stock_quantity} units</p>
                     </div>
                     <div class="text-right">
@@ -157,7 +186,8 @@
                         <span class="inline-block mt-1 text-xs bg-indigo-600 text-white px-2.5 py-1 rounded font-bold hover:bg-indigo-700">+ Add</span>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
 
         function addToCart(id, name, size, colour, price, stock) {
@@ -223,12 +253,16 @@
             cartList.innerHTML = cart.map(item => {
                 const lineTotal = item.price * item.qty;
                 total += lineTotal;
+                const normColour = (item.colour || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const normName = (item.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const showColour = item.colour && normColour !== normName && !normName.includes(normColour);
+                const itemDetail = `Size: ${item.size}` + (showColour ? ` | ${item.colour}` : '');
 
                 return `
                     <div class="flex items-center justify-between p-2.5 bg-gray-50 rounded border text-xs">
                         <div class="flex-1 pr-2">
                             <p class="font-bold text-gray-900">${item.name}</p>
-                            <p class="text-gray-500">${item.size} | ${item.colour}</p>
+                            <p class="text-gray-500">${itemDetail}</p>
                             <p class="font-semibold text-indigo-600">KES ${parseFloat(item.price).toFixed(2)}</p>
                         </div>
                         <div class="flex items-center space-x-1.5">

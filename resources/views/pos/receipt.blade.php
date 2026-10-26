@@ -4,7 +4,7 @@
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Official Sales Receipt</h2>
             <div class="space-x-2 no-print">
                 <button onclick="window.print()" class="bg-indigo-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm transition text-sm">
-                    🖨️ Print 80mm Thermal Receipt
+                    Print Thermal Receipt (80mm)
                 </button>
                 <a href="{{ route('pos.index') }}" class="bg-green-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm transition text-sm">
                     + New Sale
@@ -19,9 +19,9 @@
 
                 <!-- Header -->
                 <div class="text-center mb-6 pb-4 border-b border-dashed">
-                    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">T-SHARPRINT SOLUTIONS</h1>
-                    <p class="text-gray-600 text-xs font-bold uppercase tracking-wider mt-0.5">School Uniform Manufacturer & Retailer</p>
-                    <p class="text-indigo-600 font-semibold text-xs mt-1">{{ $sale->branch_name ?? 'Main Branch' }}</p>
+                    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">{{ strtoupper(\App\Models\BusinessSetting::get('business_name', 'TSHAPRINT SOLUTIONS')) }}</h1>
+                    <p class="text-gray-600 text-xs font-bold uppercase tracking-wider mt-0.5">Uniform Manufacturer & Retail POS</p>
+                    <p class="text-indigo-600 font-semibold text-xs mt-1">{{ $sale->branch_name ?? 'Main Shop' }}</p>
                     <div class="mt-3 inline-block bg-gray-100 px-3 py-1 rounded text-xs font-mono font-bold text-gray-800">
                         RECEIPT #: {{ $sale->receipt_number }}
                     </div>

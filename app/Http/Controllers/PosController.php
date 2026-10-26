@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\ProductVariant;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Services\SystemTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,13 +15,21 @@ class PosController extends Controller
 {
     public function index()
     {
+        $user = auth()->user();
+        $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']) && empty($user->branch_name);
+        $branches = Branch::where('is_active', true)->orderBy('name')->get();
+
+        if ($isGlobalUser) {
+            $isLockedBranch = false;
+            $currentBranchName = $branches->first()?->name ?? 'Main Shop';
+        } else {
+            $isLockedBranch = true;
+            $currentBranchName = $user->branch_name ?: ($branches->first()?->name ?? 'Main Shop');
+        }
+
         $customers = Customer::orderBy('first_name')->get();
-        $branches = [
-            'Main Branch (Tracksuits & Fleece)',
-            'Branch 2 (Sweaters Outlet A)',
-            'Branch 3 (Sweaters Outlet B)',
-        ];
-        return view('pos.index', compact('customers', 'branches'));
+
+        return view('pos.index', compact('customers', 'branches', 'isLockedBranch', 'currentBranchName'));
     }
 
     public function search(Request $request)
@@ -63,8 +73,17 @@ class PosController extends Controller
             'branch_name'        => ['nullable', 'string', 'max:100'],
         ]);
 
+        $user = auth()->user();
+        $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']) && empty($user->branch_name);
+
+        if ($isGlobalUser) {
+            $branchName = $request->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop');
+        } else {
+            $branchName = $user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop');
+        }
+
         try {
-            DB::transaction(function () use ($request) {
+            DB::transaction(function () use ($request, $branchName) {
                 $total = 0;
                 $saleItems = [];
 
@@ -90,6 +109,8 @@ class PosController extends Controller
                     ];
                 }
 
+                $now = SystemTime::now();
+
                 $sale = Sale::create([
                     'customer_id'    => $request->customer_id ?: null,
                     'user_id'        => auth()->id(),
@@ -97,7 +118,9 @@ class PosController extends Controller
                     'total_amount'   => $total,
                     'payment_method' => $request->payment_method,
                     'payment_status' => 'paid',
-                    'branch_name'    => $request->branch_name ?: 'Main Branch (Tracksuits & Fleece)',
+                    'branch_name'    => $branchName,
+                    'created_at'     => $now,
+                    'updated_at'     => $now,
                 ]);
 
                 foreach ($saleItems as $item) {
@@ -107,6 +130,8 @@ class PosController extends Controller
                         'quantity'           => $item['quantity'],
                         'unit_price'         => $item['unit_price'],
                         'line_total'         => $item['line_total'],
+                        'created_at'         => $now,
+                        'updated_at'         => $now,
                     ]);
 
                     $item['variant']->decrement('stock_quantity', $item['quantity']);
@@ -141,6 +166,9 @@ class PosController extends Controller
 
     public function salesIndex(Request $request)
     {
+        $user = auth()->user();
+        $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']) && empty($user->branch_name);
+
         $search = $request->get('search');
         $branchFilter = $request->get('branch');
 
@@ -156,18 +184,20 @@ class PosController extends Controller
             });
         }
 
-        if ($branchFilter) {
-            $query->where('branch_name', $branchFilter);
+        if (!$isGlobalUser && !empty($user->branch_name)) {
+            $query->where('branch_name', $user->branch_name);
+            $lockedBranch = $user->branch_name;
+        } else {
+            $lockedBranch = null;
+            if ($branchFilter) {
+                $query->where('branch_name', $branchFilter);
+            }
         }
 
         $sales = $query->latest()->paginate(15);
-        $branches = [
-            'Main Branch (Tracksuits & Fleece)',
-            'Branch 2 (Sweaters Outlet A)',
-            'Branch 3 (Sweaters Outlet B)',
-        ];
+        $branches = Branch::where('is_active', true)->orderBy('name')->pluck('name');
 
-        return view('sales.index', compact('sales', 'search', 'branchFilter', 'branches'));
+        return view('sales.index', compact('sales', 'search', 'branchFilter', 'branches', 'lockedBranch'));
     }
 
     public function salesShow(Sale $sale)

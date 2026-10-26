@@ -21,6 +21,37 @@ class ProductVariantController extends Controller
         return view('variants.create', compact('product'));
     }
 
+    /**
+     * Generate a concise SKU abbreviation for a variant.
+     * Keeps SKUs clean, human-readable, and prevents repetition.
+     * e.g. Product "Accurate Sweater" (ACC-SW), Size 24 -> "ACC-SW-24"
+     * If colour is distinct (e.g. "Navy Blue"), appends "-NB" -> "ACC-SW-24-NB"
+     */
+    private function generateVariantSku(Product $product, string $size, string $colour): string
+    {
+        $cleanSize = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $size));
+        $normColour = strtolower(preg_replace('/[^a-z0-9]/', '', $colour));
+        $normProd   = strtolower(preg_replace('/[^a-z0-9]/', '', $product->name));
+
+        $colourSuffix = '';
+        if (!empty($normColour) && $normColour !== $normProd && !str_contains($normProd, $normColour)) {
+            $words = preg_split('/\s+/', trim(preg_replace('/[^A-Za-z0-9\s]/', ' ', $colour)));
+            $abbr  = implode('', array_map(fn($w) => strtoupper(substr($w, 0, 1)), $words));
+            $colourSuffix = '-' . substr($abbr, 0, 4);
+        }
+
+        $baseSku = strtoupper($product->sku_prefix . '-' . $cleanSize . $colourSuffix);
+        $sku = $baseSku;
+        $counter = 2;
+
+        while (ProductVariant::where('sku', $sku)->exists()) {
+            $sku = "{$baseSku}-V{$counter}";
+            $counter++;
+        }
+
+        return $sku;
+    }
+
     public function store(Request $request, Product $product)
     {
         $validated = $request->validate([
@@ -29,15 +60,8 @@ class ProductVariantController extends Controller
             'selling_price' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $sku = strtoupper($product->sku_prefix . '-' . $validated['size'] . '-' . $validated['colour']);
-        $sku = str_replace(' ', '-', $sku);
-
-        $exists = ProductVariant::where('sku', $sku)->exists();
-        if ($exists) {
-            return back()->withErrors(['size' => 'A variant with this size and colour already exists.'])->withInput();
-        }
-
-        $barcode = strtoupper('BC-' . $product->sku_prefix . '-' . str_replace(' ', '-', $validated['size']) . '-' . str_replace(' ', '-', $validated['colour']));
+        $sku = $this->generateVariantSku($product, $validated['size'], $validated['colour']);
+        $barcode = 'BC-' . $sku;
 
         $product->variants()->create([
             'sku'            => $sku,
@@ -100,13 +124,13 @@ class ProductVariantController extends Controller
         DB::transaction(function () use ($product, $validated, $allColours, &$createdCount, &$skippedCount) {
             foreach ($validated['sizes'] as $size) {
                 foreach ($allColours as $colour) {
-                    $cleanSize = trim($size);
+                    $cleanSize   = trim($size);
                     $cleanColour = trim($colour);
 
-                    $sku = strtoupper($product->sku_prefix . '-' . str_replace(' ', '-', $cleanSize) . '-' . str_replace(' ', '-', $cleanColour));
+                    $sku     = $this->generateVariantSku($product, $cleanSize, $cleanColour);
                     $barcode = 'BC-' . $sku;
 
-                    if (ProductVariant::where('sku', $sku)->exists()) {
+                    if (ProductVariant::where('product_id', $product->id)->where('size', $cleanSize)->where('colour', $cleanColour)->exists()) {
                         $skippedCount++;
                         continue;
                     }
@@ -173,10 +197,9 @@ class ProductVariantController extends Controller
             'selling_price' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $sku = strtoupper($product->sku_prefix . '-' . $validated['size'] . '-' . $validated['colour']);
-        $sku = str_replace(' ', '-', $sku);
-
-        $barcode = strtoupper('BC-' . $product->sku_prefix . '-' . str_replace(' ', '-', $validated['size']) . '-' . str_replace(' ', '-', $validated['colour']));
+        $colourCode = $this->abbreviateColour($validated['colour']);
+        $sku        = strtoupper($product->sku_prefix . '-' . str_replace(' ', '-', $validated['size']) . '-' . $colourCode);
+        $barcode    = 'BC-' . $sku;
 
         $variant->update([
             'sku'           => $sku,
@@ -196,5 +219,273 @@ class ProductVariantController extends Controller
 
         return redirect()->route('products.variants.index', $product)
             ->with('success', 'Variant deleted successfully.');
+    }
+
+    public function priceManager(Request $request)
+    {
+        $categories = \App\Models\Category::withCount('products')->orderBy('name')->get();
+        $products = Product::with('category')->orderBy('name')->get();
+
+        // Distinct sizes for dropdowns/matrix
+        $distinctSizes = ProductVariant::distinct()
+            ->whereNotNull('size')
+            ->where('size', '!=', '')
+            ->orderByRaw('CAST(size AS UNSIGNED), size')
+            ->pluck('size');
+
+        if ($distinctSizes->isEmpty()) {
+            $distinctSizes = collect(['22', '24', '26', '28', '30', '32', '34', '36', '38']);
+        }
+
+        $matrixSizes = ['22', '24', '26', '28', '30', '32', '34', '36', '38'];
+
+        // Search and filters
+        $search = $request->input('search');
+        $categoryId = $request->input('category_id');
+        $productId = $request->input('product_id');
+        $size = $request->input('size');
+        $filterType = $request->input('filter_type', 'all');
+
+        $query = ProductVariant::with('product.category')->latest();
+
+        // 1. Dedicated Filter Type: Sweaters with Badge, Plain Sweaters, Tracksuits, etc.
+        if ($filterType === 'sweater_badge') {
+            $query->where(function ($q) {
+                $q->whereHas('product', function ($pq) {
+                    $pq->where('name', 'like', '%badge%')
+                       ->orWhere('sku_prefix', 'like', '%badge%');
+                })
+                ->orWhere('colour', 'like', '%badge%')
+                ->orWhere('sku', 'like', '%badge%');
+            });
+        } elseif ($filterType === 'sweater_plain') {
+            $query->whereHas('product', function ($pq) {
+                $pq->where(function ($sub) {
+                    $sub->where('name', 'like', '%sweater%')
+                        ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+                })
+                ->where('name', 'not like', '%badge%');
+            })
+            ->where('colour', 'not like', '%badge%')
+            ->where('sku', 'not like', '%badge%');
+        } elseif ($filterType === 'sweaters') {
+            $query->whereHas('product', function ($pq) {
+                $pq->where('name', 'like', '%sweater%')
+                   ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+            });
+        } elseif ($filterType === 'tracksuits') {
+            $query->whereHas('product', function ($pq) {
+                $pq->where('name', 'like', '%tracksuit%')
+                   ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%tracksuit%'));
+            });
+        }
+
+        if ($categoryId) {
+            $query->whereHas('product', function ($q) use ($categoryId) {
+                $q->where('category_id', $categoryId);
+            });
+        }
+
+        if ($productId) {
+            $query->where('product_id', $productId);
+        }
+
+        if ($size) {
+            $query->where('size', $size);
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('sku', 'like', "%{$search}%")
+                  ->orWhere('colour', 'like', "%{$search}%")
+                  ->orWhere('size', 'like', "%{$search}%")
+                  ->orWhereHas('product', function ($pq) use ($search) {
+                      $pq->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $variants = $query->paginate(25)->withQueryString();
+
+        return view('products.prices', compact(
+            'categories',
+            'products',
+            'distinctSizes',
+            'matrixSizes',
+            'variants',
+            'search',
+            'categoryId',
+            'productId',
+            'size',
+            'filterType'
+        ));
+    }
+
+    public function updateBySize(Request $request)
+    {
+        $validated = $request->validate([
+            'target_type'   => ['nullable', 'string'],
+            'category_id'   => ['nullable', 'exists:categories,id'],
+            'product_id'    => ['nullable', 'exists:products,id'],
+            'size'          => ['required', 'string'],
+            'selling_price' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $targetType = $request->input('target_type', 'all');
+        $size = $validated['size'];
+        $price = $validated['selling_price'];
+
+        $query = ProductVariant::where('size', $size);
+        $targetName = "all products";
+
+        if ($targetType === 'sweater_with_badge') {
+            $query->where(function ($q) {
+                $q->whereHas('product', function ($pq) {
+                    $pq->where(function ($sub) {
+                        $sub->where('name', 'like', '%sweater%')
+                            ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+                    })->where(function ($sub) {
+                        $sub->where('name', 'like', '%badge%')
+                            ->orWhere('sku_prefix', 'like', '%badge%');
+                    });
+                })
+                ->orWhere(function ($sub) {
+                    $sub->where(function ($sc) {
+                        $sc->where('colour', 'like', '%badge%')
+                           ->orWhere('sku', 'like', '%badge%');
+                    })->whereHas('product', function ($pq) {
+                        $pq->where('name', 'like', '%sweater%')
+                           ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+                    });
+                });
+            });
+            $targetName = "Sweaters with Badge";
+        } elseif ($targetType === 'sweater_plain') {
+            $query->whereHas('product', function ($pq) {
+                $pq->where(function ($sub) {
+                    $sub->where('name', 'like', '%sweater%')
+                        ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+                })->where('name', 'not like', '%badge%');
+            })
+            ->where('colour', 'not like', '%badge%')
+            ->where('sku', 'not like', '%badge%');
+        } elseif (str_starts_with($targetType, 'category_')) {
+            $catId = (int) str_replace('category_', '', $targetType);
+            $query->whereHas('product', fn($q) => $q->where('category_id', $catId));
+            $c = \App\Models\Category::find($catId);
+            $targetName = $c ? "category '{$c->name}'" : 'selected category';
+        } elseif (!empty($validated['product_id'])) {
+            $query->where('product_id', $validated['product_id']);
+            $p = Product::find($validated['product_id']);
+            $targetName = $p ? $p->name : 'selected product';
+        } elseif (!empty($validated['category_id'])) {
+            $query->whereHas('product', function ($q) use ($validated) {
+                $q->where('category_id', $validated['category_id']);
+            });
+            $c = \App\Models\Category::find($validated['category_id']);
+            $targetName = $c ? "category '{$c->name}'" : 'selected category';
+        } else {
+            $targetName = "all uniform products";
+        }
+
+        $count = $query->update(['selling_price' => $price]);
+
+        return back()->with('success', "Updated selling price to KES " . number_format($price, 2) . " for {$count} item(s) of Size {$size} in {$targetName}.");
+    }
+
+    public function updateCategorySizeMatrix(Request $request)
+    {
+        $validated = $request->validate([
+            'target_type' => ['nullable', 'string'],
+            'category_id' => ['nullable'],
+            'matrix'      => ['required', 'array'],
+            'matrix.*'    => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $targetType = $request->input('target_type', 'category');
+        if (str_starts_with($targetType, 'cat_')) {
+            $validated['category_id'] = (int) str_replace('cat_', '', $targetType);
+            $targetType = 'category';
+        }
+        $totalUpdated = 0;
+        $targetLabel = "Category";
+
+        foreach ($validated['matrix'] as $size => $price) {
+            if ($price !== null && $price !== '') {
+                $q = ProductVariant::where('size', (string)$size);
+
+                if ($targetType === 'sweater_with_badge') {
+                    $q->where(function ($sub) {
+                        $sub->whereHas('product', function ($pq) {
+                            $pq->where(function ($s) {
+                                $s->where('name', 'like', '%sweater%')
+                                  ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+                            })->where(function ($s) {
+                                $s->where('name', 'like', '%badge%')
+                                  ->orWhere('sku_prefix', 'like', '%badge%');
+                            });
+                        })
+                        ->orWhere(function ($s) {
+                            $s->where(function ($sc) {
+                                $sc->where('colour', 'like', '%badge%')
+                                   ->orWhere('sku', 'like', '%badge%');
+                            })->whereHas('product', function ($pq) {
+                                $pq->where('name', 'like', '%sweater%')
+                                   ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+                            });
+                        });
+                    });
+                    $targetLabel = "Sweaters with Badge";
+                } elseif ($targetType === 'sweater_plain') {
+                    $q->whereHas('product', function ($pq) {
+                        $pq->where(function ($sub) {
+                            $sub->where('name', 'like', '%sweater%')
+                                ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+                        })->where('name', 'not like', '%badge%');
+                    })
+                    ->where('colour', 'not like', '%badge%')
+                    ->where('sku', 'not like', '%badge%');
+                    $targetLabel = "Plain Sweaters (Without Badge)";
+                } elseif (!empty($validated['category_id'])) {
+                    $category = \App\Models\Category::find($validated['category_id']);
+                    if ($category) {
+                        $q->whereHas('product', fn($pq) => $pq->where('category_id', $category->id));
+                        $targetLabel = "Category '{$category->name}'";
+                    }
+                }
+
+                $updated = $q->update(['selling_price' => $price]);
+                $totalUpdated += $updated;
+            }
+        }
+
+        return back()->with('success', "Size matrix applied for {$targetLabel}. Successfully updated prices for {$totalUpdated} variants.");
+    }
+
+    public function updateSinglePrice(Request $request, ProductVariant $variant)
+    {
+        $validated = $request->validate([
+            'selling_price' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $variant->update(['selling_price' => $validated['selling_price']]);
+
+        return back()->with('success', "Updated price for {$variant->product->name} (Size {$variant->size}, {$variant->colour}) to KES " . number_format($validated['selling_price'], 2));
+    }
+
+    public function batchUpdateGlobal(Request $request)
+    {
+        $validated = $request->validate([
+            'prices' => ['required', 'array'],
+            'prices.*' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $updatedCount = 0;
+        foreach ($validated['prices'] as $variantId => $newPrice) {
+            ProductVariant::where('id', $variantId)->update(['selling_price' => $newPrice]);
+            $updatedCount++;
+        }
+
+        return back()->with('success', "Updated selling price for {$updatedCount} product variant(s) successfully.");
     }
 }
