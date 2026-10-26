@@ -48,16 +48,18 @@ class PurchaseController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'supplier_name'   => ['required', 'string', 'max:150'],
-            'invoice_number'  => ['nullable', 'string', 'max:100'],
-            'branch_name'     => ['required', 'string', 'max:100'],
-            'purchase_date'   => ['required', 'date'],
-            'status'          => ['required', 'in:received,pending,ordered'],
-            'notes'           => ['nullable', 'string'],
-            'items'           => ['required', 'array', 'min:1'],
-            'items.*.product_variant_id' => ['required', 'exists:product_variants,id'],
+            'supplier_name'              => ['required', 'string', 'max:150'],
+            'invoice_number'             => ['nullable', 'string', 'max:100'],
+            'branch_name'                => ['required', 'string', 'max:100'],
+            'purchase_date'              => ['required', 'date'],
+            'status'                     => ['required', 'in:received,pending,ordered'],
+            'notes'                      => ['nullable', 'string'],
+            'items'                      => ['required', 'array', 'min:1'],
+            'items.*.item_name'          => ['required', 'string', 'max:200'],
+            'items.*.product_variant_id' => ['nullable', 'exists:product_variants,id'],
+            'items.*.unit'               => ['nullable', 'string', 'max:50'],
             'items.*.unit_cost'          => ['required', 'numeric', 'min:0'],
-            'items.*.quantity'           => ['required', 'integer', 'min:1'],
+            'items.*.quantity'           => ['required', 'numeric', 'min:1'],
         ]);
 
         $count = Purchase::count() + 1;
@@ -83,17 +85,21 @@ class PurchaseController extends Controller
 
             foreach ($validated['items'] as $item) {
                 $subtotal = $item['unit_cost'] * $item['quantity'];
+                $variantId = !empty($item['product_variant_id']) ? $item['product_variant_id'] : null;
+
                 $purchase->items()->create([
-                    'product_variant_id' => $item['product_variant_id'],
+                    'item_name'          => $item['item_name'],
+                    'unit'               => $item['unit'] ?? 'Pcs',
+                    'product_variant_id' => $variantId,
                     'unit_cost'          => $item['unit_cost'],
                     'quantity'           => $item['quantity'],
                     'subtotal'           => $subtotal,
                 ]);
 
-                // Increment stock on variant if goods are marked as received into branch inventory
-                if ($validated['status'] === 'received') {
-                    ProductVariant::where('id', $item['product_variant_id'])
-                        ->increment('stock_quantity', $item['quantity']);
+                // Increment stock on variant ONLY if an actual uniform variant was selected and goods were received
+                if ($validated['status'] === 'received' && $variantId) {
+                    ProductVariant::where('id', $variantId)
+                        ->increment('stock_quantity', (int)$item['quantity']);
                 }
             }
         });
@@ -113,11 +119,13 @@ class PurchaseController extends Controller
         $purchaseNumber = $purchase->purchase_number;
 
         DB::transaction(function () use ($purchase) {
-            // If goods were already received into inventory, revert the added stock quantities
+            // Revert stock on uniform variants if goods were marked as received
             if ($purchase->status === 'received') {
                 foreach ($purchase->items as $item) {
-                    ProductVariant::where('id', $item->product_variant_id)
-                        ->decrement('stock_quantity', $item->quantity);
+                    if ($item->product_variant_id) {
+                        ProductVariant::where('id', $item->product_variant_id)
+                            ->decrement('stock_quantity', (int)$item->quantity);
+                    }
                 }
             }
 

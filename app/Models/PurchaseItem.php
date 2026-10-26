@@ -12,6 +12,8 @@ class PurchaseItem extends Model
     protected $fillable = [
         'purchase_id',
         'product_variant_id',
+        'item_name',
+        'unit',
         'unit_cost',
         'quantity',
         'subtotal',
@@ -29,6 +31,24 @@ class PurchaseItem extends Model
 
     public function productVariant()
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(ProductVariant::class)->withTrashed();
+    }
+
+    /**
+     * Get human-readable item title for display in receipts and lists.
+     * Works for both raw materials (elastics, fabric, thread) and finished uniform variants.
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        if (!empty($this->item_name)) {
+            return $this->item_name;
+        }
+
+        if ($this->productVariant) {
+            $productName = $this->productVariant->product?->name ?? 'Uniform';
+            return "{$productName} ({$this->productVariant->sku}) - Size {$this->productVariant->size}";
+        }
+
+        return 'Procurement Item';
     }
 }

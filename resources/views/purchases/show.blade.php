@@ -56,13 +56,13 @@
                 </div>
 
                 <div>
-                    <h3 class="text-sm font-extrabold text-gray-800 mb-2">Line Items</h3>
+                    <h3 class="text-sm font-extrabold text-gray-800 mb-2">Purchased Items & Materials</h3>
                     <div class="border rounded-xl overflow-hidden">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
                                 <tr>
-                                    <th class="px-4 py-3 text-left">Item / Product Variant</th>
-                                    <th class="px-4 py-3 text-left">SKU</th>
+                                    <th class="px-4 py-3 text-left">Item Description</th>
+                                    <th class="px-4 py-3 text-left">Classification / SKU</th>
                                     <th class="px-4 py-3 text-right">Unit Cost</th>
                                     <th class="px-4 py-3 text-right">Quantity</th>
                                     <th class="px-4 py-3 text-right">Subtotal</th>
@@ -71,10 +71,22 @@
                             <tbody class="divide-y divide-gray-200 text-sm">
                                 @foreach($purchase->items as $item)
                                 <tr>
-                                    <td class="px-4 py-3 font-semibold text-gray-900">{{ $item->productVariant->product->name ?? 'Product' }} (Size {{ $item->productVariant->size ?? '-' }})</td>
-                                    <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ $item->productVariant->sku ?? '-' }}</td>
+                                    <td class="px-4 py-3 font-semibold text-gray-900">
+                                        {{ $item->displayName }}
+                                    </td>
+                                    <td class="px-4 py-3 font-mono text-xs text-gray-500">
+                                        @if($item->productVariant)
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                📦 {{ $item->productVariant->sku }}
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                                🧵 Raw Material / Supply
+                                            </span>
+                                        @endif
+                                    </td>
                                     <td class="px-4 py-3 text-right text-gray-700 font-mono">KES {{ number_format($item->unit_cost, 2) }}</td>
-                                    <td class="px-4 py-3 text-right font-bold text-gray-800">{{ $item->quantity }}</td>
+                                    <td class="px-4 py-3 text-right font-bold text-gray-800">{{ $item->quantity }} {{ $item->unit ?? 'Pcs' }}</td>
                                     <td class="px-4 py-3 text-right font-extrabold text-gray-900 font-mono">KES {{ number_format($item->subtotal, 2) }}</td>
                                 </tr>
                                 @endforeach
@@ -91,7 +103,7 @@
 
                 @if($purchase->notes)
                 <div class="bg-slate-50 p-4 rounded-xl border text-xs text-slate-700">
-                    <strong class="block mb-1 font-bold">Notes:</strong>
+                    <strong class="block mb-1 font-bold">Notes / Freight Details:</strong>
                     {{ $purchase->notes }}
                 </div>
                 @endif
