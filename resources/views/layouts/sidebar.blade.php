@@ -184,7 +184,22 @@
                     </svg>
                     <span>Stock Transfer</span>
                 </div>
-                <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <div class="flex items-center space-x-1.5">
+                    @php
+                        $userBranch = auth()->user()?->branch_name;
+                        $pendingTransfersCount = \App\Models\StockTransfer::where('status', 'Pending')
+                            ->when(!$isOwnerOrAdmin && !empty($userBranch), function($q) use ($userBranch) {
+                                $q->where('to_branch', $userBranch);
+                            })
+                            ->count();
+                    @endphp
+                    @if($pendingTransfersCount > 0)
+                        <span class="bg-amber-500 text-slate-900 text-[10px] font-black px-1.5 py-0.2 rounded-full" title="{{ $pendingTransfersCount }} transfer(s) awaiting receipt">
+                            {{ $pendingTransfersCount }}
+                        </span>
+                    @endif
+                    <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </div>
             </button>
             <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('transfers.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('transfers.index') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">List Transfers</a>
