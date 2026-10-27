@@ -5,7 +5,7 @@
                 Sales Report & Customer Demand Trends
             </h2>
             <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm">
-                🖨️ Print Report
+                Print Report
             </button>
         </div>
     </x-slot>
@@ -60,7 +60,7 @@
             <div class="bg-white shadow rounded-xl overflow-hidden border">
                 <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
                     <div>
-                        <h3 class="font-extrabold text-sm text-gray-900">🔥 Most Sought-Out Products by Customers</h3>
+                        <h3 class="font-extrabold text-sm text-gray-900">Most Sought-Out Products by Customers</h3>
                         <p class="text-xs text-gray-500">Ranked by volume of uniform units purchased</p>
                     </div>
                 </div>

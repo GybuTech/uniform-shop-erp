@@ -35,8 +35,8 @@
                     <div>
                         <select name="status" class="rounded-md border-gray-300 shadow-sm text-xs">
                             <option value="">All Statuses</option>
-                            <option value="Pending"  {{ $statusFilter === 'Pending'  ? 'selected' : '' }}>🟡 Pending (In Transit)</option>
-                            <option value="Received" {{ $statusFilter === 'Received' ? 'selected' : '' }}>🟢 Received</option>
+                            <option value="Pending"  {{ $statusFilter === 'Pending'  ? 'selected' : '' }}>Pending (In Transit)</option>
+                            <option value="Received" {{ $statusFilter === 'Received' ? 'selected' : '' }}>Received</option>
                         </select>
                     </div>
 
@@ -84,11 +84,11 @@
                             <td class="px-5 py-4">
                                 @if($transfer->status === 'Received')
                                     <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                                        ✅ Received
+                                        Received
                                     </span>
                                 @else
                                     <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
-                                        🟡 Pending
+                                        Pending
                                     </span>
                                 @endif
                             </td>
@@ -118,7 +118,7 @@
                                 @elseif($transfer->status === 'Pending')
                                     <span class="text-xs text-amber-600 font-medium">Awaiting Receipt</span>
                                 @else
-                                    <span class="text-xs text-slate-400 font-medium">Received ✓</span>
+                                    <span class="text-xs text-slate-400 font-medium">Received</span>
                                 @endif
                             </td>
                         </tr>

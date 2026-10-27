@@ -14,13 +14,13 @@
                     &larr; Back to Quotations
                 </a>
                 <button type="button" onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition shadow-sm" style="background-color: #4f46e5 !important; color: #ffffff !important;">
-                    🖨️ Print Quotation
+                    Print Quotation
                 </button>
                 <form method="POST" action="{{ route('quotations.destroy', $quotation) }}" onsubmit="return confirm('Are you sure you want to permanently delete this quotation?');" class="inline">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="inline-flex items-center px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-sm" style="background-color: #dc2626 !important; color: #ffffff !important;">
-                        🗑️ Delete
+                        Delete
                     </button>
                 </form>
             </div>

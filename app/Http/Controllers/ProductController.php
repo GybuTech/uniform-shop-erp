@@ -73,10 +73,17 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
-        $product->variants()->delete();
-        $product->delete();
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($product) {
+                $product->variants()->delete();
+                $product->delete();
+            });
 
-        return redirect()->route('products.index')
-            ->with('success', 'Product and its variants removed successfully.');
+            return redirect()->route('products.index')
+                ->with('success', 'Product and its variants removed successfully.');
+        } catch (\Throwable $e) {
+            return redirect()->route('products.index')
+                ->with('error', 'Unable to delete product: ' . $e->getMessage());
+        }
     }
 }

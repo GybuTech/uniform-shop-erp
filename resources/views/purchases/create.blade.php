@@ -116,7 +116,7 @@
                                                         <option value="">-- None (Raw Material / Supply) --</option>
                                                         @foreach($variants as $variant)
                                                             <option value="{{ $variant->id }}" data-name="{{ $variant->product->name ?? 'Product' }} (Size {{ $variant->size ?? '-' }})">
-                                                                📦 {{ $variant->product->name ?? 'Product' }} - Size {{ $variant->size ?? '-' }} (SKU: {{ $variant->sku }})
+                                                                {{ $variant->product->name ?? 'Product' }} - Size {{ $variant->size ?? '-' }} (SKU: {{ $variant->sku }})
                                                             </option>
                                                         @endforeach
                                                     </select>
@@ -155,8 +155,7 @@
                             </table>
                             <div class="p-3 bg-gray-50 border-t flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                                 <button type="button" @click="items.push({ item_name: '', unit: 'Pcs', product_variant_id: '', unit_cost: 0, quantity: 1, total: 0 })" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1">
-                                    <span>➕</span>
-                                    <span>Add Another Item Row</span>
+                                    <span>+ Add Another Item Row</span>
                                 </button>
                                 <div class="text-sm font-black text-gray-900 flex items-center space-x-2">
                                     <span class="text-xs uppercase text-gray-500 font-bold">Grand Total Cost:</span>

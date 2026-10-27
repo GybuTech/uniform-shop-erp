@@ -5,7 +5,7 @@
                 Tax & VAT Summary Statement (16% Standard VAT)
             </h2>
             <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm">
-                🖨️ Print Tax Statement
+                Print Tax Statement
             </button>
         </div>
     </x-slot>

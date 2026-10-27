@@ -49,16 +49,16 @@
             @if($isOwnerOrAdmin)
             <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('dashboard', ['branch' => 'all']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === 'all' && request()->routeIs('dashboard') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    🏢 All Branches (Consolidated)
+                    All Branches (Consolidated)
                 </a>
                 <a href="{{ route('dashboard', ['branch' => 'Main Shop']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === 'Main Shop' ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    📍 Main Shop UI
+                    Main Shop
                 </a>
                 <a href="{{ route('dashboard', ['branch' => 'Branch 2 (Sweaters)']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === 'Branch 2 (Sweaters)' ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    📍 Branch 2 (Sweaters)
+                    Branch 2 (Sweaters)
                 </a>
                 <a href="{{ route('dashboard', ['branch' => 'Branch 3']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === 'Branch 3' ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    📍 Branch 3
+                    Branch 3
                 </a>
             </div>
             @endif

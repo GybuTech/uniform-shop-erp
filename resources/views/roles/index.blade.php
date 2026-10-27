@@ -54,7 +54,7 @@
 
                     <div class="bg-gray-50 px-5 py-3 border-t flex justify-between items-center">
                         <a href="{{ route('roles.edit', $role) }}" class="text-xs font-extrabold text-indigo-600 hover:text-indigo-900 flex items-center">
-                            ⚙️ Edit Permission Checkboxes &rarr;
+                            Edit Permission Checkboxes &rarr;
                         </a>
                     </div>
                 </div>

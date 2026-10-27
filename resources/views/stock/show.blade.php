@@ -6,13 +6,13 @@
             </h2>
             <div class="flex items-center space-x-3">
                 <a href="{{ route('stock-entries.edit', $stockEntry) }}" class="bg-indigo-600 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs hover:bg-indigo-700 shadow-sm transition">
-                    ✏️ Edit & Recalculate
+                    Edit & Recalculate
                 </a>
                 <form method="POST" action="{{ route('stock-entries.destroy', $stockEntry) }}" onsubmit="return confirm('Deleting this stock entry will automatically revert all added inventory quantities. Continue?')">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="bg-red-600 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs hover:bg-red-700 shadow-sm transition">
-                        🗑️ Delete & Revert Stock
+                    <button type="submit" class="bg-rose-600 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs hover:bg-rose-700 shadow-sm transition">
+                        Delete & Revert Stock
                     </button>
                 </form>
                 <a href="{{ route('stock-entries.index') }}" class="text-sm font-semibold text-indigo-600 hover:underline">

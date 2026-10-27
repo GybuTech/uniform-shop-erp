@@ -1,53 +1,46 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
                 <h2 class="font-bold text-xl text-gray-800 leading-tight">
-                    Opening Stock Intake & Spreadsheet Import
+                    Opening Stock Intake
                 </h2>
-                <p class="text-xs text-gray-500 mt-1">
-                    Upload physical stocktake sheets or intake spreadsheets directly into Tshaprint Solutions inventory.
+                <p class="text-xs text-gray-500 mt-0.5">
+                    Upload your physical stocktake spreadsheet or download the prefilled template.
                 </p>
             </div>
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2">
                 <a href="{{ route('stock-entries.template') }}"
-                   class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                   class="inline-flex items-center px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Download CSV Template (Excel)
+                    Download Stock Template (.csv)
                 </a>
-                <a href="{{ route('stock-entries.index') }}" class="text-xs text-gray-500 hover:text-gray-700 font-semibold">
-                    &larr; Factory Receipts
+                <a href="{{ route('stock-entries.index') }}" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition">
+                    View Intake History
                 </a>
             </div>
         </div>
     </x-slot>
 
     <div class="py-6">
-        <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-4">
 
             {{-- Alerts --}}
             @if(session('success'))
-                <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-xl shadow-sm">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 text-emerald-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span class="text-sm font-semibold text-emerald-900">{{ session('success') }}</span>
-                    </div>
+                <div class="bg-emerald-50 border border-emerald-300 text-emerald-800 p-3.5 rounded-lg text-sm font-medium flex items-center">
+                    <svg class="w-5 h-5 text-emerald-600 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ session('success') }}</span>
                 </div>
             @endif
 
             @if(session('import_errors') && count(session('import_errors')) > 0)
-                <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm">
-                    <div class="flex items-center mb-2">
-                        <svg class="w-5 h-5 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <span class="text-sm font-bold text-amber-900">Skipped Rows / Notices ({{ count(session('import_errors')) }} items):</span>
-                    </div>
-                    <ul class="list-disc list-inside text-xs text-amber-800 space-y-1 max-h-40 overflow-y-auto">
+                <div class="bg-amber-50 border border-amber-300 text-amber-900 p-3.5 rounded-lg text-xs space-y-1">
+                    <div class="font-bold">Notices / Skipped Rows ({{ count(session('import_errors')) }} items):</div>
+                    <ul class="list-disc list-inside space-y-0.5 max-h-32 overflow-y-auto">
                         @foreach(session('import_errors') as $err)
                             <li>{{ $err }}</li>
                         @endforeach
@@ -56,9 +49,9 @@
             @endif
 
             @if($errors->any())
-                <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm">
-                    <span class="text-sm font-bold text-red-900">Please correct the following:</span>
-                    <ul class="list-disc list-inside text-xs text-red-700 mt-1">
+                <div class="bg-red-50 border border-red-300 text-red-800 p-3.5 rounded-lg text-xs">
+                    <span class="font-bold">Please check the following:</span>
+                    <ul class="list-disc list-inside mt-1">
                         @foreach($errors->all() as $err)
                             <li>{{ $err }}</li>
                         @endforeach
@@ -66,181 +59,137 @@
                 </div>
             @endif
 
-            {{-- Summary Stats --}}
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="bg-white p-4 rounded-xl border shadow-sm">
-                    <p class="text-xs uppercase font-bold text-gray-400">Total Catalog Variants</p>
-                    <p class="text-2xl font-black text-indigo-600 mt-1">{{ number_format($totalVariants ?? 0) }}</p>
-                    <p class="text-xs text-gray-500 mt-0.5">Active uniform SKUs in system</p>
+            {{-- Handover & Catalog Status Bar --}}
+            <div class="bg-white px-4 py-3 rounded-xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                <div class="flex items-center space-x-4 text-gray-600">
+                    <div>
+                        <span class="text-gray-400 uppercase font-semibold">Active Variants:</span>
+                        <span class="font-bold text-gray-900 ml-1">{{ number_format($totalVariants ?? 0) }}</span>
+                    </div>
+                    <div class="border-l pl-4">
+                        <span class="text-gray-400 uppercase font-semibold">Current Stock Count:</span>
+                        <span class="font-bold text-indigo-700 ml-1">{{ number_format($totalUnits ?? 0) }} pcs</span>
+                    </div>
                 </div>
-                <div class="bg-white p-4 rounded-xl border shadow-sm">
-                    <p class="text-xs uppercase font-bold text-gray-400">Total Stock On Hand</p>
-                    <p class="text-2xl font-black text-emerald-600 mt-1">{{ number_format($totalUnits ?? 0) }}</p>
-                    <p class="text-xs text-gray-500 mt-0.5">Physical items across stores</p>
-                </div>
-                <div class="bg-white p-4 rounded-xl border shadow-sm">
-                    <p class="text-xs uppercase font-bold text-gray-400">System Business Date</p>
-                    <p class="text-2xl font-black text-gray-800 mt-1">{{ \App\Services\SystemTime::now()->format('d M Y') }}</p>
-                    <p class="text-xs text-gray-500 mt-0.5">Timezone: Africa/Nairobi</p>
-                </div>
+
+                {{-- Admin Zero Stock Action for Clean Client Handover --}}
+                @php
+                    $isOwnerOrAdmin = in_array(strtolower(auth()->user()->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin', 'manager']);
+                @endphp
+                @if($isOwnerOrAdmin)
+                <form method="POST" action="{{ route('stock-entries.reset') }}"
+                      onsubmit="return confirm('WARNING: This will reset the stock quantity of all uniform variants to 0 so you can upload fresh opening stock for the client. All products, prices, and categories will remain intact. Continue?');">
+                    @csrf
+                    <button type="submit" class="text-rose-600 hover:text-rose-800 hover:underline font-semibold text-xs">
+                        Reset All Current Stock to 0
+                    </button>
+                </form>
+                @endif
             </div>
 
-            {{-- Upload & Instructions --}}
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {{-- Main Compact Import Card --}}
+            <div class="bg-white p-6 rounded-xl border shadow-sm space-y-5">
+                <form method="POST" action="{{ route('stock-entries.import.store') }}" enctype="multipart/form-data" class="space-y-4"
+                      x-data="{ showAdvanced: false }">
+                    @csrf
 
-                {{-- Left: Upload Form (7 cols) --}}
-                <div class="lg:col-span-7 bg-white p-6 rounded-xl border shadow-sm space-y-5">
-                    <div class="flex items-center space-x-2 pb-3 border-b">
-                        <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm">
-                            1
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-gray-800 text-base">Upload Spreadsheet</h3>
-                            <p class="text-xs text-gray-500">Attach Excel (.xlsx, .xls) or CSV document</p>
+                    {{-- File Picker --}}
+                    <div>
+                        <label for="stock_file" class="block text-xs font-bold text-gray-700 mb-1">
+                            Spreadsheet File (.csv, .xlsx, .xls) <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center hover:border-indigo-500 transition cursor-pointer bg-gray-50"
+                             onclick="document.getElementById('stock_file').click()">
+                            <svg class="mx-auto h-8 w-8 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                            <p class="text-xs font-semibold text-gray-800">Click to select file or drag and drop</p>
+                            <p id="file_name_display" class="text-xs text-indigo-600 font-bold mt-1">No file selected</p>
+                            <input type="file" id="stock_file" name="stock_file" class="hidden"
+                                   accept=".xlsx,.xls,.csv,.txt"
+                                   onchange="document.getElementById('file_name_display').textContent = this.files[0]?.name || 'No file selected'">
                         </div>
                     </div>
 
-                    <form method="POST" action="{{ route('stock-entries.import.store') }}" enctype="multipart/form-data" class="space-y-4"
-                          x-data="{ useCustomDate: false }">
-                        @csrf
-
-                        {{-- File Upload Box --}}
-                        <div>
-                            <label for="stock_file" class="block text-xs font-bold text-gray-700 mb-1">
-                                Stock File <span class="text-red-500">*</span>
+                    {{-- Intake Mode --}}
+                    <div class="bg-gray-50 p-3.5 rounded-lg border space-y-2">
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            Intake Behavior
+                        </label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <label class="flex items-start p-2.5 bg-white border rounded-lg cursor-pointer hover:border-indigo-400">
+                                <input type="radio" name="import_mode" value="replace" checked class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                                <div class="ml-2">
+                                    <span class="font-bold text-gray-900 block">Set as Opening Balance</span>
+                                    <span class="text-[11px] text-gray-500">Replaces current counts with spreadsheet quantities (Ideal for client onboarding).</span>
+                                </div>
                             </label>
-                            <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-indigo-400 transition cursor-pointer bg-gray-50"
-                                 onclick="document.getElementById('stock_file').click()">
-                                <svg class="mx-auto h-10 w-10 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                                </svg>
-                                <p class="text-xs font-bold text-gray-700">Click to choose spreadsheet file or drag & drop</p>
-                                <p class="text-[11px] text-gray-400 mt-1">Supports: .csv, .xlsx, .xls (Up to 5MB)</p>
-                                <input type="file" id="stock_file" name="stock_file" class="hidden"
-                                       accept=".xlsx,.xls,.csv,.txt"
-                                       onchange="document.getElementById('file_name_display').textContent = this.files[0]?.name || 'No file selected'">
-                            </div>
-                            <p id="file_name_display" class="text-xs text-indigo-600 mt-1 text-center font-bold">No file selected</p>
+                            <label class="flex items-start p-2.5 bg-white border rounded-lg cursor-pointer hover:border-indigo-400">
+                                <input type="radio" name="import_mode" value="add" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                                <div class="ml-2">
+                                    <span class="font-bold text-gray-900 block">Add to Current Stock</span>
+                                    <span class="text-[11px] text-gray-500">Adds spreadsheet quantities on top of existing stock (For incoming batches).</span>
+                                </div>
+                            </label>
                         </div>
+                    </div>
 
-                        {{-- Target Store / Branch --}}
+                    {{-- Branch Selection --}}
+                    <div>
+                        <x-input-label for="branch_name" value="Target Store / Branch" />
+                        <select name="branch_name" id="branch_name" class="w-full mt-1 border-gray-300 rounded-md shadow-sm text-xs">
+                            @foreach($branches ?? ['Main Branch'] as $b)
+                                <option value="{{ $b }}">{{ $b }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Toggle Advanced Options --}}
+                    <div>
+                        <button type="button" @click="showAdvanced = !showAdvanced" class="text-xs text-gray-500 hover:text-gray-800 font-medium">
+                            <span x-text="showAdvanced ? '− Hide Reference & Historical Date' : '+ Specify Reference Notes or Historical Date'"></span>
+                        </button>
+                    </div>
+
+                    <div x-show="showAdvanced" x-cloak class="space-y-3 pt-2 border-t">
                         <div>
-                            <x-input-label for="branch_name" value="Target Store / Branch" />
-                            <select name="branch_name" id="branch_name" class="w-full mt-1 border-gray-300 rounded-md shadow-sm text-xs">
-                                @foreach($branches ?? ['Main Branch'] as $b)
-                                    <option value="{{ $b }}">{{ $b }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        {{-- Record Date Checkbox --}}
-                        <div class="bg-gray-50 p-3 rounded-lg border">
-                            <div class="flex items-center">
-                                <input type="checkbox" id="date_checkbox" x-model="useCustomDate"
-                                       class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
-                                <label for="date_checkbox" class="ml-2 text-xs font-bold text-gray-700 cursor-pointer">
-                                    Specify Custom / Historical Date for Records Purposes
-                                </label>
-                            </div>
-
-                            <div x-show="useCustomDate" x-cloak class="mt-2.5">
-                                <x-input-label for="intake_date" value="Historical Intake Date" />
-                                <input type="date" name="intake_date" id="intake_date"
-                                       value="{{ $today ?? date('Y-m-d') }}" max="{{ $today ?? date('Y-m-d') }}"
-                                       class="w-full mt-1 border-gray-300 rounded-md shadow-sm text-xs">
-                                <p class="text-[11px] text-gray-400 mt-0.5">Use this when recording opening balances from a previous date.</p>
-                            </div>
-                        </div>
-
-                        {{-- Reference Notes --}}
-                        <div>
-                            <x-input-label for="notes" value="Reference / Batch Notes" />
-                            <input type="text" name="notes" id="notes"
-                                   placeholder="e.g. Term 1 Opening Stock Audit / Factory Delivery Note 104"
+                            <x-input-label for="intake_date" value="Historical Intake Date (Optional)" />
+                            <input type="date" name="intake_date" id="intake_date"
+                                   value="{{ $today ?? date('Y-m-d') }}" max="{{ $today ?? date('Y-m-d') }}"
                                    class="w-full mt-1 border-gray-300 rounded-md shadow-sm text-xs">
                         </div>
 
-                        {{-- Submit Button --}}
-                        <div class="pt-2">
-                            <button type="submit"
-                                    class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-sm transition flex items-center justify-center">
-                                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                </svg>
-                                Process Opening Stock Intake
-                            </button>
+                        <div>
+                            <x-input-label for="notes" value="Batch Reference Notes (Optional)" />
+                            <input type="text" name="notes" id="notes"
+                                   placeholder="e.g. Physical Stocktake 2026 / Client Handover Intake"
+                                   class="w-full mt-1 border-gray-300 rounded-md shadow-sm text-xs">
                         </div>
-                    </form>
-                </div>
+                    </div>
 
-                {{-- Right: Template Guide (5 cols) --}}
-                <div class="lg:col-span-5 space-y-4">
-                    <div class="bg-white p-5 rounded-xl border shadow-sm space-y-3">
-                        <div class="flex items-center space-x-2 pb-2 border-b">
-                            <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm">
-                                2
-                            </div>
-                            <div>
-                                <h3 class="font-bold text-gray-800 text-sm">Download Pre-filled Template</h3>
-                                <p class="text-xs text-gray-500">Excel-ready with active uniform SKUs</p>
-                            </div>
-                        </div>
-
-                        <p class="text-xs text-gray-600">
-                            Download the template to see all current uniform SKUs. Enter the physical quantity counted for each item and re-upload here.
-                        </p>
-
-                        <a href="{{ route('stock-entries.template') }}"
-                           class="w-full inline-flex items-center justify-center py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-lg transition">
-                            <svg class="w-4 h-4 mr-1.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    {{-- Submit Button --}}
+                    <div class="pt-2">
+                        <button type="submit"
+                                class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-sm transition flex items-center justify-center">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                             </svg>
-                            Download Sample CSV Template
-                        </a>
+                            Process Stock Intake
+                        </button>
                     </div>
+                </form>
+            </div>
 
-                    {{-- Sample Format Preview --}}
-                    <div class="bg-white p-5 rounded-xl border shadow-sm">
-                        <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider mb-2">Column Headers Format</h4>
-                        <div class="overflow-x-auto border rounded-lg">
-                            <table class="min-w-full text-[11px] font-mono">
-                                <thead class="bg-gray-100 text-gray-700">
-                                    <tr>
-                                        <th class="px-2 py-1.5 text-left">sku</th>
-                                        <th class="px-2 py-1.5 text-left">product_name</th>
-                                        <th class="px-2 py-1.5 text-left">size</th>
-                                        <th class="px-2 py-1.5 text-left">quantity</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100">
-                                    <tr>
-                                        <td class="px-2 py-1 font-bold text-indigo-600">ACC-SW-22</td>
-                                        <td class="px-2 py-1 text-gray-600">Accurate Sweater</td>
-                                        <td class="px-2 py-1 text-gray-600">22</td>
-                                        <td class="px-2 py-1 font-bold text-emerald-600">15</td>
-                                    </tr>
-                                    <tr class="bg-gray-50">
-                                        <td class="px-2 py-1 font-bold text-indigo-600">ACC-SW-24</td>
-                                        <td class="px-2 py-1 text-gray-600">Accurate Sweater</td>
-                                        <td class="px-2 py-1 text-gray-600">24</td>
-                                        <td class="px-2 py-1 font-bold text-emerald-600">10</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-2 py-1 font-bold text-indigo-600">GRS-22</td>
-                                        <td class="px-2 py-1 text-gray-600">Grey/Red Sweater</td>
-                                        <td class="px-2 py-1 text-gray-600">22</td>
-                                        <td class="px-2 py-1 font-bold text-emerald-600">8</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <p class="text-[10px] text-gray-400 mt-2">
-                            💡 The importer automatically matches items by SKU, or by Product Name + Size if the SKU is left blank.
-                        </p>
-                    </div>
+            {{-- Compact Column Reference --}}
+            <div class="bg-gray-50 p-4 rounded-xl border text-xs text-gray-600 space-y-1.5">
+                <div class="font-bold text-gray-800">Spreadsheet Columns:</div>
+                <div class="font-mono text-[11px] bg-white p-2 border rounded text-gray-700 overflow-x-auto">
+                    sku, product_name, size, quantity, selling_price
                 </div>
-
+                <p class="text-[11px] text-gray-500">
+                    The importer matches items by <strong>SKU</strong>, or by <strong>Product Name + Size</strong> if the SKU is left empty. Use the template download above for a pre-filled list of all catalog items.
+                </p>
             </div>
 
         </div>

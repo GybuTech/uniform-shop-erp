@@ -9,13 +9,13 @@
                     &larr; Back to Purchases
                 </a>
                 <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm">
-                    🖨️ Print Invoice
+                    Print Invoice
                 </button>
                 <form method="POST" action="{{ route('purchases.destroy', $purchase) }}" onsubmit="return confirm('Deleting this purchase will revert any inventory quantities that were added upon receipt. Continue?');" class="inline">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-sm" style="background-color: #dc2626 !important; color: #ffffff !important;">
-                        🗑️ Delete Order
+                        Delete Order
                     </button>
                 </form>
             </div>
@@ -76,12 +76,12 @@
                                     </td>
                                     <td class="px-4 py-3 font-mono text-xs text-gray-500">
                                         @if($item->productVariant)
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                                📦 {{ $item->productVariant->sku }}
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">
+                                                Catalog SKU: {{ $item->productVariant->sku }}
                                             </span>
                                         @else
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                                                🧵 Raw Material / Supply
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700">
+                                                Raw Material / Supply
                                             </span>
                                         @endif
                                     </td>

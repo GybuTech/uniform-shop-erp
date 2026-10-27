@@ -38,8 +38,8 @@
                         <div>
                             <x-input-label for="status" value="Transfer Dispatch Status *" />
                             <select name="status" id="status" class="w-full mt-1 border-gray-300 rounded-md shadow-sm text-sm" required>
-                                <option value="Pending" selected>🟡 Pending (In Transit — Requires Recipient Confirmation)</option>
-                                <option value="Received">🟢 Received (Immediate Delivery — Update Destination Stock Now)</option>
+                                <option value="Pending" selected>Pending (In Transit — Requires Recipient Confirmation)</option>
+                                <option value="Received">Received (Immediate Delivery — Update Destination Stock Now)</option>
                             </select>
                             <p class="text-xs text-gray-400 mt-1">
                                 Selecting <strong>Pending</strong> logs items in transit; recipient confirms receipt on delivery.
@@ -125,7 +125,7 @@
                     <div class="flex justify-end space-x-3">
                         <a href="{{ route('transfers.index') }}" class="px-4 py-2 border rounded-md text-gray-600 hover:bg-gray-50 text-sm">Cancel</a>
                         <button type="submit" class="px-5 py-2 bg-indigo-600 text-white font-bold rounded-md hover:bg-indigo-700 text-sm">
-                            📦 Dispatch Transfer (Status: Pending)
+                            Dispatch Transfer
                         </button>
                     </div>
                 </form>

@@ -59,9 +59,9 @@
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Target Uniform Scope</label>
                                 <select name="target_type" class="w-full rounded-lg border-slate-300 text-sm font-bold text-indigo-950 focus:border-indigo-500 focus:ring focus:ring-indigo-200">
-                                    <option value="sweater_with_badge" selected>⭐ Sweaters with Badge (All products matching "badge")</option>
-                                    <option value="sweater_plain">🧥 Plain Sweaters (Without Badge)</option>
-                                    <option value="all">🌐 All Uniform Categories by Size</option>
+                                    <option value="sweater_with_badge" selected>Sweaters with Badge (All products matching "badge")</option>
+                                    <option value="sweater_plain">Plain Sweaters (Without Badge)</option>
+                                    <option value="all">All Uniform Categories by Size</option>
                                     <optgroup label="Or By Specific Category">
                                         @foreach($categories as $category)
                                             <option value="category_{{ $category->id }}">
@@ -118,8 +118,8 @@
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Select Target Scope to Price</label>
                                 <select name="target_type" class="w-full rounded-lg border-slate-300 text-sm font-semibold focus:border-emerald-500 focus:ring focus:ring-emerald-200" required>
-                                    <option value="sweater_with_badge" selected>⭐ Sweaters with Badge (Full Size Matrix)</option>
-                                    <option value="sweater_plain">🧥 Plain Sweaters (Without Badge)</option>
+                                    <option value="sweater_with_badge" selected>Sweaters with Badge (Full Size Matrix)</option>
+                                    <option value="sweater_plain">Plain Sweaters (Without Badge)</option>
                                     <optgroup label="Or By Category">
                                         @foreach($categories as $category)
                                             <option value="cat_{{ $category->id }}">
@@ -202,15 +202,15 @@
                         </a>
                         <a href="{{ route('products.prices', ['filter_type' => 'sweater_badge']) }}"
                            class="px-3 py-1 rounded-full text-xs font-bold transition {{ $filterType === 'sweater_badge' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200' }}">
-                            ⭐ Sweaters with Badge
+                            Sweaters with Badge
                         </a>
                         <a href="{{ route('products.prices', ['filter_type' => 'sweater_plain']) }}"
                            class="px-3 py-1 rounded-full text-xs font-bold transition {{ $filterType === 'sweater_plain' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200' }}">
-                            🧥 Plain Sweaters
+                            Plain Sweaters
                         </a>
                         <a href="{{ route('products.prices', ['filter_type' => 'tracksuits']) }}"
                            class="px-3 py-1 rounded-full text-xs font-bold transition {{ $filterType === 'tracksuits' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200' }}">
-                            🏃 Tracksuits
+                            Tracksuits
                         </a>
                     </div>
                 </div>

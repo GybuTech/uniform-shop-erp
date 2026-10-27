@@ -8,7 +8,7 @@
             <div class="space-x-2">
                 <a href="{{ route('products.variants.bulk-create', $product) }}"
                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-bold shadow-sm transition">
-                    ⚡ Bulk Matrix Creator
+                    Bulk Matrix Creator
                 </a>
                 <a href="{{ route('products.variants.create', $product) }}"
                    class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm font-semibold">
@@ -43,13 +43,13 @@
                 </div>
             @endif
 
-            <!-- 💰 Size-Tier Price Batch Manager (Owner & System Administrator Tool) -->
+            <!-- Size-Tier Price Batch Manager (Owner & System Administrator Tool) -->
             @can('edit-product-variants')
             <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 space-y-3" x-data="{ openBatch: false }">
                 <div class="flex justify-between items-center cursor-pointer" @click="openBatch = !openBatch">
                     <div>
-                        <h3 class="font-bold text-gray-900 text-base flex items-center">
-                            <span class="mr-2">💰</span> Size-Tier Price Batch Manager
+                        <h3 class="font-bold text-gray-900 text-base">
+                            Size-Tier Price Batch Manager
                         </h3>
                         <p class="text-xs text-gray-500">Easily change selling prices for specific sizes (e.g. Set Sizes 22-28 @ KES 1,200 | Sizes 30-38 @ KES 1,400)</p>
                     </div>

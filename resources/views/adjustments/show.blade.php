@@ -14,7 +14,7 @@
                     &larr; Back to Adjustments
                 </a>
                 <button type="button" onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition shadow-sm" style="background-color: #4f46e5 !important; color: #ffffff !important;">
-                    🖨️ Print Audit Sheet
+                    Print Audit Sheet
                 </button>
             </div>
         </div>

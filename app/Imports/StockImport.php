@@ -16,18 +16,20 @@ class StockImport implements ToCollection, WithHeadingRow
     public array $errors   = [];
     private ?int $userId;
     private ?string $customNotes;
+    private string $mode;
 
-    public function __construct(?int $userId = null, ?string $customNotes = null)
+    public function __construct(?int $userId = null, ?string $customNotes = null, string $mode = 'replace')
     {
         $this->userId      = $userId;
         $this->customNotes = $customNotes;
+        $this->mode        = in_array($mode, ['replace', 'add']) ? $mode : 'replace';
     }
 
     /**
      * Process the collection of rows.
-     * Expected columns: sku, quantity (or product_name, size, quantity)
+     * Expected columns: sku, quantity (or product_name, size, quantity, selling_price)
      */
-    public function collection(Collection $rows)
+    public function collection(Collection $rows): void
     {
         $now   = SystemTime::now();
         $notes = $this->customNotes ?: ('Spreadsheet Opening Stock Intake on ' . $now->format('d M Y H:i'));
@@ -45,9 +47,9 @@ class StockImport implements ToCollection, WithHeadingRow
             $size     = trim($row['size'] ?? '');
             $quantity = (int) ($row['quantity'] ?? $row['qty'] ?? $row['stock'] ?? 0);
 
-            if ($quantity <= 0) {
+            if ($quantity < 0) {
                 $this->skipped++;
-                $this->errors[] = "Row #{$rowNum}: Skipped — Quantity is 0 or invalid.";
+                $this->errors[] = "Row #{$rowNum}: Skipped — Quantity cannot be negative.";
                 continue;
             }
 
@@ -76,7 +78,21 @@ class StockImport implements ToCollection, WithHeadingRow
                 'quantity'           => $quantity,
             ]);
 
-            $variant->increment('stock_quantity', $quantity);
+            // Update stock according to selected mode
+            if ($this->mode === 'replace') {
+                $variant->update(['stock_quantity' => $quantity]);
+            } else {
+                $variant->increment('stock_quantity', $quantity);
+            }
+
+            // Optional selling price sync from spreadsheet
+            $sellingPrice = isset($row['selling_price']) && is_numeric($row['selling_price']) && (float)$row['selling_price'] > 0
+                ? (float)$row['selling_price']
+                : null;
+            if ($sellingPrice !== null) {
+                $variant->update(['selling_price' => $sellingPrice]);
+            }
+
             $this->imported++;
         }
     }

@@ -215,10 +215,15 @@ class ProductVariantController extends Controller
 
     public function destroy(Product $product, ProductVariant $variant)
     {
-        $variant->delete();
+        try {
+            $variant->delete();
 
-        return redirect()->route('products.variants.index', $product)
-            ->with('success', 'Variant deleted successfully.');
+            return redirect()->route('products.variants.index', $product)
+                ->with('success', 'Variant deleted successfully.');
+        } catch (\Throwable $e) {
+            return redirect()->route('products.variants.index', $product)
+                ->with('error', 'Unable to delete variant: ' . $e->getMessage());
+        }
     }
 
     public function priceManager(Request $request)

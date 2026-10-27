@@ -32,8 +32,8 @@
                         @foreach($groupedPermissions as $groupName => $permissionList)
                         <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                             <div class="flex justify-between items-center mb-3 pb-2 border-b">
-                                <h4 class="font-extrabold text-sm text-gray-800 flex items-center">
-                                    <span class="mr-2">📁</span> {{ $groupName }}
+                                <h4 class="font-extrabold text-sm text-gray-800">
+                                    {{ $groupName }}
                                 </h4>
                                 <label class="text-xs font-semibold text-indigo-600 cursor-pointer hover:underline select-none">
                                     <input type="checkbox" onchange="toggleGroup(this, 'group-{{ Str::slug($groupName) }}')" class="rounded border-gray-300 text-indigo-600">
@@ -58,7 +58,7 @@
                     <div class="flex justify-between items-center pt-4 border-t">
                         <a href="{{ route('roles.index') }}" class="text-xs font-bold text-gray-500 hover:underline">Cancel</a>
                         <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg text-sm font-extrabold shadow-sm transition">
-                            💾 Save Permission Settings
+                            Save Permission Settings
                         </button>
                     </div>
                 </form>

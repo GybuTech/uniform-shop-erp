@@ -50,48 +50,60 @@ class StockEntryController extends Controller
             // Column Header
             fputcsv($out, ['sku', 'product_name', 'size', 'quantity', 'selling_price']);
 
-            // Prefill with real sample variants from DB
-            $samples = ProductVariant::with('product')->limit(15)->get();
-            if ($samples->isNotEmpty()) {
-                foreach ($samples as $s) {
+            // Export all variants so user gets a complete sheet to enter counts
+            $variants = ProductVariant::with('product')->orderBy('sku')->get();
+            if ($variants->isNotEmpty()) {
+                foreach ($variants as $s) {
                     fputcsv($out, [
                         $s->sku,
                         $s->product?->name ?? 'Uniform Item',
                         $s->size,
-                        10,
+                        $s->stock_quantity ?? 0,
                         $s->selling_price,
                     ]);
                 }
             } else {
-                fputcsv($out, ['ACC-SW-22', 'Accurate Sweater', '22', 15, 500.00]);
-                fputcsv($out, ['ACC-SW-24', 'Accurate Sweater', '24', 12, 500.00]);
+                fputcsv($out, ['ACC-SW-22', 'Accurate Sweater', '22', 0, 500.00]);
+                fputcsv($out, ['ACC-SW-24', 'Accurate Sweater', '24', 0, 500.00]);
             }
 
             fclose($out);
         }, 200, $headers);
     }
 
+    public function resetAllStock()
+    {
+        ProductVariant::query()->update(['stock_quantity' => 0]);
+
+        return redirect()->route('stock-entries.import')
+            ->with('success', 'All inventory counts have been successfully reset to 0. You can now upload your fresh opening stock sheet.');
+    }
+
     public function import(Request $request)
     {
         $request->validate([
             'stock_file'   => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:5120'],
+            'import_mode'  => ['nullable', 'in:replace,add'],
             'intake_date'  => ['nullable', 'date'],
             'branch_name'  => ['nullable', 'string'],
             'notes'        => ['nullable', 'string', 'max:255'],
         ]);
 
-        $customNotes = $request->input('notes', 'Spreadsheet Stock Intake');
+        $mode        = $request->input('import_mode', 'replace');
+        $customNotes = $request->input('notes', 'Spreadsheet Opening Stock Intake');
         if ($request->filled('branch_name')) {
             $customNotes .= " | Branch: " . $request->input('branch_name');
         }
         if ($request->filled('intake_date')) {
             $customNotes .= " | Date: " . $request->input('intake_date');
         }
+        $customNotes .= " | Mode: " . ($mode === 'replace' ? 'Set Opening Balance' : 'Add to Stock');
 
-        $importer = new StockImport(auth()->id(), $customNotes);
+        $importer = new StockImport(auth()->id(), $customNotes, $mode);
         Excel::import($importer, $request->file('stock_file'));
 
-        $message = "Opening Stock Intake complete: {$importer->imported} items updated successfully.";
+        $actionWord = $mode === 'replace' ? 'set as opening balance' : 'added to stock';
+        $message = "Opening Stock Intake complete: {$importer->imported} uniform items {$actionWord} successfully.";
         if ($importer->skipped > 0) {
             $message .= " ({$importer->skipped} rows were skipped).";
         }

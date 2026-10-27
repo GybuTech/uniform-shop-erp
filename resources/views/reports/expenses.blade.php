@@ -9,7 +9,7 @@
                     + Log Expense
                 </a>
                 <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm">
-                    🖨️ Print Report
+                    Print Report
                 </button>
             </div>
         </div>

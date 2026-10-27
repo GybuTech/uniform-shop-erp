@@ -129,6 +129,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/stock-entries/import', [StockEntryController::class, 'importForm'])->name('stock-entries.import')->middleware('permission:create-stock-entries');
     Route::get('/stock-entries/template', [StockEntryController::class, 'downloadTemplate'])->name('stock-entries.template')->middleware('permission:create-stock-entries');
     Route::post('/stock-entries/import', [StockEntryController::class, 'import'])->name('stock-entries.import.store')->middleware('permission:create-stock-entries');
+    Route::post('/stock-entries/reset-all', [StockEntryController::class, 'resetAllStock'])->name('stock-entries.reset')->middleware('permission:create-stock-entries');
     Route::get('/stock-entries/create', [StockEntryController::class, 'create'])->name('stock-entries.create')->middleware('permission:create-stock-entries');
     Route::post('/stock-entries', [StockEntryController::class, 'store'])->name('stock-entries.store')->middleware('permission:create-stock-entries');
     Route::get('/stock-entries/{stock_entry}', [StockEntryController::class, 'show'])->name('stock-entries.show')->middleware('permission:view-stock-entries');

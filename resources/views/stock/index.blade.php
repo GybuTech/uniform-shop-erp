@@ -6,7 +6,7 @@
             <div class="flex space-x-2">
                 <a href="{{ route('stock-entries.import') }}"
                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition">
-                    📥 Import from Excel / CSV
+                    Import Spreadsheet
                 </a>
                 <a href="{{ route('stock-entries.create') }}"
                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition">
@@ -28,7 +28,7 @@
 
             @if(session('import_errors') && count(session('import_errors')) > 0)
                 <div class="mb-4 bg-amber-50 border border-amber-300 text-amber-800 px-4 py-3 rounded text-sm">
-                    <strong>⚠️ Skipped rows during import:</strong>
+                    <strong>Skipped rows during import:</strong>
                     <ul class="list-disc list-inside mt-1 space-y-0.5">
                         @foreach(session('import_errors') as $err)
                             <li>{{ $err }}</li>
