@@ -1,16 +1,15 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Stock Entries (Finished Goods Intake)</h2>
+            <div>
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">Factory Stock Receipts (Workshop Delivery Intake)</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Physical intake logs from your internal tailoring workshop or manufacturing floor.</p>
+            </div>
             @can('create-stock-entries')
-            <div class="flex space-x-2">
-                <a href="{{ route('stock-entries.import') }}"
-                   class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition">
-                    Import Spreadsheet
-                </a>
+            <div>
                 <a href="{{ route('stock-entries.create') }}"
                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition">
-                    + Record Stock Intake
+                    + Record Factory Delivery Receipt
                 </a>
             </div>
             @endcan
@@ -54,7 +53,14 @@
                         @forelse($stockEntries as $entry)
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 text-sm text-gray-900">{{ $loop->iteration }}</td>
-                            <td class="px-6 py-4 text-sm font-mono font-bold text-indigo-600">{{ $entry->reference_no ?? '—' }}</td>
+                            <td class="px-6 py-4 text-sm font-mono font-bold text-indigo-600">
+                                <div>{{ $entry->reference_no ?? '—' }}</div>
+                                @if(str_starts_with($entry->reference_no ?? '', 'IMPORT-'))
+                                    <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Opening Stock Import</span>
+                                @else
+                                    <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700">Workshop Delivery</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $entry->items->count() }} item type(s)</td>
                             <td class="px-6 py-4 text-sm text-gray-600">{{ $entry->user->name ?? 'System' }}</td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $entry->created_at->format('M d, Y H:i') }}</td>

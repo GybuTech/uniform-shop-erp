@@ -37,7 +37,6 @@ class PosController extends Controller
         $query = $request->get('q');
 
         $variants = ProductVariant::with('product')
-            ->where('stock_quantity', '>', 0)
             ->where(function($q) use ($query) {
                 $q->whereHas('product', function($p) use ($query) {
                     $p->where('name', 'like', "%{$query}%");

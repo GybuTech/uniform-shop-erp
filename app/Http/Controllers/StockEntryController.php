@@ -108,7 +108,7 @@ class StockEntryController extends Controller
             $message .= " ({$importer->skipped} rows were skipped).";
         }
 
-        return redirect()->route('stock-entries.index')
+        return redirect()->route('stock-entries.import')
             ->with('success', $message)
             ->with('import_errors', $importer->errors);
     }
@@ -180,10 +180,13 @@ class StockEntryController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $stockEntry) {
-            // 1. Revert previous stock additions
+            // 1. Revert previous stock additions safely
             foreach ($stockEntry->items as $oldItem) {
-                ProductVariant::find($oldItem->product_variant_id)
-                    ->decrement('stock_quantity', $oldItem->quantity);
+                $variant = ProductVariant::find($oldItem->product_variant_id);
+                if ($variant) {
+                    $newStock = max(0, (int)$variant->stock_quantity - (int)$oldItem->quantity);
+                    $variant->update(['stock_quantity' => $newStock]);
+                }
             }
 
             // 2. Clear old items
@@ -214,10 +217,13 @@ class StockEntryController extends Controller
     public function destroy(StockEntry $stockEntry)
     {
         DB::transaction(function () use ($stockEntry) {
-            // Revert stock additions
+            // Revert stock additions safely
             foreach ($stockEntry->items as $item) {
-                ProductVariant::find($item->product_variant_id)
-                    ->decrement('stock_quantity', $item->quantity);
+                $variant = ProductVariant::find($item->product_variant_id);
+                if ($variant) {
+                    $newStock = max(0, (int)$variant->stock_quantity - (int)$item->quantity);
+                    $variant->update(['stock_quantity' => $newStock]);
+                }
             }
 
             $stockEntry->items()->delete();

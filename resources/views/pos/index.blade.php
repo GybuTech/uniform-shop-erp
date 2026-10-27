@@ -161,7 +161,7 @@
             const container = document.getElementById('searchResults');
 
             if (variants.length === 0) {
-                container.innerHTML = '<p class="text-gray-400 text-sm text-center py-12">No available in-stock uniform items found.</p>';
+                container.innerHTML = '<p class="text-gray-400 text-sm text-center py-12">No matching uniform items found.</p>';
                 return;
             }
 
@@ -173,17 +173,27 @@
                 const safeName = (v.product_name || '').replace(/'/g, "\\'");
                 const safeColour = (v.colour || '').replace(/'/g, "\\'");
 
+                const stockBadge = v.stock_quantity <= 0
+                    ? `<span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200">Out of Stock (0 pcs)</span>`
+                    : (v.stock_quantity <= 5
+                        ? `<span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Low Stock: ${v.stock_quantity} pcs</span>`
+                        : `<span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700">In Stock: ${v.stock_quantity} pcs</span>`);
+
+                const actionButton = v.stock_quantity <= 0
+                    ? `<span class="inline-block mt-1 text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded font-semibold border">0 Stock</span>`
+                    : `<span class="inline-block mt-1 text-xs bg-indigo-600 text-white px-2.5 py-1 rounded font-bold hover:bg-indigo-700">+ Add</span>`;
+
                 return `
                 <div class="flex items-center justify-between p-3 border rounded-lg hover:bg-indigo-50 transition cursor-pointer"
                      onclick="addToCart(${v.id}, '${safeName}', '${v.size}', '${safeColour}', ${v.selling_price}, ${v.stock_quantity})">
                     <div>
                         <p class="font-bold text-gray-900 text-sm">${v.product_name}</p>
-                        <p class="text-xs text-gray-500 font-mono"><span class="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-semibold">${v.sku}</span> &bull; Size: <strong class="text-gray-800">${v.size}</strong>${colourTag}</p>
-                        <p class="text-xs font-bold ${v.stock_quantity <= 5 ? 'text-red-600' : 'text-emerald-600'}">In Stock: ${v.stock_quantity} units</p>
+                        <p class="text-xs text-gray-500 font-mono mb-1"><span class="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-semibold">${v.sku}</span> &bull; Size: <strong class="text-gray-800">${v.size}</strong>${colourTag}</p>
+                        ${stockBadge}
                     </div>
                     <div class="text-right">
                         <p class="font-extrabold text-indigo-600 text-base">KES ${parseFloat(v.selling_price).toFixed(2)}</p>
-                        <span class="inline-block mt-1 text-xs bg-indigo-600 text-white px-2.5 py-1 rounded font-bold hover:bg-indigo-700">+ Add</span>
+                        ${actionButton}
                     </div>
                 </div>
             `;
@@ -200,7 +210,7 @@
                 existing.qty++;
             } else {
                 if (stock < 1) {
-                    alert(`Item is out of stock.`);
+                    alert(`Notice: ${name} (Size ${size}) is currently out of stock (0 units on hand). Please intake stock before completing sales.`);
                     return;
                 }
                 cart.push({ id, name, size, colour, price, stock, qty: 1 });

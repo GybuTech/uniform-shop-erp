@@ -118,9 +118,6 @@
                 @can('view-products')
                 <a href="{{ route('products.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('products.index') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">List Products</a>
                 @endcan
-                @can('create-products')
-                <a href="{{ route('products.create') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('products.create') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">Add Product</a>
-                @endcan
                 @can('view-categories')
                 <a href="{{ route('categories.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('categories.*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">Categories</a>
                 @endcan
