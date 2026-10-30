@@ -108,9 +108,6 @@
                         <span class="text-gray-500">
                             Showing {{ $variants->firstItem() ?? 0 }}-{{ $variants->lastItem() ?? 0 }} of {{ $variants->total() }} items
                         </span>
-                        <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-sm transition">
-                            Save All Changes
-                        </button>
                     </div>
                 </div>
 

@@ -78,80 +78,65 @@ class ProductVariantController extends Controller
 
     public function bulkCreate(Product $product)
     {
-        // Sizes from 22 up to 38 (even numbers) for primary & secondary school uniforms
-        $defaultSizes = ['22', '24', '26', '28', '30', '32', '34', '36', '38'];
+        // Standard primary, junior & secondary school uniform sizes
+        $standardSizes = ['18', '20', '22', '24', '26', '28', '30', '32', '34', '36', '38', '40', '42', '44', 'S', 'M', 'L', 'XL', 'XXL'];
 
-        // Preset T-Sharprint Solutions uniform colours & stripes
-        $presetColours = [
-            'Navy Blue Plain',
-            'Navy Strip White',
-            'Navy Strip Sky Blue',
-            'Navy Strip Red',
-            'Red Plain',
-            'Red Strip White',
-            'Red Strip Navy',
-            'Maroon Plain',
-            'Maroon Strip White',
-            'Brown Plain',
-            'Green Plain',
-        ];
-
-        return view('variants.bulk_create', compact('product', 'defaultSizes', 'presetColours'));
+        return view('variants.bulk_create', compact('product', 'standardSizes'));
     }
 
     public function bulkStore(Request $request, Product $product)
     {
         $validated = $request->validate([
-            'sizes'                   => ['required', 'array', 'min:1'],
-            'selected_preset_colours' => ['nullable', 'array'],
-            'custom_colours'          => ['nullable', 'string'],
-            'selling_price'           => ['required', 'numeric', 'min:0'],
+            'sizes'          => ['nullable', 'array'],
+            'custom_sizes'   => ['nullable', 'string'],
+            'colour'         => ['nullable', 'string', 'max:100'],
+            'selling_price'  => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $presetColours = $validated['selected_preset_colours'] ?? [];
-        $customColoursText = $validated['custom_colours'] ?? '';
+        $selectedSizes = $validated['sizes'] ?? [];
+        $customSizesText = $validated['custom_sizes'] ?? '';
 
-        $rawCustomColours = array_map('trim', explode(',', str_replace(["\r\n", "\n", "\r"], ',', $customColoursText)));
-        $allColours = array_filter(array_unique(array_merge($presetColours, $rawCustomColours)));
+        $customSizes = array_map('trim', explode(',', str_replace(["\r\n", "\n", "\r"], ',', $customSizesText)));
+        $allSizes = array_values(array_filter(array_unique(array_merge($selectedSizes, $customSizes))));
 
-        if (empty($allColours)) {
-            return back()->withErrors(['custom_colours' => 'Please select at least one preset colour or enter a custom colour.'])->withInput();
+        if (empty($allSizes)) {
+            return back()->withErrors(['sizes' => 'Please select or enter at least one size for the product.'])->withInput();
         }
+
+        $colour = trim($validated['colour'] ?? '') ?: 'Standard';
+        $sellingPrice = isset($validated['selling_price']) && is_numeric($validated['selling_price'])
+            ? (float) $validated['selling_price']
+            : 0.00;
 
         $createdCount = 0;
         $skippedCount = 0;
 
-        DB::transaction(function () use ($product, $validated, $allColours, &$createdCount, &$skippedCount) {
-            foreach ($validated['sizes'] as $size) {
-                foreach ($allColours as $colour) {
-                    $cleanSize   = trim($size);
-                    $cleanColour = trim($colour);
+        DB::transaction(function () use ($product, $allSizes, $colour, $sellingPrice, &$createdCount, &$skippedCount) {
+            foreach ($allSizes as $cleanSize) {
+                $sku     = $this->generateVariantSku($product, $cleanSize, $colour);
+                $barcode = 'BC-' . $sku;
 
-                    $sku     = $this->generateVariantSku($product, $cleanSize, $cleanColour);
-                    $barcode = 'BC-' . $sku;
-
-                    if (ProductVariant::where('product_id', $product->id)->where('size', $cleanSize)->where('colour', $cleanColour)->exists()) {
-                        $skippedCount++;
-                        continue;
-                    }
-
-                    $product->variants()->create([
-                        'sku'            => $sku,
-                        'barcode'        => $barcode,
-                        'size'           => $cleanSize,
-                        'colour'         => $cleanColour,
-                        'selling_price'  => $validated['selling_price'],
-                        'stock_quantity' => 0,
-                    ]);
-
-                    $createdCount++;
+                if (ProductVariant::where('product_id', $product->id)->where('size', $cleanSize)->where('colour', $colour)->exists()) {
+                    $skippedCount++;
+                    continue;
                 }
+
+                $product->variants()->create([
+                    'sku'            => $sku,
+                    'barcode'        => $barcode,
+                    'size'           => $cleanSize,
+                    'colour'         => $colour,
+                    'selling_price'  => $sellingPrice,
+                    'stock_quantity' => 0,
+                ]);
+
+                $createdCount++;
             }
         });
 
-        $message = "Successfully generated {$createdCount} new uniform variants.";
+        $message = "Successfully created {$createdCount} new size variants.";
         if ($skippedCount > 0) {
-            $message .= " ({$skippedCount} existing variants were skipped to avoid duplicates).";
+            $message .= " ({$skippedCount} sizes already existed and were skipped).";
         }
 
         return redirect()->route('products.variants.index', $product)
