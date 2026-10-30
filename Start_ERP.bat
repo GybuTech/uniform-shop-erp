@@ -2,6 +2,9 @@
 title Uniform Shop ERP Launcher
 color 0A
 
+:: Ensure working directory is always this project folder
+cd /d "%~dp0"
+
 echo ========================================================
 echo         Uniform Shop ERP - Client Quick Launcher
 echo ========================================================
