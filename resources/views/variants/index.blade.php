@@ -88,6 +88,49 @@
             </div>
             @endcan
 
+            {{-- Search & Filter Bar for Product Variants --}}
+            <div class="bg-white p-4 rounded-xl border shadow-sm">
+                <form method="GET" action="{{ route('products.variants.index', $product) }}" class="flex flex-col sm:flex-row gap-3 items-center">
+                    <div class="relative flex-1 w-full">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input type="text"
+                               name="search"
+                               value="{{ $search }}"
+                               placeholder="Search variant by SKU, size (e.g. 24), barcode, or colour..."
+                               class="w-full pl-9 pr-3 py-2 text-xs rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+
+                    @if(!empty($availableSizes))
+                    <div class="w-full sm:w-44">
+                        <select name="size" class="w-full py-2 text-xs rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">All Sizes</option>
+                            @foreach($availableSizes as $sz)
+                                <option value="{{ $sz }}" {{ ($sizeFilter ?? '') == $sz ? 'selected' : '' }}>Size {{ $sz }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+
+                    <div class="flex items-center space-x-2 w-full sm:w-auto">
+                        <button type="submit" class="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm transition inline-flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            Search
+                        </button>
+                        @if($search || ($sizeFilter ?? ''))
+                            <a href="{{ route('products.variants.index', $product) }}" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition">
+                                Reset
+                            </a>
+                        @endif
+                    </div>
+                </form>
+            </div>
+
             <!-- Variants Table -->
             <div class="bg-white shadow rounded-lg overflow-hidden">
                 <table class="min-w-full divide-y divide-gray-200">

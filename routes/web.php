@@ -87,6 +87,11 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/products/{product}', [ProductController::class, 'update']);
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:delete-products');
 
+    // Ajax / Quick Variant Search
+    Route::get('/products/variants/search', [ProductVariantController::class, 'searchAjax'])
+        ->name('products.variants.search')
+        ->middleware('permission:view-products');
+
     // Quick / Bulk Price Management & Size Tier Pricing
     Route::get('/products/prices', [ProductVariantController::class, 'priceManager'])
         ->name('products.prices')

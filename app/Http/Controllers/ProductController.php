@@ -15,10 +15,38 @@ use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::with('category')->latest()->paginate(15);
-        return view('products.index', compact('products'));
+        $search = trim($request->input('search', ''));
+        $categoryId = $request->input('category_id');
+
+        $query = Product::with(['category', 'variants'])->latest();
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku_prefix', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhereHas('category', function ($cq) use ($search) {
+                      $cq->where('name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('variants', function ($vq) use ($search) {
+                      $vq->where('sku', 'like', "%{$search}%")
+                         ->orWhere('size', 'like', "%{$search}%")
+                         ->orWhere('barcode', 'like', "%{$search}%")
+                         ->orWhere('colour', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($categoryId) {
+            $query->where('category_id', $categoryId);
+        }
+
+        $products = $query->paginate(15)->withQueryString();
+        $categories = Category::orderBy('name')->get();
+
+        return view('products.index', compact('products', 'search', 'categories', 'categoryId'));
     }
 
     public function create()

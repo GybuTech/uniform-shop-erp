@@ -27,8 +27,13 @@
 
         {{-- 1. Home / Dashboard with Multi-Branch Submenu --}}
         @php
-            $isOwnerOrAdmin = in_array(strtolower(auth()->user()->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin', 'manager']);
+            $isOwnerOrAdmin = in_array(strtolower(auth()->user()?->roles?->first()?->name ?? ''), ['owner', 'system_administrator', 'admin', 'manager']);
             $currentBranch = session('active_branch', 'all');
+            try {
+                $sidebarBranches = \App\Models\Branch::where('is_active', true)->orderBy('name')->get();
+            } catch (\Throwable $e) {
+                $sidebarBranches = collect();
+            }
         @endphp
 
         <div x-data="{ open: activeMenu === 'dashboard' || activeMenu === '' }">
@@ -40,7 +45,7 @@
                     <span>Home</span>
                 </a>
                 @if($isOwnerOrAdmin)
-                <button @click="open = !open" type="button" class="p-1 hover:text-white text-slate-400">
+                <button @click="open = !open" type="button" class="p-1 hover:text-white text-slate-400" title="Toggle Branches">
                     <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 </button>
                 @endif
@@ -51,15 +56,11 @@
                 <a href="{{ route('dashboard', ['branch' => 'all']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === 'all' && request()->routeIs('dashboard') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
                     All Branches (Consolidated)
                 </a>
-                <a href="{{ route('dashboard', ['branch' => 'Main Shop']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === 'Main Shop' ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    Main Shop
-                </a>
-                <a href="{{ route('dashboard', ['branch' => 'Branch 2 (Sweaters)']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === 'Branch 2 (Sweaters)' ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    Branch 2 (Sweaters)
-                </a>
-                <a href="{{ route('dashboard', ['branch' => 'Branch 3']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === 'Branch 3' ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    Branch 3
-                </a>
+                @foreach($sidebarBranches as $sb)
+                    <a href="{{ route('dashboard', ['branch' => $sb->name]) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === $sb->name ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
+                        {{ $sb->name }}
+                    </a>
+                @endforeach
             </div>
             @endif
         </div>

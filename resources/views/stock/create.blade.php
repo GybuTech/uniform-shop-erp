@@ -20,27 +20,7 @@
         });
     @endphp
 
-    <div class="py-12" x-data="{
-        allVariants: @json($variantsData),
-        items: [
-            { product_variant_id: '', search: '', quantity: 1, open: false, stock: null }
-        ],
-        filterVariants(query) {
-            if (!query || query.trim() === '') return this.allVariants.slice(0, 30);
-            const q = query.toLowerCase().trim();
-            return this.allVariants.filter(v =>
-                v.name.toLowerCase().includes(q) ||
-                v.sku.toLowerCase().includes(q) ||
-                String(v.size).toLowerCase().includes(q)
-            ).slice(0, 30);
-        },
-        selectVariant(item, v) {
-            item.product_variant_id = v.id;
-            item.search = v.name + ' (' + v.sku + ' - Size ' + v.size + ')';
-            item.stock = v.stock;
-            item.open = false;
-        }
-    }">
+    <div class="py-12" x-data="stockEntryForm()">
         <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white shadow rounded-lg p-6">
                 <form method="POST" action="{{ route('stock-entries.store') }}" id="stockForm">
@@ -118,7 +98,10 @@
                                                                 </span>
                                                             </div>
                                                         </template>
-                                                        <div x-show="filterVariants(item.search).length === 0" class="p-3 text-center text-gray-400">
+                                                        <div x-show="!item.search || item.search.trim() === ''" class="p-3 text-center text-gray-400">
+                                                            Type school name, SKU, or size to search...
+                                                        </div>
+                                                        <div x-show="item.search && item.search.trim() !== '' && filterVariants(item.search).length === 0" class="p-3 text-center text-gray-400">
                                                             No matching products found.
                                                         </div>
                                                     </div>
@@ -151,4 +134,30 @@
             </div>
         </div>
     </div>
+
+    <script>
+        function stockEntryForm() {
+            return {
+                allVariants: @json($variantsData),
+                items: [
+                    { product_variant_id: '', search: '', quantity: 1, open: false, stock: null }
+                ],
+                filterVariants(query) {
+                    if (!query || query.trim() === '') return [];
+                    const q = query.toLowerCase().trim();
+                    return this.allVariants.filter(v =>
+                        (v.name && v.name.toLowerCase().includes(q)) ||
+                        (v.sku && v.sku.toLowerCase().includes(q)) ||
+                        (v.size !== undefined && v.size !== null && String(v.size).toLowerCase().includes(q))
+                    ).slice(0, 30);
+                },
+                selectVariant(item, v) {
+                    item.product_variant_id = v.id;
+                    item.search = v.name + ' (' + v.sku + ' - Size ' + v.size + ')';
+                    item.stock = v.stock;
+                    item.open = false;
+                }
+            };
+        }
+    </script>
 </x-app-layout>

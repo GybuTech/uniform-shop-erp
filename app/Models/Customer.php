@@ -18,6 +18,11 @@ class Customer extends Model
         'email',
     ];
 
+    public function getNameAttribute(): string
+    {
+        return trim("{$this->first_name} {$this->last_name}");
+    }
+
     public function sales(): HasMany
     {
         return $this->hasMany(Sale::class);

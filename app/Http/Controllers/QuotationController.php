@@ -26,18 +26,26 @@ class QuotationController extends Controller
     public function create()
     {
         $customers = Customer::orderBy('first_name')->get();
+        $branches  = \App\Models\Branch::where('is_active', true)->pluck('name')->toArray();
+        if (empty($branches)) {
+            $branches = ['Main Branch', 'Branch 2 Sweaters', 'Branch 3 Sweaters'];
+        }
         $variants  = ProductVariant::with('product')->get();
-        return view('quotations.create', compact('customers', 'variants'));
+        return view('quotations.create', compact('customers', 'variants', 'branches'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'customer_name' => ['required', 'string', 'max:150'],
-            'branch_name'   => ['required', 'string'],
-            'valid_until'   => ['required', 'date'],
-            'notes'         => ['nullable', 'string'],
-            'items'         => ['required', 'array', 'min:1'],
+            'customer_name'              => ['required', 'string', 'max:150'],
+            'customer_id'                => ['nullable', 'exists:customers,id'],
+            'branch_name'                => ['nullable', 'string'],
+            'valid_until'                => ['required', 'date'],
+            'notes'                      => ['nullable', 'string'],
+            'items'                      => ['required', 'array', 'min:1'],
+            'items.*.product_variant_id' => ['required', 'exists:product_variants,id'],
+            'items.*.unit_price'         => ['required', 'numeric', 'min:0'],
+            'items.*.quantity'           => ['required', 'integer', 'min:1'],
         ]);
 
         $count = Quotation::count() + 1;
@@ -48,10 +56,16 @@ class QuotationController extends Controller
             $total += $item['quantity'] * $item['unit_price'];
         }
 
+        $branchName = $validated['branch_name'] ?? session('active_branch', 'Main Shop');
+        if (empty($branchName) || $branchName === 'all') {
+            $branchName = 'Main Shop';
+        }
+
         $quotation = Quotation::create([
             'quotation_number' => $quotationNumber,
+            'customer_id'      => $validated['customer_id'] ?? null,
             'customer_name'    => $validated['customer_name'],
-            'branch_name'      => $validated['branch_name'],
+            'branch_name'      => $branchName,
             'total_amount'     => $total,
             'valid_until'      => $validated['valid_until'],
             'status'           => 'Pending',

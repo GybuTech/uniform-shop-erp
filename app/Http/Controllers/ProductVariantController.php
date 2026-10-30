@@ -9,11 +9,29 @@ use Illuminate\Support\Facades\DB;
 
 class ProductVariantController extends Controller
 {
-    public function index(Product $product)
+    public function index(Request $request, Product $product)
     {
-        $variants = $product->variants()->latest()->paginate(25);
+        $search = trim($request->input('search', ''));
+        $sizeFilter = $request->input('size');
+
+        $query = $product->variants()->latest();
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('sku', 'like', "%{$search}%")
+                  ->orWhere('size', 'like', "%{$search}%")
+                  ->orWhere('colour', 'like', "%{$search}%")
+                  ->orWhere('barcode', 'like', "%{$search}%");
+            });
+        }
+
+        if ($sizeFilter) {
+            $query->where('size', $sizeFilter);
+        }
+
+        $variants = $query->paginate(25)->withQueryString();
         $availableSizes = $product->variants()->distinct()->pluck('size')->toArray();
-        return view('variants.index', compact('product', 'variants', 'availableSizes'));
+        return view('variants.index', compact('product', 'variants', 'availableSizes', 'search', 'sizeFilter'));
     }
 
     public function create(Product $product)
@@ -477,5 +495,43 @@ class ProductVariantController extends Controller
         }
 
         return back()->with('success', "Updated selling price for {$updatedCount} product variant(s) successfully.");
+    }
+
+    public function searchAjax(Request $request)
+    {
+        $query = trim($request->input('q', ''));
+        if ($query === '') {
+            return response()->json([]);
+        }
+
+        $variants = ProductVariant::with(['product.category'])
+            ->where(function ($q) use ($query) {
+                $q->whereHas('product', function ($p) use ($query) {
+                    $p->where('name', 'like', "%{$query}%")
+                      ->orWhere('sku_prefix', 'like', "%{$query}%");
+                })
+                ->orWhere('size', 'like', "%{$query}%")
+                ->orWhere('colour', 'like', "%{$query}%")
+                ->orWhere('sku', 'like', "%{$query}%")
+                ->orWhere('barcode', 'like', "%{$query}%");
+            })
+            ->limit(30)
+            ->get();
+
+        return response()->json($variants->map(function ($variant) {
+            return [
+                'id'             => $variant->id,
+                'product_id'     => $variant->product_id,
+                'product_name'   => $variant->product?->name ?? 'Uniform',
+                'category_name'  => $variant->product?->category?->name ?? 'Uniform',
+                'sku'            => $variant->sku,
+                'size'           => $variant->size,
+                'colour'         => $variant->colour,
+                'selling_price'  => number_format($variant->selling_price, 2),
+                'stock_quantity' => $variant->stock_quantity ?? 0,
+                'edit_url'       => route('products.variants.edit', [$variant->product_id, $variant->id]),
+                'variants_url'   => route('products.variants.index', $variant->product_id),
+            ];
+        }));
     }
 }

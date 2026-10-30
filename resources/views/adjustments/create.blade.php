@@ -18,27 +18,7 @@
         });
     @endphp
 
-    <div class="py-6" x-data="{
-        allVariants: @json($variantsData),
-        items: [{ product_variant_id: '', search: '', type: 'subtract', quantity: 1, open: false, stock: null }],
-        filterVariants(query) {
-            if (!query || query.trim() === '') {
-                return this.allVariants.slice(0, 25);
-            }
-            const q = query.toLowerCase();
-            return this.allVariants.filter(v =>
-                v.name.toLowerCase().includes(q) ||
-                v.sku.toLowerCase().includes(q) ||
-                String(v.size).toLowerCase().includes(q)
-            ).slice(0, 30);
-        },
-        selectVariant(item, v) {
-            item.product_variant_id = v.id;
-            item.search = v.label;
-            item.stock = v.stock;
-            item.open = false;
-        }
-    }">
+    <div class="py-6" x-data="stockAdjustmentForm()">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white p-6 shadow-sm rounded-xl border">
                 <form method="POST" action="{{ route('adjustments.store') }}" class="space-y-6">
@@ -67,8 +47,15 @@
                     {{-- Products Table with Searchable Variant Combobox --}}
                     <div>
                         <div class="flex justify-between items-center mb-2">
-                            <h3 class="font-bold text-gray-700 text-sm">Adjusted Uniform Items</h3>
-                            <span class="text-xs text-gray-400">Search by typing school name, SKU, or size</span>
+                            <div>
+                                <h3 class="font-bold text-gray-700 text-sm">Adjusted Uniform Items</h3>
+                                <p class="text-xs text-gray-400">Search by typing school name, SKU, or size</p>
+                            </div>
+                            <button type="button"
+                                    @click="if(items.length === 0) { addItem(); } items[0].open = true; $nextTick(() => { document.getElementById('search_input_0')?.focus(); })"
+                                    class="px-3 py-1.5 text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 font-semibold rounded hover:bg-indigo-100 focus:outline-none transition">
+                                Search Adjustment
+                            </button>
                         </div>
 
                         <div class="border rounded-lg overflow-visible">
@@ -89,18 +76,21 @@
 
                                                 <div class="relative">
                                                     <input type="text"
+                                                           :id="'search_input_' + index"
                                                            x-model="item.search"
                                                            @focus="item.open = true"
                                                            @input="item.open = true"
                                                            @click.away="item.open = false"
                                                            placeholder="Type to search e.g. Accurate, GRS, Size 24..."
                                                            class="w-full border-gray-300 rounded-md text-xs py-1.5 px-3 focus:ring-indigo-500 focus:border-indigo-500"
+                                                           autocomplete="off"
                                                            required>
 
                                                     <button type="button"
-                                                            x-show="item.product_variant_id"
-                                                            @click="item.product_variant_id = ''; item.search = ''; item.stock = null; item.open = true"
-                                                            class="absolute right-2 top-1.5 text-gray-400 hover:text-gray-600 text-xs">
+                                                            x-show="item.product_variant_id || item.search"
+                                                            @click="clearVariant(item)"
+                                                            class="absolute right-2 top-1.5 text-gray-400 hover:text-gray-600 text-xs font-bold"
+                                                            title="Clear selection">
                                                         &times;
                                                     </button>
 
@@ -122,7 +112,10 @@
                                                                 </span>
                                                             </div>
                                                         </template>
-                                                        <div x-show="filterVariants(item.search).length === 0" class="p-3 text-center text-gray-400">
+                                                        <div x-show="!item.search || item.search.trim() === ''" class="p-3 text-center text-gray-400">
+                                                            Type school name, SKU, or size to search...
+                                                        </div>
+                                                        <div x-show="item.search && item.search.trim() !== '' && filterVariants(item.search).length === 0" class="p-3 text-center text-gray-400">
                                                             No matching products found.
                                                         </div>
                                                     </div>
@@ -138,14 +131,14 @@
                                                 <input type="number" min="1" :name="'items[' + index + '][quantity]'" x-model.number="item.quantity" class="w-full border-gray-300 rounded-md text-xs py-1.5" required>
                                             </td>
                                             <td class="p-2 text-center">
-                                                <button type="button" @click="if(items.length > 1) items.splice(index, 1)" class="text-gray-400 hover:text-rose-600 font-bold text-lg">&times;</button>
+                                                <button type="button" @click="removeItem(index)" class="text-gray-400 hover:text-rose-600 font-bold text-lg" title="Remove row">&times;</button>
                                             </td>
                                         </tr>
                                     </template>
                                 </tbody>
                             </table>
                             <div class="p-2 bg-gray-50 border-t flex justify-between items-center">
-                                <button type="button" @click="items.push({ product_variant_id: '', search: '', type: 'subtract', quantity: 1, open: false, stock: null })" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                                <button type="button" @click="addItem()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">
                                     + Add Item Row
                                 </button>
                                 <span class="text-xs text-gray-500" x-text="items.length + ' item row(s)'"></span>
@@ -168,4 +161,53 @@
             </div>
         </div>
     </div>
+
+    <script>
+        function stockAdjustmentForm() {
+            return {
+                allVariants: @json($variantsData),
+                items: [
+                    { product_variant_id: '', search: '', type: 'subtract', quantity: 1, open: false, stock: null }
+                ],
+                filterVariants(query) {
+                    if (!query || query.trim() === '') {
+                        return [];
+                    }
+                    const q = query.toLowerCase().trim();
+                    return this.allVariants.filter(v =>
+                        (v.name && v.name.toLowerCase().includes(q)) ||
+                        (v.sku && v.sku.toLowerCase().includes(q)) ||
+                        (v.size !== undefined && v.size !== null && String(v.size).toLowerCase().includes(q))
+                    ).slice(0, 30);
+                },
+                selectVariant(item, v) {
+                    item.product_variant_id = v.id;
+                    item.search = v.label;
+                    item.stock = v.stock;
+                    item.open = false;
+                },
+                clearVariant(item) {
+                    item.product_variant_id = '';
+                    item.search = '';
+                    item.stock = null;
+                    item.open = true;
+                },
+                addItem() {
+                    this.items.push({
+                        product_variant_id: '',
+                        search: '',
+                        type: 'subtract',
+                        quantity: 1,
+                        open: false,
+                        stock: null
+                    });
+                },
+                removeItem(index) {
+                    if (this.items.length > 1) {
+                        this.items.splice(index, 1);
+                    }
+                }
+            };
+        }
+    </script>
 </x-app-layout>
