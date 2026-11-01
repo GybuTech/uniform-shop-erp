@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\ProductVariant;
+use App\Models\Quotation;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Services\SystemTime;
@@ -34,7 +35,36 @@ class PosController extends Controller
 
     public function search(Request $request)
     {
-        $query = $request->get('q');
+        $query = trim($request->get('q', ''));
+        $exact = $request->boolean('exact');
+
+        if ($query === '') {
+            return response()->json([]);
+        }
+
+        // If scanning an exact barcode or SKU
+        if ($exact || strlen($query) >= 8 || str_starts_with($query, 'BC-')) {
+            $exactVariant = ProductVariant::with('product')
+                ->where('barcode', $query)
+                ->orWhere('sku', $query)
+                ->first();
+
+            if ($exactVariant) {
+                return response()->json([
+                    [
+                        'id'             => $exactVariant->id,
+                        'sku'            => $exactVariant->sku,
+                        'barcode'        => $exactVariant->barcode,
+                        'product_name'   => $exactVariant->product->name,
+                        'size'           => $exactVariant->size,
+                        'colour'         => $exactVariant->colour,
+                        'selling_price'  => $exactVariant->selling_price,
+                        'stock_quantity' => $exactVariant->stock_quantity,
+                        'exact_match'    => true,
+                    ]
+                ]);
+            }
+        }
 
         $variants = ProductVariant::with('product')
             ->where(function($q) use ($query) {
@@ -43,20 +73,23 @@ class PosController extends Controller
                 })
                 ->orWhere('size', 'like', "%{$query}%")
                 ->orWhere('colour', 'like', "%{$query}%")
-                ->orWhere('sku', 'like', "%{$query}%");
+                ->orWhere('sku', 'like', "%{$query}%")
+                ->orWhere('barcode', 'like', "%{$query}%");
             })
             ->limit(20)
             ->get();
 
         return response()->json($variants->map(function($variant) {
             return [
-                'id'            => $variant->id,
-                'sku'           => $variant->sku,
-                'product_name'  => $variant->product->name,
-                'size'          => $variant->size,
-                'colour'        => $variant->colour,
-                'selling_price' => $variant->selling_price,
-                'stock_quantity'=> $variant->stock_quantity,
+                'id'             => $variant->id,
+                'sku'            => $variant->sku,
+                'barcode'        => $variant->barcode,
+                'product_name'   => $variant->product->name,
+                'size'           => $variant->size,
+                'colour'         => $variant->colour,
+                'selling_price'  => $variant->selling_price,
+                'stock_quantity' => $variant->stock_quantity,
+                'exact_match'    => false,
             ];
         }));
     }
@@ -68,7 +101,10 @@ class PosController extends Controller
             'items.*.variant_id' => ['required', 'exists:product_variants,id'],
             'items.*.quantity'   => ['required', 'integer', 'min:1'],
             'customer_id'        => ['nullable', 'exists:customers,id'],
-            'payment_method'     => ['required', 'string', 'in:Cash,M-Pesa,Card'],
+            'payment_method'     => ['required', 'string', 'in:Cash,M-Pesa,Card,Split,Credit'],
+            'pricing_tier'       => ['nullable', 'string', 'in:retail,bulk,wholesale'],
+            'cash_amount'        => ['nullable', 'numeric', 'min:0'],
+            'mpesa_amount'       => ['nullable', 'numeric', 'min:0'],
             'branch_name'        => ['nullable', 'string', 'max:100'],
         ]);
 
@@ -81,8 +117,25 @@ class PosController extends Controller
             $branchName = $user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop');
         }
 
+        $paymentMethod = $request->payment_method;
+        $paymentStatus = 'paid';
+
+        // Pricing tier multiplier
+        $tierMultiplier = match ($request->pricing_tier) {
+            'bulk'      => 0.90, // 10% school bulk discount
+            'wholesale' => 0.85, // 15% wholesale discount
+            default     => 1.00, // Standard retail
+        };
+
+        if ($paymentMethod === 'Credit') {
+            if (empty($request->customer_id)) {
+                return back()->withErrors(['pos_error' => 'A registered customer account must be selected to record a Credit / On-Account sale.'])->withInput();
+            }
+            $paymentStatus = 'credit';
+        }
+
         try {
-            DB::transaction(function () use ($request, $branchName) {
+            DB::transaction(function () use ($request, $branchName, $paymentMethod, $paymentStatus, $tierMultiplier) {
                 $total = 0;
                 $saleItems = [];
 
@@ -97,15 +150,26 @@ class PosController extends Controller
                         throw new \Exception("Insufficient stock for {$variant->sku}. Available: {$variant->stock_quantity}, Requested: {$item['quantity']}");
                     }
 
-                    $lineTotal = $variant->selling_price * $item['quantity'];
+                    $unitPrice = round($variant->selling_price * $tierMultiplier, 2);
+                    $lineTotal = round($unitPrice * $item['quantity'], 2);
                     $total += $lineTotal;
 
                     $saleItems[] = [
                         'variant'    => $variant,
                         'quantity'   => $item['quantity'],
-                        'unit_price' => $variant->selling_price,
+                        'unit_price' => $unitPrice,
                         'line_total' => $lineTotal,
                     ];
+                }
+
+                $storedPaymentMethod = $paymentMethod;
+                if ($paymentMethod === 'Split') {
+                    $cashAmt = (float) $request->input('cash_amount', 0);
+                    $mpesaAmt = (float) $request->input('mpesa_amount', 0);
+                    $storedPaymentMethod = "Split (Cash: " . number_format($cashAmt, 0) . ", M-Pesa: " . number_format($mpesaAmt, 0) . ")";
+                    if (strlen($storedPaymentMethod) > 50) {
+                        $storedPaymentMethod = "Split (C:" . intval($cashAmt) . " + M:" . intval($mpesaAmt) . ")";
+                    }
                 }
 
                 $now = SystemTime::now();
@@ -115,8 +179,8 @@ class PosController extends Controller
                     'user_id'        => auth()->id(),
                     'receipt_number' => 'RCP-' . strtoupper(uniqid()),
                     'total_amount'   => $total,
-                    'payment_method' => $request->payment_method,
-                    'payment_status' => 'paid',
+                    'payment_method' => $storedPaymentMethod,
+                    'payment_status' => $paymentStatus,
                     'branch_name'    => $branchName,
                     'created_at'     => $now,
                     'updated_at'     => $now,
@@ -145,6 +209,152 @@ class PosController extends Controller
         } catch (\Exception $e) {
             return back()->withErrors(['pos_error' => $e->getMessage()])->withInput();
         }
+    }
+
+    public function quickCustomer(Request $request)
+    {
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name'  => ['nullable', 'string', 'max:100'],
+            'phone'      => ['required', 'string', 'max:20', 'unique:customers,phone'],
+            'email'      => ['nullable', 'email', 'max:255', 'unique:customers,email'],
+        ]);
+
+        $customer = Customer::create($validated);
+
+        return response()->json([
+            'success'  => true,
+            'customer' => [
+                'id'    => $customer->id,
+                'name'  => $customer->name,
+                'phone' => $customer->phone ?? '',
+            ],
+            'message'  => 'Customer added successfully.'
+        ]);
+    }
+
+    public function createQuotation(Request $request)
+    {
+        $request->validate([
+            'items'              => ['required', 'array', 'min:1'],
+            'items.*.variant_id' => ['required', 'exists:product_variants,id'],
+            'items.*.quantity'   => ['required', 'integer', 'min:1'],
+            'customer_id'        => ['nullable', 'exists:customers,id'],
+            'customer_name'      => ['nullable', 'string', 'max:150'],
+            'pricing_tier'       => ['nullable', 'string', 'in:retail,bulk,wholesale'],
+            'branch_name'        => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $user = auth()->user();
+        $branchName = $request->branch_name ?: ($user->branch_name ?: 'Main Shop');
+
+        $customer = null;
+        $customerName = trim($request->customer_name ?? '');
+        if ($request->customer_id) {
+            $customer = Customer::find($request->customer_id);
+            if ($customer && empty($customerName)) {
+                $customerName = $customer->name;
+            }
+        }
+        if (empty($customerName)) {
+            $customerName = 'General Quotation Customer';
+        }
+
+        $tierMultiplier = match ($request->pricing_tier) {
+            'bulk'      => 0.90,
+            'wholesale' => 0.85,
+            default     => 1.00,
+        };
+
+        $count = Quotation::count() + 1;
+        $quotationNumber = 'QTN-' . date('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+
+        try {
+            $quotation = DB::transaction(function () use ($request, $customer, $customerName, $branchName, $tierMultiplier, $quotationNumber) {
+                $total = 0;
+                $itemsData = [];
+
+                foreach ($request->items as $item) {
+                    $variant = ProductVariant::with('product')->find($item['variant_id']);
+                    if (!$variant) continue;
+
+                    $unitPrice = round($variant->selling_price * $tierMultiplier, 2);
+                    $subtotal = round($unitPrice * $item['quantity'], 2);
+                    $total += $subtotal;
+
+                    $itemsData[] = [
+                        'product_variant_id' => $variant->id,
+                        'product_name'       => $variant->product->name ?? 'Uniform Item',
+                        'size'               => $variant->size,
+                        'colour'             => $variant->colour,
+                        'quantity'           => $item['quantity'],
+                        'unit_price'         => $unitPrice,
+                        'subtotal'           => $subtotal,
+                    ];
+                }
+
+                $now = SystemTime::now();
+
+                $quotation = Quotation::create([
+                    'quotation_number' => $quotationNumber,
+                    'customer_id'      => $customer?->id,
+                    'customer_name'    => $customerName,
+                    'branch_name'      => $branchName,
+                    'total_amount'     => $total,
+                    'valid_until'      => $now->copy()->addDays(30),
+                    'status'           => 'Pending',
+                    'notes'            => 'Generated directly from POS Terminal' . ($request->pricing_tier ? " (Tier: " . ucfirst($request->pricing_tier) . ")" : ""),
+                    'user_id'          => auth()->id(),
+                    'created_at'       => $now,
+                    'updated_at'       => $now,
+                ]);
+
+                foreach ($itemsData as $itemRow) {
+                    $quotation->items()->create($itemRow);
+                }
+
+                return $quotation;
+            });
+
+            return response()->json([
+                'success'          => true,
+                'quotation_number' => $quotation->quotation_number,
+                'redirect_url'     => route('quotations.show', $quotation),
+                'message'          => "Quotation {$quotation->quotation_number} generated successfully."
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create quotation: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function recentSales(Request $request)
+    {
+        $user = auth()->user();
+        $query = Sale::with(['customer', 'user'])->withCount('saleItems')->latest();
+
+        if ($user->hasRole('cashier') && !empty($user->branch_name)) {
+            $query->where('branch_name', $user->branch_name);
+        }
+
+        $sales = $query->limit(10)->get();
+
+        return response()->json($sales->map(function ($sale) {
+            return [
+                'id'             => $sale->id,
+                'receipt_number' => $sale->receipt_number,
+                'customer_name'  => $sale->customer ? $sale->customer->name : 'Walk-in Customer',
+                'total_amount'   => number_format($sale->total_amount, 2),
+                'payment_method' => $sale->payment_method,
+                'payment_status' => $sale->payment_status,
+                'items_count'    => $sale->sale_items_count,
+                'time'           => $sale->created_at->format('d M H:i'),
+                'time_ago'       => $sale->created_at->diffForHumans(),
+                'receipt_url'    => route('sales.show', $sale),
+            ];
+        }));
     }
 
     public function receipt()

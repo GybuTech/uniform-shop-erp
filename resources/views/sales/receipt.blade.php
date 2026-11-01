@@ -40,7 +40,9 @@
             </div>
             <div class="flex justify-between">
                 <span>Payment Method:</span>
-                <span class="font-semibold uppercase text-gray-900">{{ $sale->payment_method }}</span>
+                <span class="font-semibold uppercase text-gray-900">
+                    {{ $sale->payment_method }} {{ $sale->payment_status === 'credit' ? '(CREDIT DEBT)' : '' }}
+                </span>
             </div>
             <div class="flex justify-between">
                 <span>Cashier:</span>

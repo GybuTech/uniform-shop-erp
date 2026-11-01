@@ -1,17 +1,28 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ $product->name }} — Variants & Price Manager
-            </h2>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h2 class="font-bold text-xl text-gray-900 leading-tight">
+                    {{ $product->name }}
+                </h2>
+                <p class="text-xs text-gray-500 mt-0.5">
+                    Variants & Price Manager &bull; SKU Prefix: <span class="font-mono font-bold text-indigo-600">{{ $product->sku_prefix }}</span>
+                </p>
+            </div>
             @can('create-product-variants')
-            <div class="space-x-2">
+            <div class="flex flex-wrap items-center gap-3">
                 <a href="{{ route('products.variants.bulk-create', $product) }}"
-                   class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-bold shadow-sm transition">
+                   class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
                     Bulk Matrix Creator
                 </a>
                 <a href="{{ route('products.variants.create', $product) }}"
-                   class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm font-semibold">
+                   class="inline-flex items-center px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-lg shadow-sm transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
                     + Add Single Variant
                 </a>
             </div>

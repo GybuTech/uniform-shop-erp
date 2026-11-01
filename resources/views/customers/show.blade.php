@@ -11,19 +11,33 @@
     </x-slot>
 
     <div class="space-y-6">
-        <!-- Info Card -->
-        <div class="bg-white p-6 rounded-lg shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <span class="text-xs uppercase text-gray-500 font-semibold block">Full Name</span>
-                <span class="text-lg font-bold text-gray-900">{{ $customer->first_name }} {{ $customer->last_name }}</span>
+        <!-- Info & Debt Ledger Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <span class="text-xs uppercase text-gray-500 font-semibold block">Customer Details</span>
+                <span class="text-base font-bold text-gray-900 block mt-1">{{ $customer->first_name }} {{ $customer->last_name }}</span>
+                <span class="text-xs text-gray-600 block mt-0.5">{{ $customer->phone ?? 'No phone' }}</span>
             </div>
-            <div>
-                <span class="text-xs uppercase text-gray-500 font-semibold block">Phone Number</span>
-                <span class="text-base text-gray-800 font-medium">{{ $customer->phone ?? 'Not specified' }}</span>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <span class="text-xs uppercase text-gray-500 font-semibold block">Total Invoiced</span>
+                <span class="text-xl font-black text-gray-900 block mt-1 font-mono">KES {{ number_format($totalPurchases, 2) }}</span>
+                <span class="text-[11px] text-gray-400 block mt-0.5">{{ $sales->total() }} lifetime sales</span>
             </div>
-            <div>
-                <span class="text-xs uppercase text-gray-500 font-semibold block">Email Address</span>
-                <span class="text-base text-gray-800 font-medium">{{ $customer->email ?? 'Not specified' }}</span>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <span class="text-xs uppercase text-gray-500 font-semibold block">Total Settled / Paid</span>
+                <span class="text-xl font-black text-emerald-600 block mt-1 font-mono">KES {{ number_format($totalPaid, 2) }}</span>
+                <span class="text-[11px] text-gray-400 block mt-0.5">Cash / M-Pesa / Card</span>
+            </div>
+            <div class="p-5 rounded-xl shadow-sm border {{ $outstandingCredit > 0 ? 'bg-amber-50 border-amber-300' : 'bg-white border-gray-100' }}">
+                <span class="text-xs uppercase {{ $outstandingCredit > 0 ? 'text-amber-800 font-bold' : 'text-gray-500 font-semibold' }} block">
+                    Outstanding Debt / Credit
+                </span>
+                <span class="text-xl font-black {{ $outstandingCredit > 0 ? 'text-amber-700' : 'text-gray-900' }} block mt-1 font-mono">
+                    KES {{ number_format($outstandingCredit, 2) }}
+                </span>
+                <span class="text-[11px] {{ $outstandingCredit > 0 ? 'text-amber-700 font-semibold' : 'text-gray-400' }} block mt-0.5">
+                    {{ $outstandingCredit > 0 ? 'Pending Payment Balance' : 'Account in good standing' }}
+                </span>
             </div>
         </div>
 
@@ -51,7 +65,12 @@
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 text-sm font-mono font-bold text-indigo-600">{{ $sale->receipt_number }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $sale->created_at->format('M d, Y H:i') }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-700 font-medium capitalize">{{ $sale->payment_method }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-700 font-medium">
+                            <span>{{ $sale->payment_method }}</span>
+                            @if($sale->payment_status === 'credit')
+                                <span class="ml-1.5 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Credit Debt</span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4 text-sm font-bold text-gray-900">KES {{ number_format($sale->total_amount, 2) }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $sale->user->name ?? 'System' }}</td>
                         <td class="px-6 py-4 text-sm text-right">

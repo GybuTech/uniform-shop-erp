@@ -37,9 +37,14 @@
                     </div>
 
                     <div class="mb-4">
-                        <x-input-label for="sku_prefix" value="SKU Prefix" />
+                        <div class="flex justify-between items-center mb-1">
+                            <x-input-label for="sku_prefix" value="SKU Prefix" />
+                            <button type="button" onclick="autoGenerateSku()" class="text-xs text-indigo-600 hover:text-indigo-800 font-bold hover:underline">
+                                Auto-Generate from Name &circlearrowright;
+                            </button>
+                        </div>
                         <x-text-input id="sku_prefix" name="sku_prefix" type="text"
-                            class="mt-1 block w-full"
+                            class="mt-1 block w-full uppercase font-mono font-bold tracking-wider"
                             value="{{ old('sku_prefix', $product->sku_prefix) }}"
                             required />
                         <x-input-error :messages="$errors->get('sku_prefix')" class="mt-2" />
@@ -61,4 +66,33 @@
             </div>
         </div>
     </div>
+
+    <script>
+        function autoGenerateSku() {
+            const name = document.getElementById('name').value;
+            if (!name) return;
+
+            const words = name.replace(/[^a-zA-Z0-9\s]/g, '').trim().split(/\s+/).filter(Boolean);
+            if (words.length === 0) return;
+
+            let result = '';
+            if (words.length === 1) {
+                const w = words[0].toUpperCase();
+                result = w.length <= 4 ? w : w.substring(0, 4);
+            } else if (words.length === 2) {
+                const w1 = words[0].toUpperCase();
+                const w2 = words[1].toUpperCase();
+                const part1 = w1.length <= 3 ? w1 : w1.substring(0, 3);
+                const part2 = w2.length <= 2 ? w2 : w2.substring(0, 2);
+                result = `${part1}-${part2}`;
+            } else {
+                const initials = words.slice(0, -1).map(w => w[0].toUpperCase()).join('');
+                const lastWord = words[words.length - 1].toUpperCase();
+                const lastAbbr = lastWord.length <= 3 ? lastWord : lastWord.substring(0, 2);
+                result = `${initials}-${lastAbbr}`;
+            }
+
+            document.getElementById('sku_prefix').value = result;
+        }
+    </script>
 </x-app-layout>

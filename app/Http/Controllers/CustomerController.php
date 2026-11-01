@@ -51,7 +51,12 @@ class CustomerController extends Controller
             ->with(['saleItems.productVariant.product'])
             ->latest()
             ->paginate(10);
-        return view('customers.show', compact('customer', 'sales'));
+
+        $totalPurchases = $customer->sales()->sum('total_amount');
+        $outstandingCredit = $customer->sales()->where('payment_status', 'credit')->sum('total_amount');
+        $totalPaid = $totalPurchases - $outstandingCredit;
+
+        return view('customers.show', compact('customer', 'sales', 'totalPurchases', 'outstandingCredit', 'totalPaid'));
     }
 
     public function edit(Customer $customer)

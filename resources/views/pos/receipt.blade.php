@@ -45,8 +45,8 @@
                     </div>
                     <div>
                         <span class="text-gray-400 font-semibold block uppercase text-[10px]">Payment Method</span>
-                        <span class="font-bold text-emerald-700 uppercase bg-emerald-100 px-2 py-0.5 rounded text-[11px]">
-                            {{ $sale->payment_method }} ({{ $sale->payment_status }})
+                        <span class="font-bold {{ $sale->payment_status === 'credit' ? 'text-amber-800 bg-amber-100' : 'text-emerald-700 bg-emerald-100' }} uppercase px-2 py-0.5 rounded text-[11px]">
+                            {{ $sale->payment_method }} &bull; {{ strtoupper($sale->payment_status) }}
                         </span>
                     </div>
                 </div>

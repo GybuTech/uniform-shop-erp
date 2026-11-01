@@ -163,6 +163,15 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pos', [PosController::class, 'store'])
         ->name('pos.store')
         ->middleware('permission:create-sales');
+    Route::post('/pos/quick-customer', [PosController::class, 'quickCustomer'])
+        ->name('pos.quick-customer')
+        ->middleware('permission:create-sales');
+    Route::post('/pos/quotation', [PosController::class, 'createQuotation'])
+        ->name('pos.quotation')
+        ->middleware('permission:create-sales');
+    Route::get('/pos/recent-sales', [PosController::class, 'recentSales'])
+        ->name('pos.recent-sales')
+        ->middleware('permission:create-sales');
     Route::get('/pos/receipt', [PosController::class, 'receipt'])
         ->name('pos.receipt')
         ->middleware('permission:create-sales');

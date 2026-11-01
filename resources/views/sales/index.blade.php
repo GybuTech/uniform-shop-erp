@@ -66,10 +66,20 @@
                                     <span class="text-gray-400 italic">Walk-in Customer</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 text-sm font-semibold capitalize">
-                                <span class="px-2.5 py-1 rounded-full text-xs font-bold {{ $sale->payment_method === 'Cash' ? 'bg-green-100 text-green-800' : ($sale->payment_method === 'M-Pesa' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800') }}">
-                                    {{ $sale->payment_method }}
-                                </span>
+                            <td class="px-6 py-4 text-sm font-semibold">
+                                @if(str_contains($sale->payment_method, 'Split'))
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
+                                        {{ $sale->payment_method }}
+                                    </span>
+                                @elseif($sale->payment_method === 'Credit' || $sale->payment_status === 'credit')
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                        Credit (Debt Ledger)
+                                    </span>
+                                @else
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold {{ $sale->payment_method === 'Cash' ? 'bg-green-100 text-green-800' : ($sale->payment_method === 'M-Pesa' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800') }}">
+                                        {{ $sale->payment_method }}
+                                    </span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 text-sm font-extrabold text-gray-900">KES {{ number_format($sale->total_amount, 2) }}</td>
                             <td class="px-6 py-4 text-sm text-gray-600">{{ $sale->user->name ?? 'Staff' }}</td>
