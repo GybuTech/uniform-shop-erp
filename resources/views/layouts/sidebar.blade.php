@@ -154,7 +154,7 @@
 
         {{-- 6. Sell --}}
         @can('create-sales')
-        <div x-data="{ open: activeMenu === 'pos' || activeMenu === 'sales' || activeMenu === 'quotations' }">
+        <div x-data="{ open: activeMenu === 'pos' || activeMenu === 'sales' || activeMenu === 'quotations' || activeMenu === 'shifts' }">
             <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-800/80 hover:text-white transition">
                 <div class="flex items-center">
                     <svg class="w-4 h-4 mr-2.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -167,6 +167,7 @@
             <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('pos.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 font-bold text-emerald-400">+ POS Terminal</a>
                 <a href="{{ route('sales.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('sales.*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">All Sales Receipts</a>
+                <a href="{{ route('shifts.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('shifts.*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">Shift Handover & Z-Reports</a>
                 <a href="{{ route('quotations.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('quotations.index') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">List Quotations</a>
                 <a href="{{ route('quotations.create') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('quotations.create') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">Add Quotation</a>
             </div>

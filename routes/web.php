@@ -13,6 +13,7 @@ use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StockEntryController;
 use App\Http\Controllers\StockTransferController;
@@ -175,6 +176,20 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/pos/receipt', [PosController::class, 'receipt'])
         ->name('pos.receipt')
         ->middleware('permission:create-sales');
+
+    // Cashier Shifts & Reconciliation
+    Route::get('/shifts', [ShiftController::class, 'index'])
+        ->name('shifts.index')
+        ->middleware('permission:view-sales');
+    Route::get('/shifts/current', [ShiftController::class, 'current'])
+        ->name('shifts.current')
+        ->middleware('permission:create-sales');
+    Route::post('/shifts/close', [ShiftController::class, 'close'])
+        ->name('shifts.close')
+        ->middleware('permission:create-sales');
+    Route::get('/shifts/{shift}/z-report', [ShiftController::class, 'zReport'])
+        ->name('shifts.zReport')
+        ->middleware('permission:view-sales');
 
     // Sales Log
     Route::get('/sales', [PosController::class, 'salesIndex'])

@@ -129,40 +129,62 @@
             {{-- Tab 2: Shift Handover & Session Accountability --}}
             <div x-show="tab === 'handover'" class="space-y-6">
                 <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-3xl">
-                    <div class="flex items-center gap-3 mb-2">
-                        <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                            </svg>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-extrabold text-slate-900 text-lg">Shift Handover & Session Accountability</h3>
+                                <p class="text-xs text-slate-500">Ensure audit integrity by understanding the difference between signing out and concluding your shift.</p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 class="font-extrabold text-slate-900 text-lg">Shift Handover & Session Accountability</h3>
-                            <p class="text-xs text-slate-500">Ensure audit integrity and shift traceability by closing your session when stepping away or changing shifts.</p>
-                        </div>
+                        <a href="{{ route('shifts.index') }}" class="text-xs font-bold text-indigo-600 hover:underline">
+                            View Shift Audit History &rarr;
+                        </a>
                     </div>
 
                     <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 my-5 text-xs text-indigo-900 space-y-1">
                         <p class="font-bold text-sm">Active Operator: {{ $user->name }} ({{ $user->username }})</p>
-                        <p>All sales receipts, stock transfers, and counter adjustments are stamped under your operator account. When your shift concludes or when stepping away, sign out below to ensure accurate shift accounting.</p>
+                        <p>All sales receipts, stock transfers, and counter adjustments are stamped under your operator account.</p>
                     </div>
 
-                    <div class="pt-2 max-w-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {{-- Option 1: Temporary Sign Out --}}
                         <div class="border border-slate-200 rounded-xl p-5 bg-slate-50/50 flex flex-col justify-between">
                             <div>
-                                <h4 class="font-bold text-sm text-slate-900 mb-1">Conclude Shift & Sign Out</h4>
-                                <p class="text-xs text-slate-500 mb-4">Securely terminates your active session and presents the login prompt for the next incoming cashier or operator.</p>
+                                <span class="text-[10px] uppercase font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded">Option A</span>
+                                <h4 class="font-bold text-sm text-slate-900 mt-2 mb-1">Temporary Sign Out</h4>
+                                <p class="text-xs text-slate-500 mb-4">Stepping away for lunch or stock intake. Your register drawer, sales, and shift session <strong>remain OPEN</strong> for your return.</p>
                             </div>
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
                                 <button type="submit"
-                                    style="background-color: #dc2626 !important; color: #ffffff !important;"
-                                    class="w-full py-3.5 px-4 font-bold rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] cursor-pointer">
-                                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                    class="w-full py-2.5 px-4 font-bold rounded-xl text-xs bg-slate-700 hover:bg-slate-800 text-white transition flex items-center justify-center gap-1.5 shadow-sm">
+                                    <svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                                     </svg>
-                                    <span class="tracking-wide uppercase text-[11px] font-extrabold text-white">Sign Out of Terminal</span>
+                                    <span>Sign Out (Keep Shift Active)</span>
                                 </button>
                             </form>
+                        </div>
+
+                        {{-- Option 2: Conclude Shift & Handover --}}
+                        <div class="border border-amber-200 rounded-xl p-5 bg-amber-50/40 flex flex-col justify-between">
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-amber-800 bg-amber-200 px-2 py-0.5 rounded">Option B</span>
+                                <h4 class="font-bold text-sm text-amber-950 mt-2 mb-1">Conclude Shift & Handover</h4>
+                                <p class="text-xs text-amber-900/80 mb-4">Your working hours are over. Verify expected cash vs counted cash, calculate variance, seal the shift, and print your Z-Report.</p>
+                            </div>
+                            <a href="{{ route('pos.index') }}#end-shift"
+                                class="w-full py-2.5 px-4 font-bold rounded-xl text-xs bg-amber-600 hover:bg-amber-700 text-white transition flex items-center justify-center gap-1.5 shadow-sm text-center">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Go to POS & End Shift</span>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -173,7 +195,7 @@
             <div x-show="tab === 'business'" class="space-y-6">
                 <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-3xl">
                     <h3 class="font-extrabold text-slate-900 text-lg mb-1">Store Information & Business Center</h3>
-                    <p class="text-xs text-slate-500 mb-6">Update the primary trading details, contact numbers, and address displayed on customer thermal receipts and invoices.</p>
+                    <p class="text-xs text-slate-500 mb-6">Update the primary trading details, contact numbers, KRA PIN, and pricing tier discounts.</p>
 
                     <form method="POST" action="{{ route('settings.business.update') }}" class="space-y-4">
                         @csrf
@@ -206,15 +228,66 @@
                             @error('business_address') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
                         </div>
 
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <x-input-label for="business_currency" value="Currency Code *" />
+                                <input type="text" name="business_currency" id="business_currency" value="{{ old('business_currency', $businessCurrency) }}" required class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm font-mono uppercase">
+                                @error('business_currency') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </div>
+                            <div>
+                                <x-input-label for="kra_pin" value="KRA PIN (Tax ID)" />
+                                <input type="text" name="kra_pin" id="kra_pin" value="{{ old('kra_pin', $kraPin) }}" placeholder="P051234567Z" class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm font-mono uppercase">
+                                @error('kra_pin') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </div>
+                            <div>
+                                <x-input-label for="vat_number" value="VAT Number (Optional)" />
+                                <input type="text" name="vat_number" id="vat_number" value="{{ old('vat_number', $vatNumber) }}" placeholder="VAT-12345" class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm font-mono">
+                                @error('vat_number') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </div>
+                        </div>
+
                         <div>
-                            <x-input-label for="business_currency" value="System Currency Code *" />
-                            <input type="text" name="business_currency" id="business_currency" value="{{ old('business_currency', $businessCurrency) }}" required class="w-40 mt-1 border-slate-300 rounded-lg shadow-sm text-sm font-mono uppercase">
-                            @error('business_currency') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            <x-input-label for="receipt_footer_note" value="Thermal Receipt Footer Note" />
+                            <input type="text" name="receipt_footer_note" id="receipt_footer_note" value="{{ old('receipt_footer_note', $receiptFooter) }}" placeholder="e.g. Goods once sold are returnable within 7 days with valid receipt." class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm">
+                            <span class="text-[11px] text-slate-400">Printed at the bottom of customer receipts.</span>
+                            @error('receipt_footer_note') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                        </div>
+
+                        {{-- Dynamic Pricing Tiers Configuration --}}
+                        <div class="border-t border-slate-200 pt-5 mt-5">
+                            <h4 class="font-extrabold text-slate-900 text-sm mb-1">Commercial Pricing Tiers & Volume Discounts</h4>
+                            <p class="text-xs text-slate-500 mb-4">Set the discount percentages and labels available on the POS Terminal dropdown. Update these anytime to adjust retail pricing.</p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <div>
+                                    <x-input-label for="pricing_tier_bulk_label" value="Bulk Tier 1 Label" />
+                                    <input type="text" name="pricing_tier_bulk_label" id="pricing_tier_bulk_label" value="{{ old('pricing_tier_bulk_label', $bulkLabel) }}" required class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm">
+                                </div>
+                                <div>
+                                    <x-input-label for="pricing_tier_bulk_discount" value="Bulk Discount Percentage (%)" />
+                                    <div class="relative mt-1">
+                                        <input type="number" step="0.1" min="0" max="99" name="pricing_tier_bulk_discount" id="pricing_tier_bulk_discount" value="{{ old('pricing_tier_bulk_discount', $bulkDiscount) }}" required class="w-full border-slate-300 rounded-lg shadow-sm text-sm pr-8 font-mono font-bold">
+                                        <span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500 font-bold">%</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="pricing_tier_wholesale_label" value="Wholesale Tier 2 Label" />
+                                    <input type="text" name="pricing_tier_wholesale_label" id="pricing_tier_wholesale_label" value="{{ old('pricing_tier_wholesale_label', $wholesaleLabel) }}" required class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm">
+                                </div>
+                                <div>
+                                    <x-input-label for="pricing_tier_wholesale_discount" value="Wholesale Discount Percentage (%)" />
+                                    <div class="relative mt-1">
+                                        <input type="number" step="0.1" min="0" max="99" name="pricing_tier_wholesale_discount" id="pricing_tier_wholesale_discount" value="{{ old('pricing_tier_wholesale_discount', $wholesaleDiscount) }}" required class="w-full border-slate-300 rounded-lg shadow-sm text-sm pr-8 font-mono font-bold">
+                                        <span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500 font-bold">%</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="flex justify-end pt-4 border-t border-slate-100">
                             <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-sm transition">
-                                Save Store Details
+                                Save Store Details & Pricing Tiers
                             </button>
                         </div>
                     </form>

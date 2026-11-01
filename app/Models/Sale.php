@@ -14,6 +14,7 @@ class Sale extends Model
     protected $fillable = [
         'customer_id',
         'user_id',
+        'shift_id',
         'receipt_number',
         'total_amount',
         'payment_method',
@@ -29,6 +30,11 @@ class Sale extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
     }
 
     public function saleItems(): HasMany

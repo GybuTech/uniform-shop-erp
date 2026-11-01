@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\BusinessSetting;
 use App\Models\Customer;
 use App\Models\ProductVariant;
 use App\Models\Quotation;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\Shift;
 use App\Services\SystemTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +32,26 @@ class PosController extends Controller
 
         $customers = Customer::orderBy('first_name')->get();
 
-        return view('pos.index', compact('customers', 'branches', 'isLockedBranch', 'currentBranchName'));
+        // Active cashier shift and dynamic tier settings
+        $activeShift = Shift::getActiveShift($user->id, $currentBranchName);
+        $activeShift->recalculateTotals();
+
+        $bulkDiscount = (float) BusinessSetting::get('pricing_tier_bulk_discount', 10.0);
+        $wholesaleDiscount = (float) BusinessSetting::get('pricing_tier_wholesale_discount', 15.0);
+        $bulkLabel = BusinessSetting::get('pricing_tier_bulk_label', 'School Bulk Tier');
+        $wholesaleLabel = BusinessSetting::get('pricing_tier_wholesale_label', 'Wholesale Contract Tier');
+
+        return view('pos.index', compact(
+            'customers',
+            'branches',
+            'isLockedBranch',
+            'currentBranchName',
+            'activeShift',
+            'bulkDiscount',
+            'wholesaleDiscount',
+            'bulkLabel',
+            'wholesaleLabel'
+        ));
     }
 
     public function search(Request $request)
@@ -120,10 +141,13 @@ class PosController extends Controller
         $paymentMethod = $request->payment_method;
         $paymentStatus = 'paid';
 
-        // Pricing tier multiplier
+        // Dynamic pricing tier percentages from BusinessSetting
+        $bulkDiscount = (float) BusinessSetting::get('pricing_tier_bulk_discount', 10.0);
+        $wholesaleDiscount = (float) BusinessSetting::get('pricing_tier_wholesale_discount', 15.0);
+
         $tierMultiplier = match ($request->pricing_tier) {
-            'bulk'      => 0.90, // 10% school bulk discount
-            'wholesale' => 0.85, // 15% wholesale discount
+            'bulk'      => max(0.01, round((100 - $bulkDiscount) / 100, 4)),
+            'wholesale' => max(0.01, round((100 - $wholesaleDiscount) / 100, 4)),
             default     => 1.00, // Standard retail
         };
 
@@ -173,10 +197,12 @@ class PosController extends Controller
                 }
 
                 $now = SystemTime::now();
+                $shift = Shift::getActiveShift(auth()->id(), $branchName);
 
                 $sale = Sale::create([
                     'customer_id'    => $request->customer_id ?: null,
                     'user_id'        => auth()->id(),
+                    'shift_id'       => $shift->id,
                     'receipt_number' => 'RCP-' . strtoupper(uniqid()),
                     'total_amount'   => $total,
                     'payment_method' => $storedPaymentMethod,
@@ -200,6 +226,7 @@ class PosController extends Controller
                     $item['variant']->decrement('stock_quantity', $item['quantity']);
                 }
 
+                $shift->recalculateTotals();
                 session(['last_sale_id' => $sale->id]);
             });
 
@@ -260,9 +287,12 @@ class PosController extends Controller
             $customerName = 'General Quotation Customer';
         }
 
+        $bulkDiscount = (float) BusinessSetting::get('pricing_tier_bulk_discount', 10.0);
+        $wholesaleDiscount = (float) BusinessSetting::get('pricing_tier_wholesale_discount', 15.0);
+
         $tierMultiplier = match ($request->pricing_tier) {
-            'bulk'      => 0.90,
-            'wholesale' => 0.85,
+            'bulk'      => max(0.01, round((100 - $bulkDiscount) / 100, 4)),
+            'wholesale' => max(0.01, round((100 - $wholesaleDiscount) / 100, 4)),
             default     => 1.00,
         };
 

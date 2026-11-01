@@ -30,6 +30,15 @@ class SettingsController extends Controller
         $businessAddress = BusinessSetting::get('business_address', 'Nairobi, Kenya');
         $businessCurrency = BusinessSetting::get('business_currency', 'KES');
 
+        // Dynamic Commercial & Tier Settings
+        $bulkDiscount = (float) BusinessSetting::get('pricing_tier_bulk_discount', 10.0);
+        $wholesaleDiscount = (float) BusinessSetting::get('pricing_tier_wholesale_discount', 15.0);
+        $bulkLabel = BusinessSetting::get('pricing_tier_bulk_label', 'School Bulk Tier');
+        $wholesaleLabel = BusinessSetting::get('pricing_tier_wholesale_label', 'Wholesale Contract Tier');
+        $kraPin = BusinessSetting::get('kra_pin', '');
+        $vatNumber = BusinessSetting::get('vat_number', '');
+        $receiptFooter = BusinessSetting::get('receipt_footer_note', 'Goods once sold are returnable within 7 days with valid receipt.');
+
         $currentSystemTime = SystemTime::formatted('d M Y, h:i A');
         $currentSystemTimeIso = SystemTime::now()->format('Y-m-d\TH:i');
         $hasTimeOffset = SystemTime::hasOffset();
@@ -45,6 +54,13 @@ class SettingsController extends Controller
             'businessPhone',
             'businessAddress',
             'businessCurrency',
+            'bulkDiscount',
+            'wholesaleDiscount',
+            'bulkLabel',
+            'wholesaleLabel',
+            'kraPin',
+            'vatNumber',
+            'receiptFooter',
             'currentSystemTime',
             'currentSystemTimeIso',
             'hasTimeOffset',
@@ -86,11 +102,18 @@ class SettingsController extends Controller
         }
 
         $validated = $request->validate([
-            'business_name'     => ['required', 'string', 'max:255'],
-            'business_email'    => ['nullable', 'email', 'max:255'],
-            'business_phone'    => ['nullable', 'string', 'max:50'],
-            'business_address'  => ['nullable', 'string', 'max:255'],
-            'business_currency' => ['required', 'string', 'max:10'],
+            'business_name'                  => ['required', 'string', 'max:255'],
+            'business_email'                 => ['nullable', 'email', 'max:255'],
+            'business_phone'                 => ['nullable', 'string', 'max:50'],
+            'business_address'               => ['nullable', 'string', 'max:255'],
+            'business_currency'              => ['required', 'string', 'max:10'],
+            'kra_pin'                        => ['nullable', 'string', 'max:50'],
+            'vat_number'                     => ['nullable', 'string', 'max:50'],
+            'receipt_footer_note'            => ['nullable', 'string', 'max:255'],
+            'pricing_tier_bulk_discount'     => ['required', 'numeric', 'min:0', 'max:99'],
+            'pricing_tier_wholesale_discount'=> ['required', 'numeric', 'min:0', 'max:99'],
+            'pricing_tier_bulk_label'        => ['required', 'string', 'max:50'],
+            'pricing_tier_wholesale_label'   => ['required', 'string', 'max:50'],
         ]);
 
         foreach ($validated as $key => $value) {

@@ -6,13 +6,19 @@
                 <p class="text-xs text-gray-500 mt-0.5">Quick Checkout &bull; Barcode Scanner &bull; Multi-Payment &bull; Quotes</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                {{-- Cashier & Shift Badge --}}
+                <div class="hidden sm:inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold border border-slate-200">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+                    <span>{{ auth()->user()->name }} (Shift #{{ str_pad($activeShift->id, 4, '0', STR_PAD_LEFT) }})</span>
+                </div>
+
                 {{-- Parked Sales Drawer Trigger --}}
                 <button type="button" onclick="openParkedSalesModal()"
                         class="inline-flex items-center px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-xs font-bold transition shadow-sm">
                     <svg class="w-4 h-4 mr-1 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>Parked Sales</span>
+                    <span>Parked</span>
                     <span id="parkedBadge" class="ml-1.5 bg-amber-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">0</span>
                 </button>
 
@@ -22,11 +28,29 @@
                     <svg class="w-4 h-4 mr-1 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>Recent Receipts</span>
+                    <span>Receipts</span>
                 </button>
 
+                {{-- End Shift / Cash Handover Trigger --}}
+                <button type="button" onclick="openEndShiftModal()"
+                        class="inline-flex items-center px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 rounded-lg text-xs font-bold transition shadow-sm">
+                    <svg class="w-4 h-4 mr-1 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>End Shift</span>
+                </button>
+
+                {{-- Separate Step-Away Sign Out --}}
+                <form method="POST" action="{{ route('logout') }}" class="inline">
+                    @csrf
+                    <button type="submit" title="Temporary Sign Out (Keeps Shift Open)"
+                            class="text-xs font-semibold text-slate-500 hover:text-slate-800 hover:underline px-2 py-1">
+                        Sign Out
+                    </button>
+                </form>
+
                 {{-- View Full Sales Log --}}
-                <a href="{{ route('sales.index') }}" class="text-xs font-semibold text-gray-600 hover:text-indigo-600 hover:underline px-2 py-1">
+                <a href="{{ route('sales.index') }}" class="text-xs font-semibold text-indigo-600 hover:underline px-1 py-1">
                     Sales Log &rarr;
                 </a>
             </div>
@@ -171,8 +195,8 @@
                             <select id="pricingTierSelect" onchange="onPricingTierChange(this.value)"
                                 class="block w-full border-gray-300 rounded-lg shadow-sm text-xs font-bold text-gray-800 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500">
                                 <option value="retail" selected>Standard Retail (100% Price)</option>
-                                <option value="bulk">School Bulk Tier (10% Off Base)</option>
-                                <option value="wholesale">Wholesale Contract Tier (15% Off Base)</option>
+                                <option value="bulk">{{ $bulkLabel }} (-{{ $bulkDiscount }}% Off Base)</option>
+                                <option value="wholesale">{{ $wholesaleLabel }} (-{{ $wholesaleDiscount }}% Off Base)</option>
                             </select>
                         </div>
 
@@ -420,6 +444,92 @@
         </div>
     </div>
 
+    {{-- MODAL: End Shift & Cash Handover (Z-Report) --}}
+    <div id="endShiftModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-base">Conclude Shift & Register Handover</h3>
+                    <p class="text-xs text-slate-500">Official cash register reconciliation (Z-Report)</p>
+                </div>
+                <button type="button" onclick="closeEndShiftModal()" class="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+            </div>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs">
+                <div>
+                    <span class="text-slate-500 block">Operator & Station:</span>
+                    <span class="font-bold text-slate-900">{{ auth()->user()->name }} ({{ $currentBranchName }})</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-slate-500 block">Shift Duration:</span>
+                    <span id="shiftDurationLabel" class="font-mono font-bold text-slate-700">Loading...</span>
+                </div>
+            </div>
+
+            {{-- Automated Shift Summary Grid --}}
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="bg-gray-50 p-2.5 rounded-lg border">
+                    <span class="text-[10px] uppercase font-bold text-gray-500 block">Opening Float</span>
+                    <span id="shiftOpeningFloat" class="font-mono font-black text-gray-900">KES 0.00</span>
+                </div>
+                <div class="bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                    <span class="text-[10px] uppercase font-bold text-emerald-700 block">Expected Cash in Drawer</span>
+                    <span id="shiftExpectedCash" class="font-mono font-black text-emerald-800 text-sm">KES 0.00</span>
+                </div>
+                <div class="bg-gray-50 p-2.5 rounded-lg border">
+                    <span class="text-[10px] uppercase font-bold text-gray-500 block">M-Pesa Collections</span>
+                    <span id="shiftMpesaTotal" class="font-mono font-bold text-gray-900">KES 0.00</span>
+                </div>
+                <div class="bg-gray-50 p-2.5 rounded-lg border">
+                    <span class="text-[10px] uppercase font-bold text-gray-500 block">Total Shift Revenue</span>
+                    <span id="shiftTotalRevenue" class="font-mono font-black text-indigo-700">KES 0.00</span>
+                </div>
+            </div>
+
+            {{-- Cash Counting Form --}}
+            <form id="endShiftForm" onsubmit="submitEndShift(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-800 mb-1">
+                        Actual Physical Cash Counted in Drawer (KES) *
+                    </label>
+                    <input type="number" step="0.01" min="0" id="actualCashInput" required
+                           class="w-full text-base font-mono font-black rounded-lg border-gray-300 focus:ring-rose-500 focus:border-rose-500"
+                           placeholder="Enter total cash counted"
+                           oninput="onActualCashChange()">
+                    <span class="text-[11px] text-gray-400">Physically count all cash notes and coins before entering.</span>
+                </div>
+
+                {{-- Live Variance Calculation Banner --}}
+                <div id="shiftVarianceBox" class="p-3 rounded-xl border text-xs font-bold flex justify-between items-center bg-gray-100 text-gray-700">
+                    <span>Cash Drawer Variance:</span>
+                    <span id="shiftVarianceAmount" class="font-mono font-black text-sm">KES 0.00</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Handover Notes / Remarks (Optional)</label>
+                    <textarea id="shiftHandoverNotes" rows="2"
+                              class="w-full text-xs rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="e.g. Handed over to Jane; change was 100% balanced"></textarea>
+                </div>
+
+                <div class="flex justify-between items-center pt-3 border-t">
+                    <a href="{{ route('shifts.index') }}" class="text-xs font-semibold text-slate-500 hover:text-slate-800 hover:underline">
+                        Past Shifts Audit
+                    </a>
+                    <div class="space-x-2">
+                        <button type="button" onclick="closeEndShiftModal()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg">
+                            Cancel
+                        </button>
+                        <button type="submit" id="endShiftSubmitBtn"
+                                class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                            Seal Shift & Print Z-Report
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         // Main POS State
         let cart = [];
@@ -430,13 +540,16 @@
 
         const TIER_MULTIPLIERS = {
             retail: 1.00,
-            bulk: 0.90,     // 10% discount for school bulk
-            wholesale: 0.85 // 15% discount for wholesale
+            bulk: Math.max(0.01, (100 - {{ (float)$bulkDiscount }}) / 100),
+            wholesale: Math.max(0.01, (100 - {{ (float)$wholesaleDiscount }}) / 100)
         };
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
             updateParkedBadge();
+            if (window.location.hash === '#end-shift') {
+                openEndShiftModal();
+            }
         });
 
         // 1. SMART UNIFIED SEARCH & BARCODE SCANNER
@@ -616,10 +729,10 @@
 
             const badgeEl = document.getElementById('bannerTierBadge');
             if (tier === 'bulk') {
-                badgeEl.innerText = 'School Bulk (10% Off)';
+                badgeEl.innerText = '{{ addslashes($bulkLabel) }} ({{ $bulkDiscount }}% Off)';
                 badgeEl.className = 'bg-amber-500/80 text-amber-100 text-[10px] font-bold px-2 py-0.5 rounded uppercase';
             } else if (tier === 'wholesale') {
-                badgeEl.innerText = 'Wholesale (15% Off)';
+                badgeEl.innerText = '{{ addslashes($wholesaleLabel) }} ({{ $wholesaleDiscount }}% Off)';
                 badgeEl.className = 'bg-purple-500/80 text-purple-100 text-[10px] font-bold px-2 py-0.5 rounded uppercase';
             } else {
                 badgeEl.innerText = 'Retail';
@@ -1154,6 +1267,116 @@
             document.getElementById('formBranchName').value = document.getElementById('branchSelect').value;
 
             return true;
+        }
+
+        // 9. SHIFT MANAGEMENT & RECONCILIATION
+        let currentShiftExpectedCash = 0;
+
+        function openEndShiftModal() {
+            const branchName = document.getElementById('branchSelect').value;
+            const btn = document.getElementById('endShiftSubmitBtn');
+            btn.disabled = true;
+            btn.innerText = 'Loading shift details...';
+
+            fetch(`{{ route('shifts.current') }}?branch=${encodeURIComponent(branchName)}`)
+                .then(res => res.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerText = 'Seal Shift & Print Z-Report';
+
+                    document.getElementById('shiftDurationLabel').innerText = data.duration + ' (' + data.started_at + ')';
+                    document.getElementById('shiftOpeningFloat').innerText = 'KES ' + parseFloat(data.opening_float).toFixed(2);
+                    document.getElementById('shiftExpectedCash').innerText = 'KES ' + parseFloat(data.expected_cash).toFixed(2);
+                    document.getElementById('shiftMpesaTotal').innerText = 'KES ' + parseFloat(data.mpesa_total).toFixed(2);
+                    document.getElementById('shiftTotalRevenue').innerText = 'KES ' + parseFloat(data.total_sales_amount).toFixed(2);
+
+                    currentShiftExpectedCash = parseFloat(data.expected_cash) || 0;
+                    document.getElementById('actualCashInput').value = '';
+                    onActualCashChange();
+
+                    document.getElementById('endShiftModal').classList.remove('hidden');
+                    setTimeout(() => document.getElementById('actualCashInput').focus(), 100);
+                })
+                .catch(() => {
+                    btn.disabled = false;
+                    btn.innerText = 'Seal Shift & Print Z-Report';
+                    alert('Could not retrieve active shift records.');
+                });
+        }
+
+        function closeEndShiftModal() {
+            document.getElementById('endShiftModal').classList.add('hidden');
+        }
+
+        function onActualCashChange() {
+            const inputVal = document.getElementById('actualCashInput').value;
+            const actual = parseFloat(inputVal) || 0;
+            const variance = Math.round((actual - currentShiftExpectedCash) * 100) / 100;
+
+            const box = document.getElementById('shiftVarianceBox');
+            const amtEl = document.getElementById('shiftVarianceAmount');
+
+            if (inputVal.trim() === '') {
+                amtEl.innerText = 'KES 0.00';
+                box.className = 'p-3 rounded-xl border text-xs font-bold flex justify-between items-center bg-gray-100 text-gray-700';
+                return;
+            }
+
+            if (Math.abs(variance) < 0.01) {
+                amtEl.innerText = 'KES 0.00 (100% BALANCED)';
+                box.className = 'p-3 rounded-xl border text-xs font-bold flex justify-between items-center bg-emerald-50 text-emerald-800 border-emerald-300';
+            } else if (variance > 0) {
+                amtEl.innerText = `+ KES ${variance.toFixed(2)} (OVERAGE)`;
+                box.className = 'p-3 rounded-xl border text-xs font-bold flex justify-between items-center bg-blue-50 text-blue-800 border-blue-300';
+            } else {
+                amtEl.innerText = `- KES ${Math.abs(variance).toFixed(2)} (SHORTFALL)`;
+                box.className = 'p-3 rounded-xl border text-xs font-bold flex justify-between items-center bg-rose-50 text-rose-800 border-rose-300';
+            }
+        }
+
+        function submitEndShift(event) {
+            event.preventDefault();
+
+            if (!confirm('Are you sure you want to conclude and close this shift? This will seal your transactions and log you out.')) {
+                return;
+            }
+
+            const btn = document.getElementById('endShiftSubmitBtn');
+            btn.disabled = true;
+            btn.innerText = 'Closing Shift...';
+
+            const payload = {
+                actual_cash: parseFloat(document.getElementById('actualCashInput').value) || 0,
+                handover_notes: document.getElementById('shiftHandoverNotes').value.trim(),
+                branch_name: document.getElementById('branchSelect').value,
+                _token: '{{ csrf_token() }}'
+            };
+
+            fetch('{{ route("shifts.close") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Shift concluded successfully! Opening official Z-Report handover slip...');
+                    window.open(data.z_report_url, '_blank');
+                    window.location.href = '{{ route("login") }}';
+                } else {
+                    btn.disabled = false;
+                    btn.innerText = 'Seal Shift & Print Z-Report';
+                    alert(data.message || 'Failed to close shift.');
+                }
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.innerText = 'Seal Shift & Print Z-Report';
+                alert('A network error occurred while closing shift.');
+            });
         }
     </script>
 </x-app-layout>
