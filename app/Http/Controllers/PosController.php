@@ -65,7 +65,7 @@ class PosController extends Controller
 
         // If scanning an exact barcode or SKU
         if ($exact || strlen($query) >= 8 || str_starts_with($query, 'BC-')) {
-            $exactVariant = ProductVariant::with('product')
+            $exactVariant = ProductVariant::with(['product.category'])
                 ->where('barcode', $query)
                 ->orWhere('sku', $query)
                 ->first();
@@ -73,44 +73,56 @@ class PosController extends Controller
             if ($exactVariant) {
                 return response()->json([
                     [
-                        'id'             => $exactVariant->id,
-                        'sku'            => $exactVariant->sku,
-                        'barcode'        => $exactVariant->barcode,
-                        'product_name'   => $exactVariant->product->name,
-                        'size'           => $exactVariant->size,
-                        'colour'         => $exactVariant->colour,
-                        'selling_price'  => $exactVariant->selling_price,
-                        'stock_quantity' => $exactVariant->stock_quantity,
-                        'exact_match'    => true,
+                        'id'              => $exactVariant->id,
+                        'sku'             => $exactVariant->sku,
+                        'barcode'         => $exactVariant->barcode,
+                        'product_name'    => $exactVariant->product?->name ?? 'Product',
+                        'brand_name'      => $exactVariant->brand_name,
+                        'unit_of_measure' => $exactVariant->unit_of_measure ?? 'Piece',
+                        'formatted_title' => $exactVariant->formatted_title,
+                        'size'            => $exactVariant->size,
+                        'colour'          => $exactVariant->colour,
+                        'selling_price'   => $exactVariant->selling_price,
+                        'stock_quantity'  => $exactVariant->stock_quantity,
+                        'exact_match'     => true,
                     ]
                 ]);
             }
         }
 
-        $variants = ProductVariant::with('product')
+        $variants = ProductVariant::with(['product.category'])
             ->where(function($q) use ($query) {
                 $q->whereHas('product', function($p) use ($query) {
-                    $p->where('name', 'like', "%{$query}%");
+                    $p->where('name', 'like', "%{$query}%")
+                      ->orWhere('sku_prefix', 'like', "%{$query}%")
+                      ->orWhereHas('category', function($c) use ($query) {
+                          $c->where('name', 'like', "%{$query}%");
+                      });
                 })
                 ->orWhere('size', 'like', "%{$query}%")
                 ->orWhere('colour', 'like', "%{$query}%")
+                ->orWhere('brand_name', 'like', "%{$query}%")
+                ->orWhere('unit_of_measure', 'like', "%{$query}%")
                 ->orWhere('sku', 'like', "%{$query}%")
                 ->orWhere('barcode', 'like', "%{$query}%");
             })
-            ->limit(20)
+            ->limit(25)
             ->get();
 
         return response()->json($variants->map(function($variant) {
             return [
-                'id'             => $variant->id,
-                'sku'            => $variant->sku,
-                'barcode'        => $variant->barcode,
-                'product_name'   => $variant->product->name,
-                'size'           => $variant->size,
-                'colour'         => $variant->colour,
-                'selling_price'  => $variant->selling_price,
-                'stock_quantity' => $variant->stock_quantity,
-                'exact_match'    => false,
+                'id'              => $variant->id,
+                'sku'             => $variant->sku,
+                'barcode'         => $variant->barcode,
+                'product_name'    => $variant->product?->name ?? 'Product',
+                'brand_name'      => $variant->brand_name,
+                'unit_of_measure' => $variant->unit_of_measure ?? 'Piece',
+                'formatted_title' => $variant->formatted_title,
+                'size'            => $variant->size,
+                'colour'          => $variant->colour,
+                'selling_price'   => $variant->selling_price,
+                'stock_quantity'  => $variant->stock_quantity,
+                'exact_match'     => false,
             ];
         }));
     }

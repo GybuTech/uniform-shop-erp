@@ -597,20 +597,23 @@
                         document.getElementById('searchSpinner').classList.add('hidden');
                         if (data && data.length > 0) {
                             const topMatch = data[0];
+                            const displayName = topMatch.formatted_title || topMatch.product_name;
                             addToCart(
                                 topMatch.id,
-                                topMatch.product_name,
+                                displayName,
                                 topMatch.size,
                                 topMatch.colour,
                                 topMatch.selling_price,
                                 topMatch.stock_quantity,
-                                topMatch.sku
+                                topMatch.sku,
+                                topMatch.unit_of_measure,
+                                topMatch.brand_name
                             );
                             // Clear input immediately so cashier can scan next item seamlessly
                             event.target.value = '';
                             document.getElementById('searchResults').innerHTML = `
                                 <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-bold flex items-center justify-between">
-                                    <span>Added to cart: ${topMatch.product_name} (${topMatch.size})</span>
+                                    <span>Added to cart: ${displayName}</span>
                                     <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-mono">${topMatch.sku}</span>
                                 </div>`;
                         } else {
@@ -627,26 +630,40 @@
             const container = document.getElementById('searchResults');
 
             if (!variants || variants.length === 0) {
-                container.innerHTML = '<p class="text-gray-400 text-xs text-center py-12">No matching uniform garments found in catalog.</p>';
+                container.innerHTML = '<p class="text-gray-400 text-xs text-center py-12">No matching items found in product catalog.</p>';
                 return;
             }
 
             const multiplier = TIER_MULTIPLIERS[pricingTier] || 1.00;
 
             container.innerHTML = variants.map(v => {
-                const normColour = (v.colour || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                const normName = (v.product_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                const showColour = v.colour && normColour !== normName && !normName.includes(normColour);
-                const colourTag = showColour ? ` &bull; <span class="text-indigo-600 font-semibold">${v.colour}</span>` : '';
-                const safeName = (v.product_name || '').replace(/'/g, "\\'");
+                const displayName = v.formatted_title || v.product_name;
+                const safeName = displayName.replace(/'/g, "\\'");
+                const safeSize = (v.size || '').replace(/'/g, "\\'");
                 const safeColour = (v.colour || '').replace(/'/g, "\\'");
+                const safeUnit = (v.unit_of_measure || 'Piece').replace(/'/g, "\\'");
+                const safeBrand = (v.brand_name || '').replace(/'/g, "\\'");
                 const effectivePrice = Math.round((v.selling_price * multiplier) * 100) / 100;
+
+                // Attribute badge: size/colour for uniforms, unit/brand for hardware/agrovet
+                let attrPill = '';
+                if (v.size && v.size.trim() !== '') {
+                    const normColour = (v.colour || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const normName = (v.product_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const showColour = v.colour && normColour !== normName && !normName.includes(normColour) && v.colour.toLowerCase() !== 'standard';
+                    const colourTag = showColour ? ` &bull; <span class="text-indigo-600 font-semibold">${v.colour}</span>` : '';
+                    attrPill = `&bull; Size: <strong class="text-gray-800">${v.size}</strong>${colourTag}`;
+                } else if (v.unit_of_measure) {
+                    attrPill = `&bull; Unit: <strong class="text-indigo-700">${v.unit_of_measure}</strong>`;
+                }
+
+                const brandPill = v.brand_name ? `<span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold mr-1.5">${v.brand_name}</span>` : '';
 
                 const stockBadge = v.stock_quantity <= 0
                     ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">Out of Stock (0)</span>`
                     : (v.stock_quantity <= 5
                         ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">Low Stock (${v.stock_quantity} left)</span>`
-                        : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${v.stock_quantity} pcs)</span>`);
+                        : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${v.stock_quantity} ${v.unit_of_measure || 'units'})</span>`);
 
                 const actionButton = v.stock_quantity <= 0
                     ? `<span class="inline-block text-xs bg-gray-100 text-gray-400 px-3 py-1 rounded font-bold border cursor-not-allowed">0 Stock</span>`
@@ -654,12 +671,12 @@
 
                 return `
                 <div class="flex items-center justify-between p-3 border rounded-xl hover:bg-indigo-50/60 transition cursor-pointer bg-white"
-                     onclick="addToCart(${v.id}, '${safeName}', '${v.size}', '${safeColour}', ${v.selling_price}, ${v.stock_quantity}, '${v.sku}')">
+                     onclick="addToCart(${v.id}, '${safeName}', '${safeSize}', '${safeColour}', ${v.selling_price}, ${v.stock_quantity}, '${v.sku}', '${safeUnit}', '${safeBrand}')">
                     <div>
-                        <p class="font-bold text-gray-900 text-sm">${v.product_name}</p>
+                        <p class="font-bold text-gray-900 text-sm">${brandPill}${displayName}</p>
                         <p class="text-xs text-gray-500 font-mono mb-1">
                             <span class="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-bold">${v.sku}</span>
-                            &bull; Size: <strong class="text-gray-800">${v.size}</strong>${colourTag}
+                            ${attrPill}
                         </p>
                         ${stockBadge}
                     </div>
@@ -674,20 +691,20 @@
         }
 
         // 2. CART LOGIC & PRICING TIERS
-        function addToCart(id, name, size, colour, basePrice, stock, sku) {
+        function addToCart(id, name, size, colour, basePrice, stock, sku, unit = 'Piece', brand = '') {
             const existing = cart.find(item => item.id === id);
             if (existing) {
                 if (existing.qty + 1 > stock) {
-                    alert(`Stock limit reached. Only ${stock} units of ${name} (${size}) currently in branch inventory.`);
+                    alert(`Stock limit reached. Only ${stock} units of ${name} currently in branch inventory.`);
                     return;
                 }
                 existing.qty++;
             } else {
                 if (stock < 1) {
-                    alert(`Notice: ${name} (${size}) is currently out of stock (0 pcs on hand).`);
+                    alert(`Notice: ${name} is currently out of stock (0 units on hand).`);
                     return;
                 }
-                cart.push({ id, name, size, colour, basePrice, stock, sku, qty: 1 });
+                cart.push({ id, name, size, colour, basePrice, stock, sku, unit, brand, qty: 1 });
             }
             renderCart();
         }
@@ -781,13 +798,19 @@
                 const lineTotal = effectiveUnit * item.qty;
                 total += lineTotal;
 
+                let subtitle = '';
+                if (item.size && item.size.trim() !== '') {
+                    subtitle = `<span class="font-bold text-gray-700">Size: ${item.size}</span>${item.colour && item.colour.toLowerCase() !== 'standard' ? ` &bull; ${item.colour}` : ''}`;
+                } else if (item.unit) {
+                    subtitle = `<span class="font-bold text-indigo-700">Unit: ${item.unit}</span>`;
+                }
+
                 return `
                 <div class="flex items-center justify-between p-2 bg-gray-50 border rounded-lg text-xs">
                     <div class="flex-1 pr-2">
                         <p class="font-bold text-gray-900 leading-tight">${item.name}</p>
                         <p class="text-[11px] text-gray-500 font-mono">
-                            <span class="font-bold text-gray-700">${item.size}</span>
-                            ${item.colour ? ` &bull; ${item.colour}` : ''}
+                            ${subtitle}
                         </p>
                         <p class="font-black text-indigo-700 font-mono">KES ${effectiveUnit.toFixed(2)} &times; ${item.qty} = KES ${lineTotal.toFixed(2)}</p>
                     </div>

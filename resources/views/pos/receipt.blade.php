@@ -65,8 +65,8 @@
                         @foreach($sale->saleItems as $item)
                         <tr>
                             <td class="py-2.5">
-                                <p class="font-bold text-gray-900">{{ $item->productVariant->product->name ?? 'Uniform Item' }}</p>
-                                <p class="text-[11px] text-gray-500 font-mono">{{ $item->productVariant->sku }} ({{ $item->productVariant->size }}/{{ $item->productVariant->colour }})</p>
+                                <p class="font-bold text-gray-900">{{ $item->productVariant->formatted_title ?? ($item->productVariant->product->name ?? 'Retail Item') }}</p>
+                                <p class="text-[11px] text-gray-500 font-mono">{{ $item->productVariant->sku }}</p>
                             </td>
                             <td class="py-2.5 text-center font-bold text-gray-800">{{ $item->quantity }}</td>
                             <td class="py-2.5 text-right font-medium text-gray-600">KES {{ number_format($item->unit_price, 2) }}</td>

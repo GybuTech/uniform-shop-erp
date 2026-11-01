@@ -10,20 +10,20 @@
                 </p>
             </div>
             @can('create-product-variants')
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
                 <a href="{{ route('products.variants.bulk-create', $product) }}"
-                   class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   class="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                     </svg>
-                    Bulk Matrix Creator
+                    Bulk Matrix Creator (Uniforms)
                 </a>
                 <a href="{{ route('products.variants.create', $product) }}"
-                   class="inline-flex items-center px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-lg shadow-sm transition">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   class="inline-flex items-center justify-center px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-lg shadow-sm transition">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
-                    + Add Single Variant
+                    + Add Single Variant / Item
                 </a>
             </div>
             @endcan
@@ -150,8 +150,8 @@
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">SKU</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Barcode</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Size</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Colour</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Size / Unit</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Colour / Brand</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Selling Price</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Stock</th>
                             <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
@@ -163,8 +163,22 @@
                             <td class="px-6 py-4 text-sm text-gray-900">{{ $loop->iteration }}</td>
                             <td class="px-6 py-4 text-sm font-mono font-bold text-gray-900">{{ $variant->sku }}</td>
                             <td class="px-6 py-4 text-sm font-mono text-gray-500">{{ $variant->barcode }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-800 font-bold">Size {{ $variant->size }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-700 font-semibold">{{ $variant->colour }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-800 font-bold">
+                                @if($variant->size)
+                                    Size {{ $variant->size }}
+                                @else
+                                    <span class="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded font-mono font-semibold">{{ $variant->unit_of_measure ?? 'Piece' }}</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-700 font-semibold">
+                                @if($variant->colour && strtolower($variant->colour) !== 'standard')
+                                    {{ $variant->colour }}
+                                @elseif($variant->brand_name)
+                                    <span class="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-medium">{{ $variant->brand_name }}</span>
+                                @else
+                                    <span class="text-gray-400 font-normal text-xs">—</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 text-sm text-gray-900 font-extrabold">
                                 KES {{ number_format($variant->selling_price, 2) }}
                             </td>
