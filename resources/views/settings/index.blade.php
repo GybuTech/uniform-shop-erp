@@ -201,11 +201,20 @@
                         @csrf
                         @method('PUT')
 
-                        <div>
-                            <x-input-label for="business_name" value="Business Trading Name *" />
-                            <input type="text" name="business_name" id="business_name" value="{{ old('business_name', $businessName) }}" required class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500">
-                            <span class="text-[11px] text-slate-400">Printed as the primary header on all thermal customer receipts.</span>
-                            @error('business_name') <span class="text-xs text-red-600 block">{{ $message }}</span> @enderror
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <x-input-label for="business_name" value="Business Trading Name *" />
+                                <input type="text" name="business_name" id="business_name" value="{{ old('business_name', $businessName) }}" required class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <span class="text-[11px] text-slate-400">Printed as the primary store name on receipts.</span>
+                                @error('business_name') <span class="text-xs text-red-600 block">{{ $message }}</span> @enderror
+                            </div>
+
+                            <div>
+                                <x-input-label for="business_tagline" value="Business Tagline / Subtitle" />
+                                <input type="text" name="business_tagline" id="business_tagline" value="{{ old('business_tagline', $businessTagline ?? '') }}" placeholder="e.g. Commercial Retail & Multi-Branch POS" class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <span class="text-[11px] text-slate-400">Printed under store name on customer receipts.</span>
+                                @error('business_tagline') <span class="text-xs text-red-600 block">{{ $message }}</span> @enderror
+                            </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -217,7 +226,7 @@
 
                             <div>
                                 <x-input-label for="business_email" value="Official Email Address" />
-                                <input type="email" name="business_email" id="business_email" value="{{ old('business_email', $businessEmail) }}" placeholder="sales@tshaprint.co.ke" class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm">
+                                <input type="email" name="business_email" id="business_email" value="{{ old('business_email', $businessEmail) }}" placeholder="sales@store.co.ke" class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm">
                                 @error('business_email') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
                             </div>
                         </div>
@@ -246,11 +255,19 @@
                             </div>
                         </div>
 
-                        <div>
-                            <x-input-label for="receipt_footer_note" value="Thermal Receipt Footer Note" />
-                            <input type="text" name="receipt_footer_note" id="receipt_footer_note" value="{{ old('receipt_footer_note', $receiptFooter) }}" placeholder="e.g. Goods once sold are returnable within 7 days with valid receipt." class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm">
-                            <span class="text-[11px] text-slate-400">Printed at the bottom of customer receipts.</span>
-                            @error('receipt_footer_note') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <x-input-label for="receipt_header_note" value="Receipt Header Note (Optional)" />
+                                <input type="text" name="receipt_header_note" id="receipt_header_note" value="{{ old('receipt_header_note', $receiptHeader ?? '') }}" placeholder="e.g. Welcome! Serving quality since 2018." class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm">
+                                <span class="text-[11px] text-slate-400">Printed below the store title.</span>
+                                @error('receipt_header_note') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </div>
+                            <div>
+                                <x-input-label for="receipt_footer_note" value="Thermal Receipt Footer Note" />
+                                <input type="text" name="receipt_footer_note" id="receipt_footer_note" value="{{ old('receipt_footer_note', $receiptFooter) }}" placeholder="e.g. Goods once sold are returnable within 7 days with valid receipt." class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm">
+                                <span class="text-[11px] text-slate-400">Printed at the bottom of customer receipts.</span>
+                                @error('receipt_footer_note') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </div>
                         </div>
 
                         {{-- Dynamic Pricing Tiers Configuration --}}

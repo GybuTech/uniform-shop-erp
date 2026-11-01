@@ -19,9 +19,21 @@
 
                 <!-- Header -->
                 <div class="text-center mb-6 pb-4 border-b border-dashed">
-                    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">{{ strtoupper(\App\Models\BusinessSetting::get('business_name', 'TSHAPRINT SOLUTIONS')) }}</h1>
-                    <p class="text-gray-600 text-xs font-bold uppercase tracking-wider mt-0.5">Uniform Manufacturer & Retail POS</p>
-                    <p class="text-indigo-600 font-semibold text-xs mt-1">{{ $sale->branch_name ?? 'Main Shop' }}</p>
+                    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight uppercase">{{ \App\Models\BusinessSetting::get('business_name', 'TSHAPRINT SOLUTIONS') }}</h1>
+                    <p class="text-gray-600 text-xs font-bold tracking-wider mt-0.5">{{ \App\Models\BusinessSetting::get('business_tagline', 'Commercial Retail & Multi-Branch POS') }}</p>
+                    <p class="text-indigo-600 font-semibold text-xs mt-1">{{ $sale->branch_name ?? 'Main Branch' }}</p>
+                    @if($headerNote = \App\Models\BusinessSetting::get('receipt_header_note'))
+                        <p class="text-gray-500 text-[11px] mt-0.5 italic">{{ $headerNote }}</p>
+                    @endif
+                    <div class="text-[10px] text-gray-500 mt-1 font-mono">
+                        {{ \App\Models\BusinessSetting::get('business_address', 'Nairobi, Kenya') }} &bull; Tel: {{ \App\Models\BusinessSetting::get('business_phone', '+254 700 000 000') }}
+                    </div>
+                    @if($kraPin = \App\Models\BusinessSetting::get('kra_pin'))
+                        <div class="text-[10px] text-gray-500 font-mono mt-0.5">
+                            KRA PIN: {{ $kraPin }}
+                            @if($vat = \App\Models\BusinessSetting::get('vat_number')) &bull; VAT: {{ $vat }} @endif
+                        </div>
+                    @endif
                     <div class="mt-3 inline-block bg-gray-100 px-3 py-1 rounded text-xs font-mono font-bold text-gray-800">
                         RECEIPT #: {{ $sale->receipt_number }}
                     </div>
@@ -62,6 +74,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
+                        @php $currency = \App\Models\BusinessSetting::get('business_currency', 'KES'); @endphp
                         @foreach($sale->saleItems as $item)
                         <tr>
                             <td class="py-2.5">
@@ -69,24 +82,24 @@
                                 <p class="text-[11px] text-gray-500 font-mono">{{ $item->productVariant->sku }}</p>
                             </td>
                             <td class="py-2.5 text-center font-bold text-gray-800">{{ $item->quantity }}</td>
-                            <td class="py-2.5 text-right font-medium text-gray-600">KES {{ number_format($item->unit_price, 2) }}</td>
-                            <td class="py-2.5 text-right font-extrabold text-gray-900">KES {{ number_format($item->line_total, 2) }}</td>
+                            <td class="py-2.5 text-right font-medium text-gray-600">{{ $currency }} {{ number_format($item->unit_price, 2) }}</td>
+                            <td class="py-2.5 text-right font-extrabold text-gray-900">{{ $currency }} {{ number_format($item->line_total, 2) }}</td>
                         </tr>
                         @endforeach
                     </tbody>
                     <tfoot class="border-t-2 border-gray-300">
                         <tr>
                             <td colspan="3" class="py-3 text-right font-bold text-gray-900 text-sm">GRAND TOTAL</td>
-                            <td class="py-3 text-right font-extrabold text-base text-emerald-600">KES {{ number_format($sale->total_amount, 2) }}</td>
+                            <td class="py-3 text-right font-extrabold text-base text-emerald-600">{{ $currency }} {{ number_format($sale->total_amount, 2) }}</td>
                         </tr>
                     </tfoot>
                 </table>
 
                 <!-- Receipt Footer -->
-                <div class="text-center text-gray-400 text-xs border-t border-dashed pt-4 space-y-1">
-                    <p class="font-bold text-gray-600">Thank you for shopping with us!</p>
-                    <p>Quality School Uniforms & Quality Apparel</p>
-                    <p class="text-[10px] text-gray-400">Goods once sold are returnable within 7 days with valid receipt.</p>
+                <div class="text-center text-gray-500 text-xs border-t border-dashed pt-4 space-y-1">
+                    <p class="font-bold text-gray-700">Thank you for your business!</p>
+                    <p class="text-[10px] text-gray-500">{{ \App\Models\BusinessSetting::get('receipt_footer_note', 'Goods once sold are returnable within 7 days with valid receipt.') }}</p>
+                    <p class="text-[9px] text-gray-400 font-mono">Cashier: {{ $sale->user->name ?? 'Staff' }} &bull; Point of Sale</p>
                 </div>
             </div>
         </div>

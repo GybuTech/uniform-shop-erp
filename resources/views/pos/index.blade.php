@@ -2,8 +2,11 @@
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
-                <h2 class="font-bold text-xl text-gray-900 leading-tight">POS Terminal</h2>
-                <p class="text-xs text-gray-500 mt-0.5">Quick Checkout &bull; Barcode Scanner &bull; Multi-Payment &bull; Quotes</p>
+                <div class="flex items-center space-x-2">
+                    <h2 class="font-bold text-xl text-gray-900 leading-tight">{{ \App\Models\BusinessSetting::get('business_name', 'POS Terminal') }}</h2>
+                    <span class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded">{{ $branchName ?? 'Main Branch' }}</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-0.5">{{ \App\Models\BusinessSetting::get('business_tagline', 'Quick Checkout • Barcode Scanner • Multi-Payment • Quotes') }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 {{-- Cashier & Shift Badge --}}

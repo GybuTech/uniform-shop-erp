@@ -23,8 +23,8 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                         </svg>
                     </div>
-                    <span class="text-xl font-extrabold text-slate-900 tracking-tight">Tshaprint Solutions</span>
-                    <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Multi-Branch Retail ERP & POS</span>
+                    <span class="text-xl font-extrabold text-slate-900 tracking-tight">{{ \App\Models\BusinessSetting::get('business_name', 'Retail POS & ERP') }}</span>
+                    <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider">{{ \App\Models\BusinessSetting::get('business_tagline', 'Multi-Branch Retail ERP & POS') }}</span>
                 </a>
             </div>
 

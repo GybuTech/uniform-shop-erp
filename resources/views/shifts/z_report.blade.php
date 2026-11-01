@@ -23,8 +23,12 @@
                 {{-- Header --}}
                 <div class="text-center pb-4 border-b border-dashed border-gray-400 space-y-1">
                     <h1 class="text-lg font-black tracking-tight uppercase">{{ $businessName }}</h1>
+                    <p class="text-[10px] text-gray-500 font-semibold">{{ \App\Models\BusinessSetting::get('business_tagline', 'Commercial Retail & Multi-Branch POS') }}</p>
                     <p class="text-[11px] font-bold text-gray-600">REGISTER SHIFT HANDOVER REPORT (Z-REPORT)</p>
-                    <p class="text-[10px] text-gray-500 font-semibold">{{ $shift->branch_name ?? 'Main Shop' }}</p>
+                    <p class="text-[10px] text-gray-500 font-semibold">{{ $shift->branch_name ?? 'Main Branch' }}</p>
+                    @if($kra = \App\Models\BusinessSetting::get('kra_pin'))
+                        <p class="text-[9px] text-gray-400 font-mono">PIN: {{ $kra }}</p>
+                    @endif
                     <div class="mt-2 inline-block bg-slate-100 px-2.5 py-0.5 rounded text-[10px] font-bold text-slate-800">
                         SHIFT #{{ str_pad($shift->id, 5, '0', STR_PAD_LEFT) }} &bull; {{ strtoupper($shift->status) }}
                     </div>

@@ -105,7 +105,7 @@
                                     {{ $header }}
                                 </div>
                             @else
-                                <h1 class="text-xl font-bold text-slate-900 tracking-tight">Tshaprint Solutions POS & ERP</h1>
+                                <h1 class="text-xl font-bold text-slate-900 tracking-tight">{{ \App\Models\BusinessSetting::get('business_name', 'Retail POS & ERP') }}</h1>
                             @endisset
                         </div>
 

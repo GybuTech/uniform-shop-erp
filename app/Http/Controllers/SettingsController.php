@@ -25,6 +25,7 @@ class SettingsController extends Controller
         }
 
         $businessName = BusinessSetting::get('business_name', 'Tshaprint Solutions');
+        $businessTagline = BusinessSetting::get('business_tagline', 'Commercial Retail & Multi-Branch POS');
         $businessEmail = BusinessSetting::get('business_email', 'sales@tshaprint.co.ke');
         $businessPhone = BusinessSetting::get('business_phone', '+254 700 000 000');
         $businessAddress = BusinessSetting::get('business_address', 'Nairobi, Kenya');
@@ -37,6 +38,7 @@ class SettingsController extends Controller
         $wholesaleLabel = BusinessSetting::get('pricing_tier_wholesale_label', 'Wholesale Contract Tier');
         $kraPin = BusinessSetting::get('kra_pin', '');
         $vatNumber = BusinessSetting::get('vat_number', '');
+        $receiptHeader = BusinessSetting::get('receipt_header_note', '');
         $receiptFooter = BusinessSetting::get('receipt_footer_note', 'Goods once sold are returnable within 7 days with valid receipt.');
 
         $currentSystemTime = SystemTime::formatted('d M Y, h:i A');
@@ -50,6 +52,7 @@ class SettingsController extends Controller
             'allUsers',
             'isOwnerOrAdmin',
             'businessName',
+            'businessTagline',
             'businessEmail',
             'businessPhone',
             'businessAddress',
@@ -60,6 +63,7 @@ class SettingsController extends Controller
             'wholesaleLabel',
             'kraPin',
             'vatNumber',
+            'receiptHeader',
             'receiptFooter',
             'currentSystemTime',
             'currentSystemTimeIso',
@@ -103,12 +107,14 @@ class SettingsController extends Controller
 
         $validated = $request->validate([
             'business_name'                  => ['required', 'string', 'max:255'],
+            'business_tagline'               => ['nullable', 'string', 'max:255'],
             'business_email'                 => ['nullable', 'email', 'max:255'],
             'business_phone'                 => ['nullable', 'string', 'max:50'],
             'business_address'               => ['nullable', 'string', 'max:255'],
             'business_currency'              => ['required', 'string', 'max:10'],
             'kra_pin'                        => ['nullable', 'string', 'max:50'],
             'vat_number'                     => ['nullable', 'string', 'max:50'],
+            'receipt_header_note'            => ['nullable', 'string', 'max:255'],
             'receipt_footer_note'            => ['nullable', 'string', 'max:255'],
             'pricing_tier_bulk_discount'     => ['required', 'numeric', 'min:0', 'max:99'],
             'pricing_tier_wholesale_discount'=> ['required', 'numeric', 'min:0', 'max:99'],

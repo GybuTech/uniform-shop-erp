@@ -24,12 +24,21 @@ class BranchAndUserBackfillSeeder extends Seeder
 
         // 2. Seed business settings
         $settings = [
-            'business_name'              => 'Tshaprint Solutions',
-            'business_email'             => 'sales@tshaprint.co.ke',
-            'business_phone'             => '+254 700 000 000',
-            'business_address'           => 'Nairobi Central Business District, Kenya',
-            'business_currency'          => 'KES',
-            'system_time_offset_seconds' => '0',
+            'business_name'                  => 'Tshaprint Solutions',
+            'business_tagline'               => 'Commercial Retail & Multi-Branch POS',
+            'business_email'                 => 'sales@tshaprint.co.ke',
+            'business_phone'                 => '+254 700 000 000',
+            'business_address'               => 'Nairobi Central Business District, Kenya',
+            'business_currency'              => 'KES',
+            'kra_pin'                        => '',
+            'vat_number'                     => '',
+            'receipt_header_note'            => '',
+            'receipt_footer_note'            => 'Goods once sold are returnable within 7 days with valid receipt.',
+            'pricing_tier_bulk_label'        => 'School Bulk Tier',
+            'pricing_tier_bulk_discount'     => '10.0',
+            'pricing_tier_wholesale_label'   => 'Wholesale Contract Tier',
+            'pricing_tier_wholesale_discount'=> '15.0',
+            'system_time_offset_seconds'     => '0',
         ];
 
         foreach ($settings as $key => $val) {

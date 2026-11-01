@@ -13,8 +13,8 @@
                 </svg>
             </div>
             <div class="flex flex-col">
-                <span class="text-white font-extrabold text-sm tracking-tight leading-none">Tshaprint <span class="text-indigo-400">Solutions</span></span>
-                <span class="text-[9px] font-medium text-slate-400 tracking-wider uppercase mt-0.5">Retail ERP & Multi-Branch POS</span>
+                <span class="text-white font-extrabold text-sm tracking-tight leading-none truncate max-w-[170px]">{{ \App\Models\BusinessSetting::get('business_name', 'Tshaprint Solutions') }}</span>
+                <span class="text-[9px] font-medium text-slate-400 tracking-wider uppercase mt-0.5 truncate max-w-[170px]">{{ \App\Models\BusinessSetting::get('business_tagline', 'Retail ERP & Multi-Branch POS') }}</span>
             </div>
         </a>
         <button @click="sidebarOpen = false" class="p-1 text-slate-400 hover:text-white lg:hidden" title="Close Sidebar">

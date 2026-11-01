@@ -18,9 +18,16 @@
     <!-- Receipt Container -->
     <div class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg border border-gray-200 font-mono text-sm print:shadow-none print:border-none print:w-full print:p-0">
         <div class="text-center border-b pb-4 mb-4">
-            <h1 class="text-xl font-extrabold uppercase tracking-wider text-gray-900">{{ strtoupper(\App\Models\BusinessSetting::get('business_name', 'TSHAPRINT SOLUTIONS')) }}</h1>
-            <p class="text-xs text-gray-500">Official Sales Receipt &bull; {{ $sale->branch_name ?? 'Main Shop' }}</p>
+            <h1 class="text-xl font-extrabold uppercase tracking-wider text-gray-900">{{ \App\Models\BusinessSetting::get('business_name', 'TSHAPRINT SOLUTIONS') }}</h1>
+            <p class="text-xs text-gray-500 font-semibold">{{ \App\Models\BusinessSetting::get('business_tagline', 'Commercial Retail & Multi-Branch POS') }}</p>
+            <p class="text-xs text-indigo-700 font-medium">{{ $sale->branch_name ?? 'Main Branch' }}</p>
+            @if($headerNote = \App\Models\BusinessSetting::get('receipt_header_note'))
+                <p class="text-gray-500 text-[10px] mt-0.5 italic">{{ $headerNote }}</p>
+            @endif
             <p class="text-xs text-gray-500 mt-1">Tel: {{ \App\Models\BusinessSetting::get('business_phone', '+254 700 000 000') }} | Email: {{ \App\Models\BusinessSetting::get('business_email', 'sales@tshaprint.co.ke') }}</p>
+            @if($kraPin = \App\Models\BusinessSetting::get('kra_pin'))
+                <p class="text-[10px] text-gray-500 font-mono">KRA PIN: {{ $kraPin }} @if($vat = \App\Models\BusinessSetting::get('vat_number')) | VAT: {{ $vat }} @endif</p>
+            @endif
         </div>
 
         <div class="space-y-1 text-xs text-gray-600 mb-4 border-b pb-4">
@@ -79,14 +86,14 @@
         <div class="border-t-2 border-dashed border-gray-300 pt-3 space-y-1 text-xs">
             <div class="flex justify-between text-base font-extrabold text-gray-900 py-1 border-b border-gray-200">
                 <span>GRAND TOTAL:</span>
-                <span>KES {{ number_format($sale->total_amount, 2) }}</span>
+                <span>{{ \App\Models\BusinessSetting::get('business_currency', 'KES') }} {{ number_format($sale->total_amount, 2) }}</span>
             </div>
         </div>
 
         <!-- Footer Note -->
         <div class="text-center text-[10px] text-gray-500 mt-6 pt-4 border-t border-gray-200 space-y-1">
-            <p>Thank you for shopping with us!</p>
-            <p>Goods once sold are returnable as per warranty policy.</p>
+            <p class="font-bold text-gray-700">Thank you for your business!</p>
+            <p>{{ \App\Models\BusinessSetting::get('receipt_footer_note', 'Goods once sold are returnable within 7 days with valid receipt.') }}</p>
         </div>
     </div>
 </x-app-layout>

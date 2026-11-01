@@ -40,9 +40,12 @@
                 {{-- Quotation Header --}}
                 <div class="flex justify-between items-start pb-6 border-b border-slate-200">
                     <div>
-                        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Tshaprint <span class="text-indigo-600">Solutions</span></h1>
-                        <p class="text-xs text-slate-500 mt-1">School Uniforms, Sports Kits & Corporate Apparel</p>
-                        <p class="text-xs text-slate-500">Nairobi, Kenya &bull; Tel: +254 700 000 000</p>
+                        <h1 class="text-2xl font-black text-slate-900 tracking-tight">{{ \App\Models\BusinessSetting::get('business_name', 'Tshaprint Solutions') }}</h1>
+                        <p class="text-xs text-slate-500 mt-1">{{ \App\Models\BusinessSetting::get('business_tagline', 'Commercial Retail & Institutional Supplies') }}</p>
+                        <p class="text-xs text-slate-500">{{ \App\Models\BusinessSetting::get('business_address', 'Nairobi, Kenya') }} &bull; Tel: {{ \App\Models\BusinessSetting::get('business_phone', '+254 700 000 000') }}</p>
+                        @if($kraPin = \App\Models\BusinessSetting::get('kra_pin'))
+                            <p class="text-[11px] font-mono text-slate-400 mt-0.5">KRA PIN: {{ $kraPin }} @if($vat = \App\Models\BusinessSetting::get('vat_number')) &bull; VAT: {{ $vat }} @endif</p>
+                        @endif
                     </div>
                     <div class="text-right">
                         <span class="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-extrabold rounded-full uppercase tracking-wider mb-2">
@@ -120,7 +123,7 @@
                         </div>
                         <div class="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
                             <span>Grand Total:</span>
-                            <span class="text-indigo-600">KES {{ number_format($quotation->total_amount, 2) }}</span>
+                            <span class="text-indigo-600">{{ \App\Models\BusinessSetting::get('business_currency', 'KES') }} {{ number_format($quotation->total_amount, 2) }}</span>
                         </div>
                     </div>
                 </div>
