@@ -232,11 +232,28 @@
                             <select id="paymentMethod" onchange="onPaymentMethodChange(this.value)"
                                 class="block w-full border-gray-300 rounded-lg shadow-sm text-xs font-bold text-gray-800 focus:ring-indigo-500 focus:border-indigo-500">
                                 <option value="Cash">Cash (Immediate Collection)</option>
-                                <option value="M-Pesa">M-Pesa (Mobile Money STK/Till)</option>
+                                <option value="M-Pesa">M-Pesa (Mobile Money Till / Paybill)</option>
                                 <option value="Split">Multiple Pay (Split Cash + M-Pesa)</option>
                                 <option value="Card">Bank Card / Debit</option>
                                 <option value="Credit">Credit Sale (On-Account / Customer Debt Ledger)</option>
                             </select>
+                        </div>
+
+                        {{-- M-Pesa Counter Confirmation & Reference Code (Visible when M-Pesa or Split selected) --}}
+                        <div id="mpesaRefPanel" class="hidden mb-3 p-3 bg-emerald-50/80 border border-emerald-300 rounded-xl space-y-1.5">
+                            <div class="flex justify-between items-center">
+                                <label for="paymentReferenceInput" class="block text-[11px] font-bold text-emerald-950 uppercase tracking-wider">
+                                    M-Pesa SMS Code / Ref
+                                </label>
+                                @if($till = \App\Models\BusinessSetting::get('mpesa_till_number'))
+                                    <span class="text-[10px] bg-emerald-200 text-emerald-900 font-mono font-bold px-1.5 py-0.5 rounded">Till: {{ $till }}</span>
+                                @elseif($paybill = \App\Models\BusinessSetting::get('mpesa_paybill_number'))
+                                    <span class="text-[10px] bg-emerald-200 text-emerald-900 font-mono font-bold px-1.5 py-0.5 rounded">Paybill: {{ $paybill }}</span>
+                                @endif
+                            </div>
+                            <input type="text" id="paymentReferenceInput" placeholder="e.g. TKI459032X (from shop phone SMS)" maxlength="30"
+                                   class="w-full text-xs font-mono font-bold uppercase rounded-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 py-1.5 px-2 bg-white text-gray-800">
+                            <p class="text-[10px] text-emerald-700 leading-tight">Confirm SMS on the business phone, then record the code here to print on customer receipt.</p>
                         </div>
 
                         {{-- Split Payment Inline Summary Box (visible when Split selected) --}}
@@ -294,6 +311,7 @@
                             <input type="hidden" name="pricing_tier" id="formPricingTier" value="retail">
                             <input type="hidden" name="cash_amount" id="formCashAmount" value="0">
                             <input type="hidden" name="mpesa_amount" id="formMpesaAmount" value="0">
+                            <input type="hidden" name="payment_reference" id="formPaymentReference">
                             <input type="hidden" name="branch_name" id="formBranchName">
 
                             <button type="submit" id="checkoutBtn" disabled
@@ -769,6 +787,8 @@
             cart = [];
             splitCash = 0;
             splitMpesa = 0;
+            const refInput = document.getElementById('paymentReferenceInput');
+            if (refInput) refInput.value = '';
             renderCart();
         }
 
@@ -876,12 +896,17 @@
         function onPaymentMethodChange(method) {
             const splitPanel = document.getElementById('splitPaymentPanel');
             const creditPanel = document.getElementById('creditNoticePanel');
+            const mpesaPanel = document.getElementById('mpesaRefPanel');
 
             splitPanel.classList.add('hidden');
             creditPanel.classList.add('hidden');
+            if (mpesaPanel) mpesaPanel.classList.add('hidden');
 
-            if (method === 'Split') {
+            if (method === 'M-Pesa') {
+                if (mpesaPanel) mpesaPanel.classList.remove('hidden');
+            } else if (method === 'Split') {
                 splitPanel.classList.remove('hidden');
+                if (mpesaPanel) mpesaPanel.classList.remove('hidden');
                 openSplitPaymentModal();
             } else if (method === 'Credit') {
                 creditPanel.classList.remove('hidden');
@@ -1003,6 +1028,7 @@
             const custSelect = document.getElementById('customerSelect');
             const custOption = custSelect.options[custSelect.selectedIndex];
             const custName = custOption ? custOption.getAttribute('data-name') : 'Walk-in Customer';
+            const refInput = document.getElementById('paymentReferenceInput');
 
             const parkedItem = {
                 id: 'park_' + Date.now(),
@@ -1012,6 +1038,7 @@
                 customerName: custName,
                 pricingTier: pricingTier,
                 paymentMethod: document.getElementById('paymentMethod').value,
+                paymentReference: refInput ? refInput.value : '',
                 branch: document.getElementById('branchSelect').value,
                 items: JSON.parse(JSON.stringify(cart)),
                 total: calculateCartTotal()
@@ -1025,6 +1052,7 @@
             cart = [];
             splitCash = 0;
             splitMpesa = 0;
+            if (refInput) refInput.value = '';
             renderCart();
             updateParkedBadge();
 
@@ -1095,6 +1123,9 @@
             document.getElementById('pricingTierSelect').value = pricingTier;
             document.getElementById('customerSelect').value = found.customerId || '';
             document.getElementById('paymentMethod').value = found.paymentMethod || 'Cash';
+            onPaymentMethodChange(found.paymentMethod || 'Cash');
+            const resumedRefInput = document.getElementById('paymentReferenceInput');
+            if (resumedRefInput) resumedRefInput.value = found.paymentReference || '';
 
             // Remove from queue
             queue = queue.filter(p => p.id !== parkId);
@@ -1329,6 +1360,8 @@
             document.getElementById('formPricingTier').value = pricingTier;
             document.getElementById('formCashAmount').value = splitCash;
             document.getElementById('formMpesaAmount').value = splitMpesa;
+            const checkoutRefInput = document.getElementById('paymentReferenceInput');
+            document.getElementById('formPaymentReference').value = checkoutRefInput ? checkoutRefInput.value.trim() : '';
             document.getElementById('formBranchName').value = document.getElementById('branchSelect').value;
 
             return true;

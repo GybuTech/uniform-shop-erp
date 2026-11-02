@@ -34,6 +34,16 @@
                             @if($vat = \App\Models\BusinessSetting::get('vat_number')) &bull; VAT: {{ $vat }} @endif
                         </div>
                     @endif
+                    @if($till = \App\Models\BusinessSetting::get('mpesa_till_number'))
+                        <div class="text-[10px] text-emerald-800 font-mono font-bold mt-0.5">
+                            BUY GOODS TILL: {{ $till }}
+                        </div>
+                    @endif
+                    @if($paybill = \App\Models\BusinessSetting::get('mpesa_paybill_number'))
+                        <div class="text-[10px] text-emerald-800 font-mono font-bold mt-0.5">
+                            PAYBILL: {{ $paybill }}
+                        </div>
+                    @endif
                     <div class="mt-3 inline-block bg-gray-100 px-3 py-1 rounded text-xs font-mono font-bold text-gray-800">
                         RECEIPT #: {{ $sale->receipt_number }}
                     </div>
@@ -60,6 +70,11 @@
                         <span class="font-bold {{ $sale->payment_status === 'credit' ? 'text-amber-800 bg-amber-100' : 'text-emerald-700 bg-emerald-100' }} uppercase px-2 py-0.5 rounded text-[11px]">
                             {{ $sale->payment_method }} &bull; {{ strtoupper($sale->payment_status) }}
                         </span>
+                        @if($sale->payment_reference)
+                            <div class="mt-1 text-[11px] font-mono text-emerald-800 font-bold">
+                                REF: {{ $sale->payment_reference }}
+                            </div>
+                        @endif
                     </div>
                 </div>
 

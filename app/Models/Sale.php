@@ -19,6 +19,7 @@ class Sale extends Model
         'total_amount',
         'payment_method',
         'payment_status',
+        'payment_reference',
         'branch_name',
     ];
 

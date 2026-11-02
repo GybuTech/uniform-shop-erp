@@ -28,6 +28,12 @@
             @if($kraPin = \App\Models\BusinessSetting::get('kra_pin'))
                 <p class="text-[10px] text-gray-500 font-mono">KRA PIN: {{ $kraPin }} @if($vat = \App\Models\BusinessSetting::get('vat_number')) | VAT: {{ $vat }} @endif</p>
             @endif
+            @if($till = \App\Models\BusinessSetting::get('mpesa_till_number'))
+                <p class="text-[10px] text-emerald-800 font-mono font-bold mt-0.5">BUY GOODS TILL: {{ $till }}</p>
+            @endif
+            @if($paybill = \App\Models\BusinessSetting::get('mpesa_paybill_number'))
+                <p class="text-[10px] text-emerald-800 font-mono font-bold mt-0.5">PAYBILL: {{ $paybill }}</p>
+            @endif
         </div>
 
         <div class="space-y-1 text-xs text-gray-600 mb-4 border-b pb-4">
@@ -51,6 +57,12 @@
                     {{ $sale->payment_method }} {{ $sale->payment_status === 'credit' ? '(CREDIT DEBT)' : '' }}
                 </span>
             </div>
+            @if($sale->payment_reference)
+            <div class="flex justify-between font-mono font-bold text-emerald-800">
+                <span>M-Pesa Ref:</span>
+                <span>{{ $sale->payment_reference }}</span>
+            </div>
+            @endif
             <div class="flex justify-between">
                 <span>Cashier:</span>
                 <span>{{ $sale->user->name ?? 'Staff' }}</span>

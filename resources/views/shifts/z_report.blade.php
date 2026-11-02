@@ -79,6 +79,36 @@
                     </div>
                 </div>
 
+                {{-- M-Pesa References Audit Log (For Till Reconciliation) --}}
+                @php
+                    $mpesaSales = $shift->sales ? $shift->sales->filter(function($s) {
+                        return ($s->payment_method === 'M-Pesa' || $s->mpesa_amount > 0) && !empty($s->payment_reference);
+                    }) : collect();
+                @endphp
+                @if($mpesaSales->isNotEmpty())
+                    <div class="py-3 border-b border-dashed border-gray-300 space-y-1.5 text-[11px]">
+                        <p class="font-bold uppercase tracking-wider text-[10px] text-gray-500">M-Pesa Code Verification Log</p>
+                        <table class="w-full text-[10px] font-mono">
+                            <thead>
+                                <tr class="text-gray-500 border-b border-gray-200">
+                                    <th class="text-left py-1">Receipt</th>
+                                    <th class="text-left py-1">Code / Ref</th>
+                                    <th class="text-right py-1">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @foreach($mpesaSales as $mSale)
+                                    <tr>
+                                        <td class="py-1 text-gray-700">{{ $mSale->receipt_number }}</td>
+                                        <td class="py-1 font-bold text-emerald-800">{{ $mSale->payment_reference }}</td>
+                                        <td class="py-1 text-right font-medium">{{ $currency }} {{ number_format($mSale->mpesa_amount > 0 ? $mSale->mpesa_amount : $mSale->total_amount, 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
                 {{-- Cash Drawer Reconciliation --}}
                 <div class="py-3 border-b border-dashed border-gray-300 space-y-1.5 text-[11px]">
                     <p class="font-bold uppercase tracking-wider text-[10px] text-gray-500">Cash Drawer Reconciliation</p>

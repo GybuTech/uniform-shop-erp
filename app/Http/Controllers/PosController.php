@@ -135,6 +135,7 @@ class PosController extends Controller
             'items.*.quantity'   => ['required', 'numeric', 'min:0.01'],
             'customer_id'        => ['nullable', 'exists:customers,id'],
             'payment_method'     => ['required', 'string', 'in:Cash,M-Pesa,Card,Split,Credit'],
+            'payment_reference'  => ['nullable', 'string', 'max:50'],
             'pricing_tier'       => ['nullable', 'string', 'in:retail,bulk,wholesale'],
             'cash_amount'        => ['nullable', 'numeric', 'min:0'],
             'mpesa_amount'       => ['nullable', 'numeric', 'min:0'],
@@ -213,16 +214,17 @@ class PosController extends Controller
                 $shift = Shift::getActiveShift(auth()->id(), $branchName);
 
                 $sale = Sale::create([
-                    'customer_id'    => $request->customer_id ?: null,
-                    'user_id'        => auth()->id(),
-                    'shift_id'       => $shift->id,
-                    'receipt_number' => 'RCP-' . strtoupper(uniqid()),
-                    'total_amount'   => $total,
-                    'payment_method' => $storedPaymentMethod,
-                    'payment_status' => $paymentStatus,
-                    'branch_name'    => $branchName,
-                    'created_at'     => $now,
-                    'updated_at'     => $now,
+                    'customer_id'       => $request->customer_id ?: null,
+                    'user_id'           => auth()->id(),
+                    'shift_id'          => $shift->id,
+                    'receipt_number'    => 'RCP-' . strtoupper(uniqid()),
+                    'total_amount'      => $total,
+                    'payment_method'    => $storedPaymentMethod,
+                    'payment_status'    => $paymentStatus,
+                    'payment_reference' => trim($request->input('payment_reference', '')) ?: null,
+                    'branch_name'       => $branchName,
+                    'created_at'        => $now,
+                    'updated_at'        => $now,
                 ]);
 
                 foreach ($saleItems as $item) {

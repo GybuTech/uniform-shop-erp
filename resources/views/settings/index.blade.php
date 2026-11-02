@@ -255,6 +255,22 @@
                             </div>
                         </div>
 
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200/80">
+                            <div>
+                                <x-input-label for="mpesa_till_number" value="Lipa na M-Pesa Till Number (Buy Goods)" />
+                                <input type="text" name="mpesa_till_number" id="mpesa_till_number" value="{{ old('mpesa_till_number', $mpesaTill ?? '') }}" placeholder="e.g. 894562" class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm font-mono font-bold text-emerald-800">
+                                <span class="text-[11px] text-slate-500">Printed on customer receipts for quick counter payment.</span>
+                                @error('mpesa_till_number') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </div>
+
+                            <div>
+                                <x-input-label for="mpesa_paybill_number" value="M-Pesa Paybill / Account No. (Optional)" />
+                                <input type="text" name="mpesa_paybill_number" id="mpesa_paybill_number" value="{{ old('mpesa_paybill_number', $mpesaPaybill ?? '') }}" placeholder="e.g. 522522 (Acc: 123456)" class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm font-mono font-bold text-emerald-800">
+                                <span class="text-[11px] text-slate-500">For businesses using Safaricom Paybill.</span>
+                                @error('mpesa_paybill_number') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </div>
+                        </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <x-input-label for="receipt_header_note" value="Receipt Header Note (Optional)" />

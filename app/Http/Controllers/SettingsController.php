@@ -38,6 +38,8 @@ class SettingsController extends Controller
         $wholesaleLabel = BusinessSetting::get('pricing_tier_wholesale_label', 'Wholesale Contract Tier');
         $kraPin = BusinessSetting::get('kra_pin', '');
         $vatNumber = BusinessSetting::get('vat_number', '');
+        $mpesaTill = BusinessSetting::get('mpesa_till_number', '');
+        $mpesaPaybill = BusinessSetting::get('mpesa_paybill_number', '');
         $receiptHeader = BusinessSetting::get('receipt_header_note', '');
         $receiptFooter = BusinessSetting::get('receipt_footer_note', 'Goods once sold are returnable within 7 days with valid receipt.');
 
@@ -63,6 +65,8 @@ class SettingsController extends Controller
             'wholesaleLabel',
             'kraPin',
             'vatNumber',
+            'mpesaTill',
+            'mpesaPaybill',
             'receiptHeader',
             'receiptFooter',
             'currentSystemTime',
@@ -114,6 +118,8 @@ class SettingsController extends Controller
             'business_currency'              => ['required', 'string', 'max:10'],
             'kra_pin'                        => ['nullable', 'string', 'max:50'],
             'vat_number'                     => ['nullable', 'string', 'max:50'],
+            'mpesa_till_number'              => ['nullable', 'string', 'max:50'],
+            'mpesa_paybill_number'           => ['nullable', 'string', 'max:50'],
             'receipt_header_note'            => ['nullable', 'string', 'max:255'],
             'receipt_footer_note'            => ['nullable', 'string', 'max:255'],
             'pricing_tier_bulk_discount'     => ['required', 'numeric', 'min:0', 'max:99'],
