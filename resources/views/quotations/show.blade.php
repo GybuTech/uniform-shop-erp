@@ -94,10 +94,18 @@
                                     @endif
                                 </td>
                                 <td class="py-3.5 px-3">
-                                    <span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 text-indigo-700">Size {{ $item->size }}</span>
-                                    <span class="text-slate-600 ml-1">{{ $item->colour }}</span>
+                                    @if($item->size)
+                                        <span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 text-indigo-700">Size {{ $item->size }}</span>
+                                        @if($item->colour && strtolower($item->colour) !== 'standard')
+                                            <span class="text-slate-600 ml-1">{{ $item->colour }}</span>
+                                        @endif
+                                    @elseif($item->unit_of_measure)
+                                        <span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800">{{ $item->unit_of_measure }}</span>
+                                    @else
+                                        <span class="text-slate-400 text-xs">—</span>
+                                    @endif
                                 </td>
-                                <td class="py-3.5 px-3 text-right font-bold text-slate-900">{{ number_format($item->quantity) }}</td>
+                                <td class="py-3.5 px-3 text-right font-bold text-slate-900">{{ (float) $item->quantity }}</td>
                                 <td class="py-3.5 px-3 text-right font-mono text-slate-700">KES {{ number_format($item->unit_price, 2) }}</td>
                                 <td class="py-3.5 px-3 text-right font-mono font-extrabold text-slate-900">KES {{ number_format($item->subtotal, 2) }}</td>
                             </tr>
@@ -119,7 +127,7 @@
                     <div class="w-full sm:w-64 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
                         <div class="flex justify-between text-xs text-slate-600">
                             <span>Total Items:</span>
-                            <span class="font-bold text-slate-800">{{ $quotation->items->sum('quantity') }} pcs</span>
+                            <span class="font-bold text-slate-800">{{ (float) $quotation->items->sum('quantity') }} units</span>
                         </div>
                         <div class="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
                             <span>Grand Total:</span>

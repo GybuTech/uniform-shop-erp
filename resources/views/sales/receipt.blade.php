@@ -74,7 +74,7 @@
                         <div class="font-bold text-gray-900">{{ $item->productVariant->formatted_title ?? ($item->productVariant->product->name ?? 'Item') }}</div>
                         <div class="text-[10px] text-gray-500 font-mono">{{ $item->productVariant->sku }}</div>
                     </td>
-                    <td class="py-2 text-center align-top font-bold">{{ $item->quantity }}</td>
+                    <td class="py-2 text-center align-top font-bold">{{ (float) $item->quantity }}</td>
                     <td class="py-2 text-right align-top">{{ number_format($item->unit_price, 2) }}</td>
                     <td class="py-2 text-right align-top font-bold">{{ number_format($item->line_total, 2) }}</td>
                 </tr>

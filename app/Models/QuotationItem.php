@@ -15,6 +15,7 @@ class QuotationItem extends Model
         'product_name',
         'size',
         'colour',
+        'unit_of_measure',
         'quantity',
         'unit_price',
         'subtotal',

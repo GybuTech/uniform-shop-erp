@@ -712,11 +712,21 @@
             renderCart();
         }
 
+        function isContinuousUnit(unit) {
+            if (!unit) return false;
+            const u = unit.toLowerCase();
+            return u.includes('kg') || u.includes('meter') || u.includes('metre') || u.includes('litre') || u.includes('liter') || u.includes('gram');
+        }
+
         function updateQty(id, delta) {
             const item = cart.find(i => i.id === id);
             if (!item) return;
 
-            const newQty = item.qty + delta;
+            const isCont = isContinuousUnit(item.unit);
+            // Continuous units step by 0.5; discrete units step by 1
+            const step = isCont ? (delta > 0 ? 0.5 : -0.5) : (delta > 0 ? 1 : -1);
+            const newQty = Math.round((item.qty + step) * 100) / 100;
+
             if (newQty > item.stock) {
                 alert(`Cannot exceed stock limit of ${item.stock} units.`);
                 return;
@@ -728,6 +738,25 @@
                 item.qty = newQty;
                 renderCart();
             }
+        }
+
+        function setQtyDirect(id, val) {
+            const item = cart.find(i => i.id === id);
+            if (!item) return;
+
+            const parsed = parseFloat(val);
+            if (isNaN(parsed) || parsed <= 0) {
+                removeFromCart(id);
+                return;
+            }
+
+            if (parsed > item.stock) {
+                alert(`Cannot exceed available stock of ${item.stock} units.`);
+                item.qty = item.stock;
+            } else {
+                item.qty = Math.round(parsed * 100) / 100;
+            }
+            renderCart();
         }
 
         function removeFromCart(id) {
@@ -782,9 +811,12 @@
             const checkoutBtnText = document.getElementById('checkoutBtnText');
             const multiplier = TIER_MULTIPLIERS[pricingTier] || 1.00;
 
-            const totalItemCount = cart.reduce((count, i) => count + i.qty, 0);
-            cartItemCountLabel.innerText = `${totalItemCount} item${totalItemCount === 1 ? '' : 's'}`;
-            grandTotalItemsEl.innerText = `${totalItemCount} item${totalItemCount === 1 ? '' : 's'}`;
+            const totalItemCount = Math.round(cart.reduce((count, i) => count + i.qty, 0) * 100) / 100;
+            const countLabel = (Number.isInteger(totalItemCount) || totalItemCount % 1 === 0)
+                ? `${totalItemCount} item${totalItemCount === 1 ? '' : 's'}`
+                : `${totalItemCount.toFixed(2)} units`;
+            cartItemCountLabel.innerText = countLabel;
+            grandTotalItemsEl.innerText = countLabel;
 
             if (cart.length === 0) {
                 cartList.innerHTML = '<p class="text-gray-400 text-xs text-center py-6 border border-dashed rounded-lg">Cart is currently empty</p>';
@@ -808,6 +840,10 @@
                     subtitle = `<span class="font-bold text-indigo-700">Unit: ${item.unit}</span>`;
                 }
 
+                const isCont = isContinuousUnit(item.unit);
+                const stepAttr = isCont ? '0.01' : '1';
+                const displayQty = (Number.isInteger(item.qty) || item.qty % 1 === 0) ? item.qty : item.qty.toFixed(2);
+
                 return `
                 <div class="flex items-center justify-between p-2 bg-gray-50 border rounded-lg text-xs">
                     <div class="flex-1 pr-2">
@@ -815,13 +851,16 @@
                         <p class="text-[11px] text-gray-500 font-mono">
                             ${subtitle}
                         </p>
-                        <p class="font-black text-indigo-700 font-mono">KES ${effectiveUnit.toFixed(2)} &times; ${item.qty} = KES ${lineTotal.toFixed(2)}</p>
+                        <p class="font-black text-indigo-700 font-mono">KES ${effectiveUnit.toFixed(2)} &times; ${displayQty} = KES ${lineTotal.toFixed(2)}</p>
                     </div>
                     <div class="flex items-center space-x-1">
-                        <button type="button" onclick="updateQty(${item.id}, -1)" class="w-6 h-6 bg-white hover:bg-gray-200 border rounded font-black text-gray-700">-</button>
-                        <span class="font-extrabold w-6 text-center text-xs font-mono">${item.qty}</span>
-                        <button type="button" onclick="updateQty(${item.id}, 1)" class="w-6 h-6 bg-white hover:bg-gray-200 border rounded font-black text-gray-700">+</button>
-                        <button type="button" onclick="removeFromCart(${item.id})" class="text-rose-500 hover:text-rose-700 ml-1 font-bold text-sm">✕</button>
+                        <button type="button" onclick="updateQty(${item.id}, -1)" class="w-6 h-6 bg-white hover:bg-gray-200 border rounded font-black text-gray-700 text-xs">-</button>
+                        <input type="number" step="${stepAttr}" min="0.01" max="${item.stock}" value="${displayQty}"
+                               onchange="setQtyDirect(${item.id}, this.value)"
+                               onfocus="this.select()"
+                               class="w-16 h-6 text-center text-xs font-mono font-extrabold border border-gray-300 rounded bg-white px-1 py-0 focus:ring-1 focus:ring-indigo-500">
+                        <button type="button" onclick="updateQty(${item.id}, 1)" class="w-6 h-6 bg-white hover:bg-gray-200 border rounded font-black text-gray-700 text-xs">+</button>
+                        <button type="button" onclick="removeFromCart(${item.id})" class="text-rose-500 hover:text-rose-700 ml-1 font-bold text-sm" title="Remove Item">✕</button>
                     </div>
                 </div>`;
             }).join('');

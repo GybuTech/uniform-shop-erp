@@ -132,7 +132,7 @@ class PosController extends Controller
         $request->validate([
             'items'              => ['required', 'array', 'min:1'],
             'items.*.variant_id' => ['required', 'exists:product_variants,id'],
-            'items.*.quantity'   => ['required', 'integer', 'min:1'],
+            'items.*.quantity'   => ['required', 'numeric', 'min:0.01'],
             'customer_id'        => ['nullable', 'exists:customers,id'],
             'payment_method'     => ['required', 'string', 'in:Cash,M-Pesa,Card,Split,Credit'],
             'pricing_tier'       => ['nullable', 'string', 'in:retail,bulk,wholesale'],
@@ -182,17 +182,18 @@ class PosController extends Controller
                         throw new \Exception("Product variant no longer exists.");
                     }
 
-                    if ($variant->stock_quantity < $item['quantity']) {
-                        throw new \Exception("Insufficient stock for {$variant->sku}. Available: {$variant->stock_quantity}, Requested: {$item['quantity']}");
+                    $qty = (float) $item['quantity'];
+                    if ($variant->stock_quantity < $qty) {
+                        throw new \Exception("Insufficient stock for {$variant->sku}. Available: {$variant->stock_quantity}, Requested: {$qty}");
                     }
 
                     $unitPrice = round($variant->selling_price * $tierMultiplier, 2);
-                    $lineTotal = round($unitPrice * $item['quantity'], 2);
+                    $lineTotal = round($unitPrice * $qty, 2);
                     $total += $lineTotal;
 
                     $saleItems[] = [
                         'variant'    => $variant,
-                        'quantity'   => $item['quantity'],
+                        'quantity'   => $qty,
                         'unit_price' => $unitPrice,
                         'line_total' => $lineTotal,
                     ];
@@ -277,7 +278,7 @@ class PosController extends Controller
         $request->validate([
             'items'              => ['required', 'array', 'min:1'],
             'items.*.variant_id' => ['required', 'exists:product_variants,id'],
-            'items.*.quantity'   => ['required', 'integer', 'min:1'],
+            'items.*.quantity'   => ['required', 'numeric', 'min:0.01'],
             'customer_id'        => ['nullable', 'exists:customers,id'],
             'customer_name'      => ['nullable', 'string', 'max:150'],
             'pricing_tier'       => ['nullable', 'string', 'in:retail,bulk,wholesale'],
@@ -320,16 +321,18 @@ class PosController extends Controller
                     $variant = ProductVariant::with('product')->find($item['variant_id']);
                     if (!$variant) continue;
 
+                    $qty = (float) $item['quantity'];
                     $unitPrice = round($variant->selling_price * $tierMultiplier, 2);
-                    $subtotal = round($unitPrice * $item['quantity'], 2);
+                    $subtotal = round($unitPrice * $qty, 2);
                     $total += $subtotal;
 
                     $itemsData[] = [
                         'product_variant_id' => $variant->id,
-                        'product_name'       => $variant->product->name ?? 'Uniform Item',
+                        'product_name'       => $variant->formatted_title ?? ($variant->product->name ?? 'Retail Item'),
                         'size'               => $variant->size,
                         'colour'             => $variant->colour,
-                        'quantity'           => $item['quantity'],
+                        'unit_of_measure'    => $variant->unit_of_measure ?? 'Piece',
+                        'quantity'           => $qty,
                         'unit_price'         => $unitPrice,
                         'subtotal'           => $subtotal,
                     ];
