@@ -9,11 +9,9 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Always seed roles, permissions, and admin user safely (Idempotent)
+        // 1. Rapid Store Onboarding & Core Configuration (Idempotent)
         $this->call([
-            RolesSeeder::class,
-            PermissionsSeeder::class,
-            AdminUserSeeder::class,
+            InitialStoreSeeder::class,
             BranchAndUserBackfillSeeder::class,
         ]);
 
