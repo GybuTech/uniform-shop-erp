@@ -89,6 +89,7 @@ class InitialStoreSeeder extends Seeder
             'business_phone'                  => '+254 700 000 000',
             'business_address'                => 'Nairobi, Kenya',
             'business_currency'               => 'KES',
+            'currency'                        => 'KES',
             'kra_pin'                         => '',
             'vat_number'                      => '',
             'mpesa_till_number'               => '',

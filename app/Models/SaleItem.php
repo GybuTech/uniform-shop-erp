@@ -27,4 +27,9 @@ class SaleItem extends Model
     {
         return $this->belongsTo(ProductVariant::class)->withTrashed();
     }
+
+    public function variant(): BelongsTo
+    {
+        return $this->productVariant();
+    }
 }
