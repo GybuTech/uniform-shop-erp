@@ -103,6 +103,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/products/prices/by-size', [ProductVariantController::class, 'updateBySize'])
         ->name('products.prices.by-size')
         ->middleware('permission:edit-product-variants');
+    Route::post('/products/prices/groups', [ProductVariantController::class, 'updateByPriceGroups'])
+        ->name('products.prices.groups')
+        ->middleware('permission:edit-product-variants');
     Route::post('/products/prices/matrix', [ProductVariantController::class, 'updateCategorySizeMatrix'])
         ->name('products.prices.matrix')
         ->middleware('permission:edit-product-variants');

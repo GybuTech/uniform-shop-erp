@@ -19,12 +19,12 @@ class PosController extends Controller
     public function index()
     {
         $user = auth()->user();
-        $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']) && empty($user->branch_name);
+        $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
         $branches = Branch::where('is_active', true)->orderBy('name')->get();
 
-        if ($isGlobalUser) {
+        if ($isOwnerOrAdmin) {
             $isLockedBranch = false;
-            $currentBranchName = $branches->first()?->name ?? 'Main Shop';
+            $currentBranchName = $request->get('branch') ?: ($user->branch_name ?: ($branches->first()?->name ?? 'Main Shop'));
         } else {
             $isLockedBranch = true;
             $currentBranchName = $user->branch_name ?: ($branches->first()?->name ?? 'Main Shop');
@@ -58,6 +58,11 @@ class PosController extends Controller
     {
         $query = trim($request->get('q', ''));
         $exact = $request->boolean('exact');
+        $user = auth()->user();
+        $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']) && empty($user->branch_name);
+        $branchName = $isGlobalUser
+            ? ($request->get('branch') ?: ($user->branch_name ?: 'Main Shop'))
+            : ($user->branch_name ?: 'Main Shop');
 
         if ($query === '') {
             return response()->json([]);
@@ -65,7 +70,7 @@ class PosController extends Controller
 
         // If scanning an exact barcode or SKU
         if ($exact || strlen($query) >= 8 || str_starts_with($query, 'BC-')) {
-            $exactVariant = ProductVariant::with(['product.category'])
+            $exactVariant = ProductVariant::with(['product.category', 'branchStocks'])
                 ->where('barcode', $query)
                 ->orWhere('sku', $query)
                 ->first();
@@ -83,14 +88,14 @@ class PosController extends Controller
                         'size'            => $exactVariant->size,
                         'colour'          => $exactVariant->colour,
                         'selling_price'   => $exactVariant->selling_price,
-                        'stock_quantity'  => $exactVariant->stock_quantity,
+                        'stock_quantity'  => $exactVariant->getStockForBranch($branchName),
                         'exact_match'     => true,
                     ]
                 ]);
             }
         }
 
-        $variants = ProductVariant::with(['product.category'])
+        $variants = ProductVariant::with(['product.category', 'branchStocks'])
             ->where(function($q) use ($query) {
                 $q->whereHas('product', function($p) use ($query) {
                     $p->where('name', 'like', "%{$query}%")
@@ -109,7 +114,7 @@ class PosController extends Controller
             ->limit(25)
             ->get();
 
-        return response()->json($variants->map(function($variant) {
+        return response()->json($variants->map(function($variant) use ($branchName) {
             return [
                 'id'              => $variant->id,
                 'sku'             => $variant->sku,
@@ -121,7 +126,7 @@ class PosController extends Controller
                 'size'            => $variant->size,
                 'colour'          => $variant->colour,
                 'selling_price'   => $variant->selling_price,
-                'stock_quantity'  => $variant->stock_quantity,
+                'stock_quantity'  => $variant->getStockForBranch($branchName),
                 'exact_match'     => false,
             ];
         }));
@@ -143,10 +148,10 @@ class PosController extends Controller
         ]);
 
         $user = auth()->user();
-        $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']) && empty($user->branch_name);
+        $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
 
-        if ($isGlobalUser) {
-            $branchName = $request->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop');
+        if ($isOwnerOrAdmin) {
+            $branchName = $request->branch_name ?: ($user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop'));
         } else {
             $branchName = $user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop');
         }
@@ -238,7 +243,8 @@ class PosController extends Controller
                         'updated_at'         => $now,
                     ]);
 
-                    $item['variant']->decrement('stock_quantity', $item['quantity']);
+                    // Deduct stock for that specific store branch
+                    $item['variant']->adjustStockForBranch($branchName, -1 * $item['quantity']);
                 }
 
                 $shift->recalculateTotals();
@@ -423,7 +429,7 @@ class PosController extends Controller
     public function salesIndex(Request $request)
     {
         $user = auth()->user();
-        $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']) && empty($user->branch_name);
+        $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
 
         $search = $request->get('search');
         $branchFilter = $request->get('branch');
@@ -440,7 +446,7 @@ class PosController extends Controller
             });
         }
 
-        if (!$isGlobalUser && !empty($user->branch_name)) {
+        if (!$isOwnerOrAdmin && !empty($user->branch_name)) {
             $query->where('branch_name', $user->branch_name);
             $lockedBranch = $user->branch_name;
         } else {

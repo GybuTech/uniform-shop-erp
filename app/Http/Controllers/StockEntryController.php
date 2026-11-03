@@ -131,7 +131,10 @@ class StockEntryController extends Controller
             'items.*.quantity'          => ['required', 'integer', 'min:1'],
         ]);
 
-        DB::transaction(function () use ($request) {
+        $user = auth()->user();
+        $branchName = $request->input('branch_name', $user->branch_name ?: 'Main Shop');
+
+        DB::transaction(function () use ($request, $branchName) {
             $stockEntry = StockEntry::create([
                 'user_id'      => auth()->id(),
                 'reference_no' => $request->reference_no,
@@ -144,8 +147,10 @@ class StockEntryController extends Controller
                     'quantity'           => $item['quantity'],
                 ]);
 
-                ProductVariant::find($item['product_variant_id'])
-                    ->increment('stock_quantity', $item['quantity']);
+                $variant = ProductVariant::find($item['product_variant_id']);
+                if ($variant) {
+                    $variant->adjustStockForBranch($branchName, (float)$item['quantity']);
+                }
             }
         });
 
@@ -179,13 +184,15 @@ class StockEntryController extends Controller
             'items.*.quantity'          => ['required', 'integer', 'min:1'],
         ]);
 
-        DB::transaction(function () use ($request, $stockEntry) {
+        $user = auth()->user();
+        $branchName = $request->input('branch_name', $user->branch_name ?: 'Main Shop');
+
+        DB::transaction(function () use ($request, $branchName, $stockEntry) {
             // 1. Revert previous stock additions safely
             foreach ($stockEntry->items as $oldItem) {
                 $variant = ProductVariant::find($oldItem->product_variant_id);
                 if ($variant) {
-                    $newStock = max(0, (int)$variant->stock_quantity - (int)$oldItem->quantity);
-                    $variant->update(['stock_quantity' => $newStock]);
+                    $variant->adjustStockForBranch($branchName, -1 * (float)$oldItem->quantity);
                 }
             }
 
@@ -205,8 +212,10 @@ class StockEntryController extends Controller
                     'quantity'           => $item['quantity'],
                 ]);
 
-                ProductVariant::find($item['product_variant_id'])
-                    ->increment('stock_quantity', $item['quantity']);
+                $variant = ProductVariant::find($item['product_variant_id']);
+                if ($variant) {
+                    $variant->adjustStockForBranch($branchName, (float)$item['quantity']);
+                }
             }
         });
 
@@ -216,13 +225,15 @@ class StockEntryController extends Controller
 
     public function destroy(StockEntry $stockEntry)
     {
-        DB::transaction(function () use ($stockEntry) {
+        $user = auth()->user();
+        $branchName = $user->branch_name ?: 'Main Shop';
+
+        DB::transaction(function () use ($stockEntry, $branchName) {
             // Revert stock additions safely
             foreach ($stockEntry->items as $item) {
                 $variant = ProductVariant::find($item->product_variant_id);
                 if ($variant) {
-                    $newStock = max(0, (int)$variant->stock_quantity - (int)$item->quantity);
-                    $variant->update(['stock_quantity' => $newStock]);
+                    $variant->adjustStockForBranch($branchName, -1 * (float)$item->quantity);
                 }
             }
 

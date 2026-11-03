@@ -187,7 +187,7 @@
                                     {{ $variant->stock_quantity }} units
                                 </span>
                             </td>
-                            <td class="px-6 py-4 text-sm text-right space-x-2">
+                            <td class="px-6 py-4 text-sm text-right space-x-2 whitespace-nowrap">
                                 @can('edit-product-variants')
                                 <a href="{{ route('products.variants.edit', [$product, $variant]) }}"
                                    class="text-indigo-600 hover:underline font-bold text-xs">Edit Variant</a>

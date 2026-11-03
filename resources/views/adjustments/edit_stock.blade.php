@@ -95,10 +95,10 @@
                 {{-- Action Toolbar --}}
                 <div class="bg-gray-50 border p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                     <div class="flex items-center space-x-2">
-                        <span class="font-semibold text-gray-600">Branch:</span>
-                        <select name="branch_name" id="bulk_branch_name" class="text-xs bg-white rounded-lg border-gray-300 py-1 px-2.5">
+                        <span class="font-bold text-gray-700">Stock For Branch:</span>
+                        <select name="branch_name" id="bulk_branch_name" onchange="window.location.href='{{ route('adjustments.edit-stock') }}?branch=' + encodeURIComponent(this.value)" class="text-xs font-bold text-indigo-900 bg-white rounded-lg border-gray-300 py-1 px-2.5">
                             @foreach($branches as $branch)
-                                <option value="{{ $branch }}">{{ $branch }}</option>
+                                <option value="{{ $branch }}" {{ ($selectedBranch ?? 'Main Shop') === $branch ? 'selected' : '' }}>{{ $branch }}</option>
                             @endforeach
                         </select>
                         <input type="hidden" name="reason" id="bulk_reason" value="Physical Stock Inventory Count">
@@ -149,15 +149,16 @@
                                             @endif
                                         </td>
 
-                                        {{-- Current System Stock --}}
+                                        {{-- Current System Stock for Selected Branch --}}
+                                        @php $branchStock = $variant->getStockForBranch($selectedBranch ?? 'Main Shop'); @endphp
                                         <td class="px-4 py-3 text-center font-bold">
-                                            @if(($variant->stock_quantity ?? 0) <= 0)
+                                            @if($branchStock <= 0)
                                                 <span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                                                     0 units
                                                 </span>
                                             @else
                                                 <span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800">
-                                                    {{ $variant->stock_quantity }} units
+                                                    {{ $branchStock }} units
                                                 </span>
                                             @endif
                                         </td>
@@ -169,7 +170,7 @@
                                                     type="number"
                                                     name="stocks[{{ $variant->id }}]"
                                                     id="stock_input_{{ $variant->id }}"
-                                                    value="{{ $variant->stock_quantity ?? 0 }}"
+                                                    value="{{ $branchStock }}"
                                                     min="0"
                                                     class="w-20 text-center font-bold text-gray-900 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-xs py-1"
                                                 >

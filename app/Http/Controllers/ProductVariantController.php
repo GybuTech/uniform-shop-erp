@@ -104,6 +104,50 @@ class ProductVariantController extends Controller
         return $sku;
     }
 
+    /**
+     * Resolves the selling price for a given size variant based on the pricing mode.
+     */
+    private function resolveSizePrice(string $size, string $mode, float $defaultPrice, array $groups, array $individualPrices): float
+    {
+        if ($mode === 'individual') {
+            if (isset($individualPrices[$size]) && is_numeric($individualPrices[$size])) {
+                return (float) $individualPrices[$size];
+            }
+            return $defaultPrice;
+        }
+
+        if ($mode === 'groups') {
+            foreach ($groups as $group) {
+                $grpPrice = isset($group['price']) && is_numeric($group['price']) ? (float) $group['price'] : null;
+                if ($grpPrice === null) continue;
+
+                // Check explicit comma-separated list
+                if (!empty($group['sizes'])) {
+                    $list = array_map('trim', explode(',', strtolower($group['sizes'])));
+                    if (in_array(strtolower(trim($size)), $list)) {
+                        return $grpPrice;
+                    }
+                }
+
+                // Check numeric range (e.g. 22 to 26)
+                $from = isset($group['from_size']) ? trim($group['from_size']) : '';
+                $to   = isset($group['to_size']) ? trim($group['to_size']) : '';
+                if (is_numeric($from) && is_numeric($to) && is_numeric($size)) {
+                    $numSize = (float) $size;
+                    $numFrom = min((float)$from, (float)$to);
+                    $numTo   = max((float)$from, (float)$to);
+                    if ($numSize >= $numFrom && $numSize <= $numTo) {
+                        return $grpPrice;
+                    }
+                } elseif (!empty($from) && empty($to) && strtolower(trim($size)) === strtolower($from)) {
+                    return $grpPrice;
+                }
+            }
+        }
+
+        return $defaultPrice;
+    }
+
     public function store(Request $request, Product $product)
     {
         $validated = $request->validate([
@@ -151,7 +195,15 @@ class ProductVariantController extends Controller
             'sizes'          => ['nullable', 'array'],
             'custom_sizes'   => ['nullable', 'string'],
             'colour'         => ['nullable', 'string', 'max:100'],
+            'pricing_mode'   => ['nullable', 'string', 'in:flat,groups,individual'],
             'selling_price'  => ['nullable', 'numeric', 'min:0'],
+            'price_groups'   => ['nullable', 'array'],
+            'price_groups.*.from_size' => ['nullable', 'string', 'max:20'],
+            'price_groups.*.to_size'   => ['nullable', 'string', 'max:20'],
+            'price_groups.*.sizes'     => ['nullable', 'string', 'max:100'],
+            'price_groups.*.price'     => ['nullable', 'numeric', 'min:0'],
+            'size_prices'    => ['nullable', 'array'],
+            'size_prices.*'  => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $selectedSizes = $validated['sizes'] ?? [];
@@ -165,14 +217,17 @@ class ProductVariantController extends Controller
         }
 
         $colour = trim($validated['colour'] ?? '') ?: 'Standard';
-        $sellingPrice = isset($validated['selling_price']) && is_numeric($validated['selling_price'])
+        $pricingMode = $validated['pricing_mode'] ?? 'flat';
+        $defaultPrice = isset($validated['selling_price']) && is_numeric($validated['selling_price'])
             ? (float) $validated['selling_price']
             : 0.00;
+        $priceGroups = $validated['price_groups'] ?? [];
+        $sizePrices = $validated['size_prices'] ?? [];
 
         $createdCount = 0;
         $skippedCount = 0;
 
-        DB::transaction(function () use ($product, $allSizes, $colour, $sellingPrice, &$createdCount, &$skippedCount) {
+        DB::transaction(function () use ($product, $allSizes, $colour, $pricingMode, $defaultPrice, $priceGroups, $sizePrices, &$createdCount, &$skippedCount) {
             foreach ($allSizes as $cleanSize) {
                 $sku     = $this->generateVariantSku($product, $cleanSize, $colour);
                 $barcode = 'BC-' . $sku;
@@ -181,6 +236,8 @@ class ProductVariantController extends Controller
                     $skippedCount++;
                     continue;
                 }
+
+                $sellingPrice = $this->resolveSizePrice($cleanSize, $pricingMode, $defaultPrice, $priceGroups, $sizePrices);
 
                 $product->variants()->create([
                     'sku'            => $sku,
@@ -195,7 +252,7 @@ class ProductVariantController extends Controller
             }
         });
 
-        $message = "Successfully created {$createdCount} new size variants.";
+        $message = "Successfully created {$createdCount} new size variants with configured pricing.";
         if ($skippedCount > 0) {
             $message .= " ({$skippedCount} sizes already existed and were skipped).";
         }
@@ -456,6 +513,104 @@ class ProductVariantController extends Controller
         return back()->with('success', "Updated selling price to KES " . number_format($price, 2) . " for {$count} item(s) of Size {$size} in {$targetName}.");
     }
 
+    /**
+     * Batch update variant prices across size ranges/groups (e.g. 22-26 @ 900, 28-30 @ 1000).
+     */
+    public function updateByPriceGroups(Request $request)
+    {
+        $validated = $request->validate([
+            'target_type'              => ['nullable', 'string'],
+            'category_id'              => ['nullable', 'exists:categories,id'],
+            'product_id'               => ['nullable', 'exists:products,id'],
+            'groups'                   => ['required', 'array', 'min:1'],
+            'groups.*.from_size'       => ['nullable', 'string', 'max:20'],
+            'groups.*.to_size'         => ['nullable', 'string', 'max:20'],
+            'groups.*.sizes'           => ['nullable', 'string', 'max:100'],
+            'groups.*.price'           => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $targetType = $request->input('target_type', 'all');
+        $totalUpdated = 0;
+        $appliedRanges = [];
+
+        DB::transaction(function () use ($validated, $targetType, &$totalUpdated, &$appliedRanges) {
+            foreach ($validated['groups'] as $group) {
+                $price = (float) $group['price'];
+                $from  = trim($group['from_size'] ?? '');
+                $to    = trim($group['to_size'] ?? '');
+                $sizesList = !empty($group['sizes'])
+                    ? array_map('trim', explode(',', $group['sizes']))
+                    : [];
+
+                // Base query matching scope
+                $query = ProductVariant::query();
+
+                if ($targetType === 'sweater_with_badge') {
+                    $query->where(function ($q) {
+                        $q->whereHas('product', function ($pq) {
+                            $pq->where(function ($sub) {
+                                $sub->where('name', 'like', '%sweater%')
+                                    ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+                            })->where(function ($sub) {
+                                $sub->where('name', 'like', '%badge%')
+                                    ->orWhere('sku_prefix', 'like', '%badge%');
+                            });
+                        })
+                        ->orWhere(function ($sub) {
+                            $sub->where(function ($sc) {
+                                $sc->where('colour', 'like', '%badge%')
+                                   ->orWhere('sku', 'like', '%badge%');
+                            })->whereHas('product', function ($pq) {
+                                $pq->where('name', 'like', '%sweater%')
+                                   ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+                            });
+                        });
+                    });
+                } elseif ($targetType === 'sweater_plain') {
+                    $query->whereHas('product', function ($pq) {
+                        $pq->where(function ($sub) {
+                            $sub->where('name', 'like', '%sweater%')
+                                ->orWhereHas('category', fn($c) => $c->where('name', 'like', '%sweater%'));
+                        })->where('name', 'not like', '%badge%');
+                    })
+                    ->where('colour', 'not like', '%badge%')
+                    ->where('sku', 'not like', '%badge%');
+                } elseif (str_starts_with($targetType, 'category_')) {
+                    $catId = (int) str_replace('category_', '', $targetType);
+                    $query->whereHas('product', fn($q) => $q->where('category_id', $catId));
+                } elseif (!empty($validated['product_id'])) {
+                    $query->where('product_id', $validated['product_id']);
+                } elseif (!empty($validated['category_id'])) {
+                    $query->whereHas('product', fn($q) => $q->where('category_id', $validated['category_id']));
+                }
+
+                // Match sizes in range
+                if (!empty($sizesList)) {
+                    $query->whereIn('size', $sizesList);
+                    $rangeDesc = implode(', ', $sizesList);
+                } elseif (is_numeric($from) && is_numeric($to)) {
+                    $numFrom = min((float)$from, (float)$to);
+                    $numTo   = max((float)$from, (float)$to);
+                    $query->whereRaw('size REGEXP "^[0-9]+(\\.[0-9]+)?$"')
+                          ->whereRaw('CAST(size AS DECIMAL(10,2)) >= ? AND CAST(size AS DECIMAL(10,2)) <= ?', [$numFrom, $numTo]);
+                    $rangeDesc = "Sizes {$numFrom}-{$numTo}";
+                } elseif (!empty($from)) {
+                    $query->where('size', $from);
+                    $rangeDesc = "Size {$from}";
+                } else {
+                    continue;
+                }
+
+                $count = $query->update(['selling_price' => $price]);
+                $totalUpdated += $count;
+                $appliedRanges[] = "{$rangeDesc} @ KES " . number_format($price, 2);
+            }
+        });
+
+        $summary = implode('; ', $appliedRanges);
+        return back()->with('success', "Updated prices for {$totalUpdated} variant(s) across size groups: {$summary}.");
+    }
+
     public function updateCategorySizeMatrix(Request $request)
     {
         $validated = $request->validate([
@@ -559,7 +714,10 @@ class ProductVariantController extends Controller
             return response()->json([]);
         }
 
-        $variants = ProductVariant::with(['product.category'])
+        $user = auth()->user();
+        $branchName = $request->input('branch', $user?->branch_name ?: null);
+
+        $variants = ProductVariant::with(['product.category', 'branchStocks'])
             ->where(function ($q) use ($query) {
                 $q->whereHas('product', function ($p) use ($query) {
                     $p->where('name', 'like', "%{$query}%")
@@ -575,7 +733,7 @@ class ProductVariantController extends Controller
             ->limit(30)
             ->get();
 
-        return response()->json($variants->map(function ($variant) {
+        return response()->json($variants->map(function ($variant) use ($branchName) {
             return [
                 'id'              => $variant->id,
                 'product_id'      => $variant->product_id,
@@ -588,7 +746,7 @@ class ProductVariantController extends Controller
                 'size'            => $variant->size,
                 'colour'          => $variant->colour,
                 'selling_price'   => number_format($variant->selling_price, 2),
-                'stock_quantity'  => $variant->stock_quantity ?? 0,
+                'stock_quantity'  => $variant->getStockForBranch($branchName),
                 'edit_url'        => route('products.variants.edit', [$variant->product_id, $variant->id]),
                 'variants_url'    => route('products.variants.index', $variant->product_id),
             ];

@@ -63,4 +63,79 @@ class ProductVariant extends Model
     {
         return $this->hasMany(SaleItem::class);
     }
+
+    public function branchStocks(): HasMany
+    {
+        return $this->hasMany(BranchStock::class);
+    }
+
+    /**
+     * Get stock for a specific branch (or aggregate total across all branches if branch is null).
+     */
+    public function getStockForBranch(?string $branchName = null): float
+    {
+        if (empty($branchName)) {
+            $total = (float) $this->branchStocks()->sum('stock_quantity');
+            return $total > 0 ? $total : (float) $this->stock_quantity;
+        }
+
+        $bs = $this->branchStocks()
+            ->where('branch_name', trim($branchName))
+            ->first();
+
+        return $bs ? (float) $bs->stock_quantity : 0.00;
+    }
+
+    /**
+     * Set exact stock for a specific branch.
+     */
+    public function setStockForBranch(string $branchName, float $quantity): BranchStock
+    {
+        $branch = Branch::where('name', trim($branchName))->first()
+            ?? Branch::firstOrCreate(['name' => trim($branchName)], ['code' => 'BR-' . rand(10, 99)]);
+
+        $bs = BranchStock::updateOrCreate(
+            [
+                'branch_id'          => $branch->id,
+                'product_variant_id' => $this->id,
+            ],
+            [
+                'branch_name'        => $branch->name,
+                'stock_quantity'     => max(0, $quantity),
+            ]
+        );
+
+        // Keep aggregate variant stock_quantity synchronized
+        $this->update(['stock_quantity' => $this->branchStocks()->sum('stock_quantity')]);
+
+        return $bs;
+    }
+
+    /**
+     * Adjust stock for a specific branch (increment or decrement).
+     */
+    public function adjustStockForBranch(string $branchName, float $diff): BranchStock
+    {
+        $branch = Branch::where('name', trim($branchName))->first()
+            ?? Branch::firstOrCreate(['name' => trim($branchName)], ['code' => 'BR-' . rand(10, 99)]);
+
+        $bs = BranchStock::firstOrCreate(
+            [
+                'branch_id'          => $branch->id,
+                'product_variant_id' => $this->id,
+            ],
+            [
+                'branch_name'        => $branch->name,
+                'stock_quantity'     => 0.00,
+            ]
+        );
+
+        $newQty = max(0, (float)$bs->stock_quantity + $diff);
+        $bs->update(['stock_quantity' => $newQty]);
+
+        // Keep aggregate variant stock_quantity synchronized
+        $this->update(['stock_quantity' => $this->branchStocks()->sum('stock_quantity')]);
+
+        return $bs;
+    }
 }

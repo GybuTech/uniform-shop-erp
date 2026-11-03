@@ -59,7 +59,7 @@
                             <span class="inline-block bg-red-100 text-red-800 text-xs px-2.5 py-0.5 rounded font-semibold">Deactivated</span>
                         @endif
                     </td>
-                    <td class="px-6 py-4 text-sm text-right space-x-2">
+                    <td class="px-6 py-4 text-sm text-right space-x-2 whitespace-nowrap">
                         <a href="{{ route('users.edit', $user) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">Edit</a>
                         <form method="POST" action="{{ route('users.toggle-status', $user) }}" class="inline" onsubmit="return confirm('Change account status for {{ $user->name }}?')">
                             @csrf
@@ -83,7 +83,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" class="px-6 py-8 text-center text-gray-500">No staff accounts found.</td>
+                    <td colspan="8" class="px-6 py-8 text-center text-gray-500">No staff accounts found.</td>
                 </tr>
                 @endforelse
             </tbody>

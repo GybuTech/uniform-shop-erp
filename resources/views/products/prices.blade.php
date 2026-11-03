@@ -156,6 +156,102 @@
 
             </div>
 
+            {{-- 3. Size Range Group Pricing (e.g. 22-26 @ 900, 28-30 @ 1000) --}}
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4" x-data="priceGroupsManager()">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-100">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
+                            3
+                        </div>
+                        <div>
+                            <h3 class="font-extrabold text-slate-900 text-base">Size Range Group Pricing</h3>
+                            <p class="text-xs text-slate-500">Allocate prices in size range tiers (e.g. sizes 22-26 @ 900, 28-30 @ 1000, 32-36 @ 1100) across any product or category</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" @click="loadSchoolUniformPresets()" class="text-xs bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-3 py-1.5 rounded-lg font-bold transition">
+                            + Load Uniform Presets (22-26, 28-30, 32-36, 38-42)
+                        </button>
+                        <button type="button" @click="addGroupRow()" class="text-xs bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-lg font-bold transition">
+                            + Add Range Row
+                        </button>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ route('products.prices.groups') }}" class="space-y-4">
+                    @csrf
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Target Uniform Scope</label>
+                            <select name="target_type" class="w-full rounded-lg border-slate-300 text-xs font-bold text-indigo-950 focus:border-purple-500 focus:ring focus:ring-purple-200">
+                                <option value="sweater_with_badge" selected>Sweaters with Badge (All products matching "badge")</option>
+                                <option value="sweater_plain">Plain Sweaters (Without Badge)</option>
+                                <option value="all">All Uniform Categories</option>
+                                <optgroup label="Or By Category">
+                                    @foreach($categories as $category)
+                                        <option value="category_{{ $category->id }}">
+                                            {{ $category->name }} ({{ $category->products_count }} products)
+                                        </option>
+                                    @endforeach
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Or Specific Single Product (Optional)</label>
+                            <select name="product_id" class="w-full rounded-lg border-slate-300 text-xs font-medium focus:border-purple-500 focus:ring focus:ring-purple-200">
+                                <option value="">-- Apply to selected scope above --</option>
+                                @foreach($products as $prod)
+                                    <option value="{{ $prod->id }}">{{ $prod->name }} ({{ $prod->sku_prefix }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    {{-- Group Range Rows --}}
+                    <div class="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <template x-for="(grp, idx) in groups" :key="idx">
+                            <div class="grid grid-cols-12 gap-2 items-center bg-white p-2.5 rounded-lg border border-slate-200 text-xs">
+                                <div class="col-span-3 sm:col-span-3">
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase">From Size</label>
+                                    <input type="text" :name="`groups[${idx}][from_size]`" x-model="grp.from_size" placeholder="22"
+                                           class="w-full text-xs font-bold text-slate-800 rounded border-slate-300 py-1.5 px-2 focus:ring-purple-500">
+                                </div>
+                                <div class="col-span-3 sm:col-span-3">
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase">To Size</label>
+                                    <input type="text" :name="`groups[${idx}][to_size]`" x-model="grp.to_size" placeholder="26"
+                                           class="w-full text-xs font-bold text-slate-800 rounded border-slate-300 py-1.5 px-2 focus:ring-purple-500">
+                                </div>
+                                <div class="col-span-4 sm:col-span-4">
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase">New Selling Price (KES)</label>
+                                    <div class="relative">
+                                        <span class="absolute inset-y-0 left-0 pl-2 flex items-center text-slate-400 font-bold text-[10px]">KES</span>
+                                        <input type="number" step="0.01" min="0" :name="`groups[${idx}][price]`" x-model.number="grp.price" placeholder="900.00" required
+                                               class="pl-9 w-full text-xs font-bold text-purple-700 rounded border-slate-300 py-1.5 px-2 focus:ring-purple-500">
+                                    </div>
+                                </div>
+                                <div class="col-span-2 sm:col-span-2 text-right pt-3">
+                                    <button type="button" @click="removeGroupRow(idx)" class="text-rose-600 hover:text-rose-800 font-bold text-xs" title="Remove Range">
+                                        ✕ Remove
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="flex justify-end pt-1">
+                        <button type="submit" onclick="return confirm('Apply these size group prices across all matching variants in the selected scope?');"
+                                class="px-5 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-lg text-xs shadow-sm transition flex items-center">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Apply Group Prices to Scope
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             {{-- Section 3: Search, Filter & Individual Variant Overrides --}}
             <div class="bg-white shadow rounded-2xl border border-slate-200 overflow-hidden">
                 <div class="p-6 border-b border-slate-200 bg-slate-50">
@@ -322,4 +418,33 @@
 
         </div>
     </div>
+
+    <script>
+        function priceGroupsManager() {
+            return {
+                groups: [
+                    { from_size: '22', to_size: '26', price: 900 },
+                    { from_size: '28', to_size: '30', price: 1000 },
+                    { from_size: '32', to_size: '36', price: 1100 },
+                    { from_size: '38', to_size: '42', price: 1250 }
+                ],
+                addGroupRow() {
+                    this.groups.push({ from_size: '', to_size: '', price: 0 });
+                },
+                removeGroupRow(idx) {
+                    if (this.groups.length > 1) {
+                        this.groups.splice(idx, 1);
+                    }
+                },
+                loadSchoolUniformPresets() {
+                    this.groups = [
+                        { from_size: '22', to_size: '26', price: 900 },
+                        { from_size: '28', to_size: '30', price: 1000 },
+                        { from_size: '32', to_size: '36', price: 1100 },
+                        { from_size: '38', to_size: '42', price: 1250 }
+                    ];
+                }
+            };
+        }
+    </script>
 </x-app-layout>

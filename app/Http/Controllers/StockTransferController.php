@@ -119,13 +119,14 @@ class StockTransferController extends Controller
                 ]);
 
                 // Deduct from source branch stock immediately on dispatch
-                ProductVariant::find($item['product_variant_id'])
-                    ->decrement('stock_quantity', $item['quantity']);
+                $variant = ProductVariant::find($item['product_variant_id']);
+                if ($variant) {
+                    $variant->adjustStockForBranch($validated['from_branch'], -1 * $item['quantity']);
 
-                // If created directly as Received, also credit to destination immediately
-                if ($status === 'Received') {
-                    ProductVariant::find($item['product_variant_id'])
-                        ->increment('stock_quantity', $item['quantity']);
+                    // If created directly as Received, also credit to destination branch immediately
+                    if ($status === 'Received') {
+                        $variant->adjustStockForBranch($validated['to_branch'], $item['quantity']);
+                    }
                 }
             }
         });
@@ -153,10 +154,12 @@ class StockTransferController extends Controller
         }
 
         DB::transaction(function () use ($transfer) {
-            // Add stock to destination on confirmation
+            // Add stock to destination branch on confirmation
             foreach ($transfer->items as $item) {
-                ProductVariant::find($item->product_variant_id)
-                    ->increment('stock_quantity', $item->quantity);
+                $variant = ProductVariant::find($item->product_variant_id);
+                if ($variant) {
+                    $variant->adjustStockForBranch($transfer->to_branch, $item->quantity);
+                }
             }
 
             $transfer->update([

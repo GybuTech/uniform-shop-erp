@@ -591,8 +591,10 @@
 
             document.getElementById('searchSpinner').classList.remove('hidden');
 
+            const currentBranch = document.getElementById('branchSelect') ? document.getElementById('branchSelect').value : '';
+
             searchTimeout = setTimeout(() => {
-                fetch(`{{ route('pos.search') }}?q=${encodeURIComponent(trimmed)}`)
+                fetch(`{{ route('pos.search') }}?q=${encodeURIComponent(trimmed)}&branch=${encodeURIComponent(currentBranch)}`)
                     .then(res => res.json())
                     .then(data => {
                         document.getElementById('searchSpinner').classList.add('hidden');
@@ -611,8 +613,9 @@
                 if (!query) return;
 
                 // Immediate exact match lookup for Barcode Scanners
+                const currentBranch = document.getElementById('branchSelect') ? document.getElementById('branchSelect').value : '';
                 document.getElementById('searchSpinner').classList.remove('hidden');
-                fetch(`{{ route('pos.search') }}?q=${encodeURIComponent(query)}&exact=1`)
+                fetch(`{{ route('pos.search') }}?q=${encodeURIComponent(query)}&branch=${encodeURIComponent(currentBranch)}&exact=1`)
                     .then(res => res.json())
                     .then(data => {
                         document.getElementById('searchSpinner').classList.add('hidden');

@@ -47,7 +47,7 @@
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $customer->phone ?? '—' }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $customer->email ?? '—' }}</td>
                         <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $customer->sales_count }} sales</td>
-                        <td class="px-6 py-4 text-sm text-right space-x-2">
+                        <td class="px-6 py-4 text-sm text-right space-x-2 whitespace-nowrap">
                             <a href="{{ route('customers.show', $customer) }}" class="text-emerald-600 hover:text-emerald-900 font-medium">History</a>
                             <a href="{{ route('customers.edit', $customer) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">Edit</a>
                             <form method="POST" action="{{ route('customers.destroy', $customer) }}" class="inline" onsubmit="return confirm('Soft delete this customer?')">

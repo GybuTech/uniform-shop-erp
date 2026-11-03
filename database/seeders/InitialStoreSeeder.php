@@ -107,6 +107,12 @@ class InitialStoreSeeder extends Seeder
             BusinessSetting::firstOrCreate(['key' => $key], ['value' => $val]);
         }
 
+        // 6. Ensure default branch inventory sync
+        $variantsWithoutBranchStock = \App\Models\ProductVariant::doesntHave('branchStocks')->get();
+        foreach ($variantsWithoutBranchStock as $v) {
+            $v->setStockForBranch($mainBranch->name, (float)$v->stock_quantity);
+        }
+
         $duration = round(microtime(true) - $start, 2);
 
         $this->command?->info("✅ Rapid Store Onboarding Completed in {$duration}s!");

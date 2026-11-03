@@ -96,16 +96,13 @@ class PurchaseController extends Controller
                     'subtotal'           => $subtotal,
                 ]);
 
-                // Increment stock on variant ONLY if an actual uniform variant was selected and goods were received
-                if ($validated['status'] === 'received' && $variantId) {
-                    ProductVariant::where('id', $variantId)
-                        ->increment('stock_quantity', (int)$item['quantity']);
-                }
+                // Note: Purchases and Stock are separate independent entities.
+                // Store branches record physical stock independently via Stock Intake / Physical Adjustments.
             }
         });
 
         return redirect()->route('purchases.index')
-            ->with('success', "Purchase order {$purchaseNumber} recorded successfully.");
+            ->with('success', "Purchase order {$purchaseNumber} recorded successfully. (Procurement record saved independently of retail store stock).");
     }
 
     public function show(Purchase $purchase)
@@ -119,16 +116,6 @@ class PurchaseController extends Controller
         $purchaseNumber = $purchase->purchase_number;
 
         DB::transaction(function () use ($purchase) {
-            // Revert stock on uniform variants if goods were marked as received
-            if ($purchase->status === 'received') {
-                foreach ($purchase->items as $item) {
-                    if ($item->product_variant_id) {
-                        ProductVariant::where('id', $item->product_variant_id)
-                            ->decrement('stock_quantity', (int)$item->quantity);
-                    }
-                }
-            }
-
             $purchase->items()->delete();
             $purchase->delete();
         });
