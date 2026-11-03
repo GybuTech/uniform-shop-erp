@@ -16,11 +16,19 @@ use Illuminate\Support\Facades\DB;
 
 class PosController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = auth()->user();
+        if (!$user) {
+            return redirect()->route('login');
+        }
+
         $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
         $branches = Branch::where('is_active', true)->orderBy('name')->get();
+
+        if (!$isOwnerOrAdmin && empty($user->branch_name)) {
+            return redirect()->route('dashboard')->with('error', 'Your account is not assigned to an active branch. Please contact a supervisor.');
+        }
 
         if ($isOwnerOrAdmin) {
             $isLockedBranch = false;
@@ -59,7 +67,7 @@ class PosController extends Controller
         $query = trim($request->get('q', ''));
         $exact = $request->boolean('exact');
         $user = auth()->user();
-        $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']) && empty($user->branch_name);
+        $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
         $branchName = $isGlobalUser
             ? ($request->get('branch') ?: ($user->branch_name ?: 'Main Shop'))
             : ($user->branch_name ?: 'Main Shop');

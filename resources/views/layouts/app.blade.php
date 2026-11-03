@@ -15,13 +15,33 @@
         <!-- AlpineJS -->
         <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-        <!-- Vite Compiled Assets -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        <!-- Vite Compiled Assets with Offline Production Fallback -->
+        @if(file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
+            @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @else
+            <script src="https://cdn.tailwindcss.com"></script>
+        @endif
 
         <style>
             [x-cloak] { display: none !important; }
             body {
                 font-family: 'Plus Jakarta Sans', sans-serif;
+            }
+
+            /* Print Stylesheet: cleanly hides navigation, sidebar, on-screen action buttons when printing */
+            @media print {
+                .no-print, header, aside, nav, .card-tools, button:not(.printable), .btn-action, form.filter-form {
+                    display: none !important;
+                }
+                body {
+                    background: #ffffff !important;
+                    color: #000000 !important;
+                }
+                .max-w-7xl {
+                    max-width: 100% !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
             }
 
             /* Responsive screen scaling across 11"-27" monitor sizes and resolutions */

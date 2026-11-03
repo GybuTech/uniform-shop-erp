@@ -1,12 +1,20 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Expenses Log
-            </h2>
-            <a href="{{ route('expenses.create') }}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition">
-                + Add New Expense
-            </a>
+        <div class="card-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+                <h2 class="card-title font-bold text-xl text-gray-800 leading-tight">
+                    Expenses & Cash-Up Summary
+                </h2>
+                <p class="text-xs text-gray-500 mt-0.5">Track petty cash, store overheads, and daily cash-up deductions.</p>
+            </div>
+            <div class="card-tools flex flex-wrap items-center gap-2">
+                <a href="{{ route('expenses.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-sm transition">
+                    + Log Expense / Cash-Up
+                </a>
+                <button type="button" onclick="window.print()" class="inline-flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-xs border transition">
+                    Print Report
+                </button>
+            </div>
         </div>
     </x-slot>
 

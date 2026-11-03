@@ -40,11 +40,24 @@
 
                         <div>
                             <x-input-label for="branch_name" value="Destination Branch *" />
-                            <select name="branch_name" id="branch_name" required class="w-full mt-1 border-gray-300 rounded-md shadow-sm text-sm">
-                                @foreach($branches as $branch)
-                                    <option value="{{ $branch->name }}">{{ $branch->name }}</option>
-                                @endforeach
-                            </select>
+                            @php
+                                $u = auth()->user();
+                                $isOwner = $u && $u->hasAnyRole(['owner', 'system_administrator', 'admin']);
+                                $lockedBranch = (!$isOwner && !empty($u->branch_name)) ? $u->branch_name : null;
+                            @endphp
+                            @if($lockedBranch)
+                                <div class="px-3 py-2 bg-gray-100 border rounded-md text-sm font-bold text-gray-800 flex items-center justify-between mt-1">
+                                    <span>{{ $lockedBranch }}</span>
+                                    <span class="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-mono">Assigned Station</span>
+                                </div>
+                                <input type="hidden" name="branch_name" value="{{ $lockedBranch }}">
+                            @else
+                                <select name="branch_name" id="branch_name" required class="w-full mt-1 border-gray-300 rounded-md shadow-sm text-sm">
+                                    @foreach($branches as $branch)
+                                        <option value="{{ $branch->name }}" {{ ($u->branch_name ?? '') === $branch->name ? 'selected' : '' }}>{{ $branch->name }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
                         </div>
 
                         <div>

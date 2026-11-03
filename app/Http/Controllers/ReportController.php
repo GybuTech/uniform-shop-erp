@@ -13,37 +13,104 @@ use Carbon\Carbon;
 
 class ReportController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $user = auth()->user();
+        $isOwnerOrAdmin = $user && $user->hasAnyRole(['owner', 'system_administrator', 'admin']);
+        $branches = \App\Models\Branch::where('is_active', true)->orderBy('name')->get();
+
+        if ($branches->isEmpty()) {
+            $branches = collect([
+                (object)['name' => 'Main Shop', 'code' => 'BR-01'],
+                (object)['name' => 'STALL 35', 'code' => 'BR-02'],
+                (object)['name' => 'Kyoi stage(sweaters)', 'code' => 'BR-03'],
+            ]);
+        }
+
+        if ($isOwnerOrAdmin) {
+            $selectedBranch = $request->get('branch', 'all');
+            $isLocked = false;
+        } else {
+            $selectedBranch = $user->branch_name ?: ($branches->first()->name ?? 'Main Shop');
+            $isLocked = true;
+        }
+
         $today = Carbon::today();
         $startOfMonth = Carbon::now()->startOfMonth();
 
-        $todaySalesCount = Sale::whereDate('created_at', $today)->count();
-        $todayRevenue    = Sale::whereDate('created_at', $today)->sum('total_amount');
+        // 1. Sales Scoped by Branch
+        $salesQuery = Sale::query();
+        if ($selectedBranch !== 'all') {
+            $salesQuery->where('branch_name', $selectedBranch);
+        }
 
-        $monthlySalesCount = Sale::where('created_at', '>=', $startOfMonth)->count();
-        $monthlyRevenue    = Sale::where('created_at', '>=', $startOfMonth)->sum('total_amount');
+        $todaySalesCount = (clone $salesQuery)->whereDate('created_at', $today)->count();
+        $todayRevenue    = (float) (clone $salesQuery)->whereDate('created_at', $today)->sum('total_amount');
 
-        $inventoryValue = ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
-        $totalItemsInStock = ProductVariant::sum('stock_quantity');
+        $monthlySalesCount = (clone $salesQuery)->where('created_at', '>=', $startOfMonth)->count();
+        $monthlyRevenue    = (float) (clone $salesQuery)->where('created_at', '>=', $startOfMonth)->sum('total_amount');
 
-        $lowStockVariants = ProductVariant::with('product')
-            ->where('stock_quantity', '<=', 5)
-            ->orderBy('stock_quantity', 'asc')
-            ->get();
+        // 2. Inventory & Valuation Scoped by Branch
+        if ($selectedBranch !== 'all') {
+            // Specific Branch Inventory
+            $totalItemsInStock = (float) \App\Models\BranchStock::where('branch_name', $selectedBranch)->sum('stock_quantity');
+            $inventoryValue = (float) \App\Models\BranchStock::join('product_variants', 'branch_stocks.product_variant_id', '=', 'product_variants.id')
+                ->where('branch_stocks.branch_name', $selectedBranch)
+                ->sum(DB::raw('branch_stocks.stock_quantity * product_variants.selling_price'));
 
-        $bestSellers = SaleItem::select('product_variant_id', DB::raw('SUM(quantity) as total_qty'), DB::raw('SUM(line_total) as total_revenue'))
+            $lowStockBranchRecords = \App\Models\BranchStock::with(['productVariant.product'])
+                ->where('branch_name', $selectedBranch)
+                ->where('stock_quantity', '<=', 5)
+                ->orderBy('stock_quantity', 'asc')
+                ->get();
+
+            $lowStockVariants = $lowStockBranchRecords->map(function ($bs) {
+                $v = $bs->productVariant;
+                if ($v) {
+                    $v->branch_stock_quantity = $bs->stock_quantity;
+                }
+                return $v;
+            })->filter();
+        } else {
+            // Consolidated Across All Branches
+            $totalItemsInStock = (float) \App\Models\BranchStock::sum('stock_quantity');
+            if ($totalItemsInStock == 0) {
+                // Fallback to variant stock_quantity if branch_stocks is empty
+                $totalItemsInStock = (float) ProductVariant::sum('stock_quantity');
+                $inventoryValue = (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
+            } else {
+                $inventoryValue = (float) \App\Models\BranchStock::join('product_variants', 'branch_stocks.product_variant_id', '=', 'product_variants.id')
+                    ->sum(DB::raw('branch_stocks.stock_quantity * product_variants.selling_price'));
+            }
+
+            $lowStockVariants = ProductVariant::with('product')
+                ->where('stock_quantity', '<=', 5)
+                ->orderBy('stock_quantity', 'asc')
+                ->get();
+        }
+
+        // 3. Best Sellers
+        $bestSellersQuery = SaleItem::select('product_variant_id', DB::raw('SUM(quantity) as total_qty'), DB::raw('SUM(line_total) as total_revenue'))
             ->groupBy('product_variant_id')
             ->orderByDesc('total_qty')
             ->with('productVariant.product')
-            ->take(5)
-            ->get();
+            ->take(5);
 
-        $salesByCashier = Sale::select('user_id', DB::raw('COUNT(*) as total_sales'), DB::raw('SUM(total_amount) as total_revenue'))
+        if ($selectedBranch !== 'all') {
+            $bestSellersQuery->whereHas('sale', fn($q) => $q->where('branch_name', $selectedBranch));
+        }
+        $bestSellers = $bestSellersQuery->get();
+
+        // 4. Sales by Cashier
+        $salesByCashierQuery = Sale::select('user_id', DB::raw('COUNT(*) as total_sales'), DB::raw('SUM(total_amount) as total_revenue'))
             ->groupBy('user_id')
             ->with('user')
-            ->orderByDesc('total_revenue')
-            ->get();
+            ->orderByDesc('total_revenue');
+
+        if ($selectedBranch !== 'all') {
+            $salesByCashierQuery->where('branch_name', $selectedBranch);
+        }
+        $salesByCashier = $salesByCashierQuery->get();
 
         return view('reports.index', compact(
             'todaySalesCount',
@@ -54,7 +121,11 @@ class ReportController extends Controller
             'totalItemsInStock',
             'lowStockVariants',
             'bestSellers',
-            'salesByCashier'
+            'salesByCashier',
+            'branches',
+            'selectedBranch',
+            'isLocked',
+            'isOwnerOrAdmin'
         ));
     }
 

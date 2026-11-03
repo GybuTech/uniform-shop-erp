@@ -1,8 +1,33 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Analytics & Business Reports') }}
-        </h2>
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+                <h2 class="font-bold text-xl text-gray-800 leading-tight">
+                    {{ __('Analytics & Business Reports') }}
+                </h2>
+                <p class="text-xs text-gray-500 mt-0.5">Central command center: inventory valuation, sales metrics, and stock levels.</p>
+            </div>
+            <div>
+                @if($isLocked)
+                    <div class="px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-bold text-blue-900 flex items-center">
+                        <span class="text-[10px] text-blue-500 uppercase mr-1.5">Your Branch:</span>
+                        <span>{{ $selectedBranch }}</span>
+                    </div>
+                @else
+                    <form method="GET" action="{{ route('reports.index') }}" class="flex items-center gap-2">
+                        <label class="text-xs font-bold text-gray-600 uppercase tracking-wider">Scope:</label>
+                        <select name="branch" onchange="this.form.submit()" class="text-xs font-bold rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 py-1.5">
+                            <option value="all" {{ $selectedBranch === 'all' ? 'selected' : '' }}>All Branches (Consolidated)</option>
+                            @foreach($branches as $b)
+                                <option value="{{ $b->name }}" {{ $selectedBranch === $b->name ? 'selected' : '' }}>
+                                    {{ $b->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </form>
+                @endif
+            </div>
+        </div>
     </x-slot>
 
     <div class="space-y-6">

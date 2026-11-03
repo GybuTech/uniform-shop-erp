@@ -13,6 +13,10 @@ class StockEntry extends Model
 
     protected $fillable = [
         'user_id',
+        'source_type',
+        'delivery_note_no',
+        'origin_workshop',
+        'branch_name',
         'reference_no',
         'notes',
     ];
