@@ -40,8 +40,15 @@ class PosController extends Controller
 
         $customers = Customer::orderBy('first_name')->get();
 
-        // Active cashier shift and dynamic tier settings
-        $activeShift = Shift::getActiveShift($user->id, $currentBranchName);
+        // Active cashier shift check: Cashiers must open a verified shift with rollover float
+        $activeShift = Shift::where('user_id', $user->id)
+            ->where('status', 'open')
+            ->first();
+
+        if (!$activeShift) {
+            return redirect()->route('shifts.open', ['branch' => $currentBranchName])
+                ->with('info', "Please verify and open your cash drawer shift before processing sales.");
+        }
         $activeShift->recalculateTotals();
 
         $bulkDiscount = (float) BusinessSetting::get('pricing_tier_bulk_discount', 10.0);

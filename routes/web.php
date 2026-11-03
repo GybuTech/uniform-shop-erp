@@ -197,15 +197,36 @@ Route::middleware(['auth'])->group(function () {
         ->name('pos.receipt')
         ->middleware('permission:create-sales');
 
-    // Cashier Shifts & Reconciliation
+    // Cashier Shifts & Cash Rollover Continuity
     Route::get('/shifts', [ShiftController::class, 'index'])
         ->name('shifts.index')
         ->middleware('permission:view-sales');
-    Route::get('/shifts/current', [ShiftController::class, 'current'])
-        ->name('shifts.current')
+    Route::get('/shifts/open', [ShiftController::class, 'openForm'])
+        ->name('shifts.open')
+        ->middleware('permission:create-sales');
+    Route::get('/admin/shifts/open', [ShiftController::class, 'openForm'])
+        ->name('backend.admin.shifts.open')
+        ->middleware('permission:create-sales');
+    Route::post('/shifts/open', [ShiftController::class, 'storeOpen'])
+        ->name('shifts.open.store')
+        ->middleware('permission:create-sales');
+    Route::post('/admin/shifts/open', [ShiftController::class, 'storeOpen'])
+        ->middleware('permission:create-sales');
+    Route::get('/shifts/close', [ShiftController::class, 'closeForm'])
+        ->name('shifts.close.form')
+        ->middleware('permission:create-sales');
+    Route::get('/admin/shifts/close', [ShiftController::class, 'closeForm'])
         ->middleware('permission:create-sales');
     Route::post('/shifts/close', [ShiftController::class, 'close'])
         ->name('shifts.close')
+        ->middleware('permission:create-sales');
+    Route::post('/shifts/close/store', [ShiftController::class, 'close'])
+        ->name('shifts.close.store')
+        ->middleware('permission:create-sales');
+    Route::post('/admin/shifts/close', [ShiftController::class, 'close'])
+        ->middleware('permission:create-sales');
+    Route::get('/shifts/current', [ShiftController::class, 'current'])
+        ->name('shifts.current')
         ->middleware('permission:create-sales');
     Route::get('/shifts/{shift}/z-report', [ShiftController::class, 'zReport'])
         ->name('shifts.zReport')

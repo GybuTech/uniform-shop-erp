@@ -139,6 +139,41 @@
                     </div>
                 </div>
 
+                {{-- Chain of Custody & Cash Rollover --}}
+                <div class="py-3 border-b border-dashed border-gray-300 space-y-1 text-[11px]">
+                    <p class="font-bold uppercase tracking-wider text-[10px] text-gray-500">Chain of Custody & Handover</p>
+                    <div class="flex justify-between">
+                        <span>Owner Collection:</span>
+                        <span class="font-bold {{ $shift->cash_collected_by_owner ? 'text-indigo-700' : 'text-emerald-700' }}">
+                            {{ $shift->cash_collected_by_owner ? 'YES - COLLECTED' : 'NO - UNCOLLECTED OVERNIGHT' }}
+                        </span>
+                    </div>
+                    @if($shift->cash_collected_by_owner)
+                        <div class="flex justify-between">
+                            <span>Amount Collected:</span>
+                            <span class="font-bold">{{ $currency }} {{ number_format($shift->amount_collected, 2) }}</span>
+                        </div>
+                        @if($shift->collected_by_name)
+                            <div class="flex justify-between text-[10px] text-gray-500">
+                                <span>Collected By:</span>
+                                <span>{{ $shift->collected_by_name }}</span>
+                            </div>
+                        @endif
+                        <div class="flex justify-between font-black text-gray-900 pt-1 border-t border-dotted">
+                            <span>Float Remaining in Drawer:</span>
+                            <span class="text-sm font-black text-emerald-800">{{ $currency }} {{ number_format($shift->float_left_in_drawer ?? 0, 2) }}</span>
+                        </div>
+                    @else
+                        <div class="flex justify-between font-black text-gray-900 pt-1 border-t border-dotted">
+                            <span>Overnight Rollover Float:</span>
+                            <span class="text-sm font-black text-emerald-800">{{ $currency }} {{ number_format($shift->actual_cash ?? 0, 2) }}</span>
+                        </div>
+                        <div class="text-[9px] text-gray-500 italic">
+                            Full closing cash remained in physical drawer for tomorrow's verified opening float.
+                        </div>
+                    @endif
+                </div>
+
                 {{-- Handover Remarks --}}
                 @if($shift->handover_notes)
                     <div class="py-3 border-b border-dashed border-gray-300 text-[11px]">

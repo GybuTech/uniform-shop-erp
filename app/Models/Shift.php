@@ -13,6 +13,7 @@ class Shift extends Model
 
     protected $fillable = [
         'user_id',
+        'branch_id',
         'branch_name',
         'started_at',
         'ended_at',
@@ -20,6 +21,12 @@ class Shift extends Model
         'expected_cash',
         'actual_cash',
         'variance',
+        'cash_collected_by_owner',
+        'amount_collected',
+        'float_left_in_drawer',
+        'collected_by_name',
+        'override_reason',
+        'override_by_user_id',
         'mpesa_total',
         'card_total',
         'credit_total',
@@ -30,21 +37,29 @@ class Shift extends Model
     ];
 
     protected $casts = [
-        'started_at'         => 'datetime',
-        'ended_at'           => 'datetime',
-        'opening_float'      => 'decimal:2',
-        'expected_cash'      => 'decimal:2',
-        'actual_cash'        => 'decimal:2',
-        'variance'           => 'decimal:2',
-        'mpesa_total'        => 'decimal:2',
-        'card_total'         => 'decimal:2',
-        'credit_total'       => 'decimal:2',
-        'total_sales_amount' => 'decimal:2',
+        'started_at'              => 'datetime',
+        'ended_at'                => 'datetime',
+        'opening_float'           => 'decimal:2',
+        'expected_cash'           => 'decimal:2',
+        'actual_cash'             => 'decimal:2',
+        'variance'                => 'decimal:2',
+        'cash_collected_by_owner' => 'boolean',
+        'amount_collected'        => 'decimal:2',
+        'float_left_in_drawer'    => 'decimal:2',
+        'mpesa_total'             => 'decimal:2',
+        'card_total'              => 'decimal:2',
+        'credit_total'            => 'decimal:2',
+        'total_sales_amount'      => 'decimal:2',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function sales(): HasMany
@@ -60,6 +75,61 @@ class Shift extends Model
     public function isClosed(): bool
     {
         return $this->status === 'closed';
+    }
+
+    public function getStartingFloatAttribute(): float
+    {
+        return (float) $this->opening_float;
+    }
+
+    public function setStartingFloatAttribute($value): void
+    {
+        $this->attributes['opening_float'] = $value;
+    }
+
+    public function getCashSalesAmount(): float
+    {
+        return max(0.0, round((float) $this->expected_cash - (float) $this->opening_float, 2));
+    }
+
+    /**
+     * Query the last closed shift for a branch to determine the rolling float.
+     */
+    public static function getLastClosedShiftForBranch(string $branchName, ?int $branchId = null): ?self
+    {
+        return static::where(function ($q) use ($branchName, $branchId) {
+                if ($branchId) {
+                    $q->where('branch_id', $branchId)->orWhere('branch_name', $branchName);
+                } else {
+                    $q->where('branch_name', $branchName);
+                }
+            })
+            ->where('status', 'closed')
+            ->orderByDesc('ended_at')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
+     * Calculate the automated continuity float for a branch opening shift.
+     * Returns [float $defaultFloat, ?Shift $lastShift, string $statusLabel]
+     */
+    public static function resolveOpeningFloatForBranch(string $branchName, ?int $branchId = null): array
+    {
+        $lastShift = static::getLastClosedShiftForBranch($branchName, $branchId);
+
+        if (!$lastShift) {
+            return [0.00, null, 'Initial Shift (Brand New Store Baseline)'];
+        }
+
+        if ($lastShift->cash_collected_by_owner) {
+            $float = (float) ($lastShift->float_left_in_drawer ?? 0.00);
+            return [$float, $lastShift, 'Collected by Owner (Float Remaining in Drawer)'];
+        }
+
+        // Uncollected: Yesterday's full counted cash remains in the physical drawer overnight
+        $float = (float) ($lastShift->actual_cash ?? $lastShift->expected_cash);
+        return [$float, $lastShift, 'Uncollected Overnight Rollover'];
     }
 
     /**

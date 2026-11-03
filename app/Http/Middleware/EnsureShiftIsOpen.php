@@ -41,6 +41,11 @@ class EnsureShiftIsOpen
                     ->with('error', 'Please open a cashier shift before proceeding.');
             }
 
+            if (Route::has('shifts.open')) {
+                return redirect()->route('shifts.open')
+                    ->with('error', 'Please open a cashier shift before accessing the POS terminal.');
+            }
+
             if (Route::has('shifts.index')) {
                 return redirect()->route('shifts.index')
                     ->with('error', 'Please open a cashier shift before accessing the POS terminal.');

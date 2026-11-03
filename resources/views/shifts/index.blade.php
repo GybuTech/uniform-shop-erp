@@ -67,6 +67,11 @@
                                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase {{ $shift->status === 'open' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-700' }}">
                                         {{ $shift->status }}
                                     </span>
+                                    @if($shift->status === 'closed')
+                                        <div class="text-[9px] mt-0.5 font-bold {{ $shift->cash_collected_by_owner ? 'text-indigo-600' : 'text-emerald-700' }}">
+                                            {{ $shift->cash_collected_by_owner ? 'Collected' : 'Overnight Rollover' }}
+                                        </div>
+                                    @endif
                                 </td>
                                 <td class="px-5 py-3 text-right whitespace-nowrap">
                                     <a href="{{ route('shifts.zReport', $shift) }}"
