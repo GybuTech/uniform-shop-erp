@@ -170,13 +170,15 @@ class ProductController extends Controller
     }
 
     /**
-     * Download pre-formatted CSV template for bulk importing real products, sizes & prices.
+     * Download CSV template for bulk importing/exporting real products, sizes, prices, and stock.
+     * If products already exist in the database, exports ALL available catalog items.
+     * If the catalog is empty, outputs pre-formatted guidance sample rows.
      */
     public function downloadCatalogTemplate()
     {
         $headers = [
             'Content-Type'        => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="tshaprint_real_product_catalog_template.csv"',
+            'Content-Disposition' => 'attachment; filename="tshaprint_product_catalog_export.csv"',
             'Pragma'              => 'no-cache',
             'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
             'Expires'             => '0',
@@ -189,13 +191,33 @@ class ProductController extends Controller
             // Column Header
             fputcsv($out, ['category_name', 'product_name', 'sku_prefix', 'size', 'colour', 'selling_price', 'initial_stock']);
 
-            // Sample rows to guide the client
-            fputcsv($out, ['School Sweaters', 'Accurate Sweater', 'ACC-SW', '22', 'Standard', 500.00, 0]);
-            fputcsv($out, ['School Sweaters', 'Accurate Sweater', 'ACC-SW', '24', 'Standard', 500.00, 0]);
-            fputcsv($out, ['School Sweaters', 'Accurate Sweater', 'ACC-SW', '26', 'Standard', 550.00, 0]);
-            fputcsv($out, ['Tracksuits', 'Kayole Tracksuit', 'KAY-TRK', '26', 'Navy Blue', 900.00, 0]);
-            fputcsv($out, ['Tracksuits', 'Kayole Tracksuit', 'KAY-TRK', '28', 'Navy Blue', 900.00, 0]);
-            fputcsv($out, ['Tracksuits', 'Kayole Tracksuit', 'KAY-TRK', '30', 'Navy Blue', 1000.00, 0]);
+            // Export all variants currently available in the database
+            $variants = ProductVariant::with(['product.category', 'branchStocks'])
+                ->whereHas('product')
+                ->orderBy('sku')
+                ->get();
+
+            if ($variants->isNotEmpty()) {
+                foreach ($variants as $v) {
+                    fputcsv($out, [
+                        $v->product?->category?->name ?? 'General Uniforms',
+                        $v->product?->name ?? 'Uniform Item',
+                        $v->product?->sku_prefix ?? 'PRD',
+                        $v->size ?? 'Standard',
+                        $v->colour ?? 'Standard',
+                        $v->selling_price ?? 0.00,
+                        $v->stock_quantity ?? 0,
+                    ]);
+                }
+            } else {
+                // Baseline template sample rows (shown only if database is completely blank)
+                fputcsv($out, ['School Sweaters', 'Accurate Sweater', 'ACC-SW', '22', 'Standard', 500.00, 0]);
+                fputcsv($out, ['School Sweaters', 'Accurate Sweater', 'ACC-SW', '24', 'Standard', 500.00, 0]);
+                fputcsv($out, ['School Sweaters', 'Accurate Sweater', 'ACC-SW', '26', 'Standard', 550.00, 0]);
+                fputcsv($out, ['Tracksuits', 'Kayole Tracksuit', 'KAY-TRK', '26', 'Navy Blue', 900.00, 0]);
+                fputcsv($out, ['Tracksuits', 'Kayole Tracksuit', 'KAY-TRK', '28', 'Navy Blue', 900.00, 0]);
+                fputcsv($out, ['Tracksuits', 'Kayole Tracksuit', 'KAY-TRK', '30', 'Navy Blue', 1000.00, 0]);
+            }
 
             fclose($out);
         }, 200, $headers);

@@ -1,5 +1,4 @@
 <x-app-layout>
-    <div x-data="{ showResetModal: false }">
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -22,7 +21,7 @@
                     $isOwnerOrAdmin = in_array(strtolower(auth()->user()->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin', 'manager']);
                 @endphp
                 @if($isOwnerOrAdmin)
-                <button type="button" @click="showResetModal = true"
+                <button type="button" onclick="openResetModal()"
                         class="inline-flex items-center px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -210,10 +209,10 @@
 
     {{-- Delete / Reset Test Stock Modal (Owner/Admin Only) --}}
     @if($isOwnerOrAdmin)
-    <div x-show="showResetModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="showResetModal = false"></div>
+    <div id="resetModal" class="fixed inset-0 z-50 overflow-y-auto hidden" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeResetModal()"></div>
         <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left">
+            <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left z-10">
                 <div class="flex items-center space-x-3 text-rose-600">
                     <div class="p-2.5 bg-rose-100 rounded-xl">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -258,7 +257,7 @@
                     </div>
 
                     <div class="flex justify-end space-x-2 pt-2 border-t">
-                        <button type="button" @click="showResetModal = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                        <button type="button" onclick="closeResetModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
                             Cancel
                         </button>
                         <button type="submit" onclick="return confirm('Are you sure you want to delete test stock counts? This cannot be undone.');" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
@@ -270,5 +269,22 @@
         </div>
     </div>
     @endif
-    </div>
+
+    <script>
+        function openResetModal() {
+            var el = document.getElementById('resetModal');
+            if (el) el.classList.remove('hidden');
+        }
+        function closeResetModal() {
+            var el = document.getElementById('resetModal');
+            if (el) el.classList.add('hidden');
+        }
+
+        // Close on Escape key press
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeResetModal();
+            }
+        });
+    </script>
 </x-app-layout>

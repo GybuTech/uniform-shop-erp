@@ -1,5 +1,4 @@
 <x-app-layout>
-    <div x-data="{ showImportModal: false, showPurgeModal: false }">
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
@@ -20,13 +19,14 @@
                     + Add Product
                 </a>
                 <a href="{{ route('products.template') }}"
-                   class="inline-flex items-center px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                   class="inline-flex items-center px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition"
+                   title="Export all current products & variants or download blank CSV template">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Download Template (.csv)
+                    Download Template / Export All (.csv)
                 </a>
-                <button type="button" @click="showImportModal = true"
+                <button type="button" onclick="openImportModal()"
                         class="inline-flex items-center px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -37,7 +37,7 @@
                     $isOwnerOrAdmin = in_array(strtolower(auth()->user()->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin', 'manager']);
                 @endphp
                 @if($isOwnerOrAdmin)
-                <button type="button" @click="showPurgeModal = true"
+                <button type="button" onclick="openPurgeModal()"
                         class="inline-flex items-center px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -210,10 +210,10 @@
     </div>
 
     {{-- 1. Bulk Import Products Modal --}}
-    <div x-show="showImportModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="showImportModal = false"></div>
+    <div id="importModal" class="fixed inset-0 z-50 overflow-y-auto hidden" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeImportModal()"></div>
         <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left">
+            <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left z-10">
                 <div class="flex items-center space-x-3 text-indigo-600">
                     <div class="p-2.5 bg-indigo-100 rounded-xl">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -255,7 +255,7 @@
                     </div>
 
                     <div class="flex justify-end space-x-2 pt-2 border-t">
-                        <button type="button" @click="showImportModal = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                        <button type="button" onclick="closeImportModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
                             Cancel
                         </button>
                         <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
@@ -269,10 +269,10 @@
 
     {{-- 2. Purge Test Catalog Modal (Owner/Admin Only) --}}
     @if($isOwnerOrAdmin)
-    <div x-show="showPurgeModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="showPurgeModal = false"></div>
+    <div id="purgeModal" class="fixed inset-0 z-50 overflow-y-auto hidden" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closePurgeModal()"></div>
         <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left">
+            <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left z-10">
                 <div class="flex items-center space-x-3 text-rose-600">
                     <div class="p-2.5 bg-rose-100 rounded-xl">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -305,7 +305,7 @@
                     </div>
 
                     <div class="flex justify-end space-x-2 pt-2 border-t">
-                        <button type="button" @click="showPurgeModal = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                        <button type="button" onclick="closePurgeModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
                             Cancel
                         </button>
                         <button type="submit" onclick="return confirm('CRITICAL CONFIRMATION: Are you sure you want to permanently delete ALL test products, variants, and test transactions?');" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
@@ -317,5 +317,31 @@
         </div>
     </div>
     @endif
-    </div>
+
+    <script>
+        function openImportModal() {
+            var el = document.getElementById('importModal');
+            if (el) el.classList.remove('hidden');
+        }
+        function closeImportModal() {
+            var el = document.getElementById('importModal');
+            if (el) el.classList.add('hidden');
+        }
+        function openPurgeModal() {
+            var el = document.getElementById('purgeModal');
+            if (el) el.classList.remove('hidden');
+        }
+        function closePurgeModal() {
+            var el = document.getElementById('purgeModal');
+            if (el) el.classList.add('hidden');
+        }
+
+        // Close any open modal on Escape key press
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeImportModal();
+                closePurgeModal();
+            }
+        });
+    </script>
 </x-app-layout>
