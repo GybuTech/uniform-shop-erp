@@ -87,6 +87,9 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:edit-products');
     Route::patch('/products/{product}', [ProductController::class, 'update']);
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:delete-products');
+    Route::get('/products-template', [ProductController::class, 'downloadCatalogTemplate'])->name('products.template')->middleware('permission:create-products');
+    Route::post('/products-import', [ProductController::class, 'importCatalog'])->name('products.import')->middleware('permission:create-products');
+    Route::post('/products-purge-test-catalog', [ProductController::class, 'purgeTestCatalog'])->name('products.purge')->middleware('permission:delete-products');
 
     // Ajax / Quick Variant Search
     Route::get('/products/variants/search', [ProductVariantController::class, 'searchAjax'])

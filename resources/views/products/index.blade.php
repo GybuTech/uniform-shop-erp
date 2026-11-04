@@ -1,4 +1,5 @@
 <x-app-layout>
+    <div x-data="{ showImportModal: false, showPurgeModal: false }">
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
@@ -9,15 +10,41 @@
                     Browse uniform products, search across all variants, or manage product catalog items.
                 </p>
             </div>
-            <div>
+            <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('products.create') }}"
                    style="background-color: #000000 !important; color: #ffffff !important;"
-                   class="inline-flex items-center px-4 py-2 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-lg shadow-md border border-black transition">
+                   class="inline-flex items-center px-3.5 py-2 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-lg shadow-md border border-black transition">
                     <svg class="w-4 h-4 mr-1.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
                     </svg>
                     + Add Product
                 </a>
+                <a href="{{ route('products.template') }}"
+                   class="inline-flex items-center px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download Template (.csv)
+                </a>
+                <button type="button" @click="showImportModal = true"
+                        class="inline-flex items-center px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Bulk Import Products (.csv)
+                </button>
+                @php
+                    $isOwnerOrAdmin = in_array(strtolower(auth()->user()->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin', 'manager']);
+                @endphp
+                @if($isOwnerOrAdmin)
+                <button type="button" @click="showPurgeModal = true"
+                        class="inline-flex items-center px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Purge Test Catalog
+                </button>
+                @endif
             </div>
         </div>
     </x-slot>
@@ -180,5 +207,115 @@
             </div>
 
         </div>
+    </div>
+
+    {{-- 1. Bulk Import Products Modal --}}
+    <div x-show="showImportModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="showImportModal = false"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left">
+                <div class="flex items-center space-x-3 text-indigo-600">
+                    <div class="p-2.5 bg-indigo-100 rounded-xl">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-base text-gray-900">Bulk Import Real Catalog (.csv)</h3>
+                        <p class="text-xs text-gray-500">Upload spreadsheet with products, sizes, categories, and prices</p>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 space-y-1">
+                    <p class="font-bold">Required CSV Columns:</p>
+                    <code class="block font-mono text-[11px] bg-white p-1.5 border rounded text-indigo-950">category_name, product_name, sku_prefix, size, colour, selling_price, initial_stock</code>
+                    <p class="text-[11px] text-indigo-700">If the category or product does not exist, the system will create them automatically.</p>
+                </div>
+
+                <form method="POST" action="{{ route('products.import') }}" enctype="multipart/form-data" class="space-y-4">
+                    @csrf
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                            Spreadsheet File (.csv) *
+                        </label>
+                        <input type="file" name="catalog_file" required accept=".csv,.txt"
+                               class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-indigo-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                            Default Receiving Branch (For Initial Stock, if any)
+                        </label>
+                        <select name="branch_name" class="w-full text-xs font-bold rounded-xl border-gray-300 focus:ring-indigo-500">
+                            <option value="Main Shop">Main Shop</option>
+                            <option value="STALL 35">STALL 35</option>
+                            <option value="Kyoi stage(sweaters)">Kyoi stage(sweaters)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex justify-end space-x-2 pt-2 border-t">
+                        <button type="button" @click="showImportModal = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
+                            Upload & Import Real Catalog
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- 2. Purge Test Catalog Modal (Owner/Admin Only) --}}
+    @if($isOwnerOrAdmin)
+    <div x-show="showPurgeModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="showPurgeModal = false"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left">
+                <div class="flex items-center space-x-3 text-rose-600">
+                    <div class="p-2.5 bg-rose-100 rounded-xl">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-base text-gray-900">Purge All Test Catalog Items</h3>
+                        <p class="text-xs text-gray-500">Completely wipe test products, variants, and test transactions</p>
+                    </div>
+                </div>
+
+                <div class="bg-rose-50 border border-rose-200 rounded-xl p-3.5 text-xs text-rose-900 space-y-1.5">
+                    <p class="font-bold">⚠️ Warning: Complete Test Catalog Deletion</p>
+                    <p>This action will permanently delete all test products, sizes, prices, and test transaction records so you can record your real products with clean fresh IDs.</p>
+                    <p class="text-[11px] text-rose-700"><strong>Protected Data:</strong> User logins, Staff roles, Store branches, and Shop settings (Tshaprint Solutions) will remain 100% safe.</p>
+                </div>
+
+                <form method="POST" action="{{ route('products.purge') }}" class="space-y-4">
+                    @csrf
+
+                    <div class="p-3 bg-gray-50 border rounded-xl space-y-2">
+                        <label class="flex items-start space-x-2 cursor-pointer select-none">
+                            <input type="checkbox" name="purge_categories" value="1" class="mt-0.5 rounded text-rose-600 focus:ring-rose-500">
+                            <div class="text-xs">
+                                <span class="font-bold text-gray-900">Also delete all categories</span>
+                                <p class="text-[11px] text-gray-500">Leave unchecked if you want to keep the existing categories (School Sweaters, Tracksuits, etc.). Check if you want to wipe categories and start completely fresh.</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end space-x-2 pt-2 border-t">
+                        <button type="button" @click="showPurgeModal = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                            Cancel
+                        </button>
+                        <button type="submit" onclick="return confirm('CRITICAL CONFIRMATION: Are you sure you want to permanently delete ALL test products, variants, and test transactions?');" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
+                            Yes, Purge Test Products & Variants
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    @endif
     </div>
 </x-app-layout>
