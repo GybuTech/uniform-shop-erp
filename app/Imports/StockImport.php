@@ -17,12 +17,14 @@ class StockImport implements ToCollection, WithHeadingRow
     private ?int $userId;
     private ?string $customNotes;
     private string $mode;
+    private ?string $branchName;
 
-    public function __construct(?int $userId = null, ?string $customNotes = null, string $mode = 'replace')
+    public function __construct(?int $userId = null, ?string $customNotes = null, string $mode = 'replace', ?string $branchName = null)
     {
         $this->userId      = $userId;
         $this->customNotes = $customNotes;
         $this->mode        = in_array($mode, ['replace', 'add']) ? $mode : 'replace';
+        $this->branchName  = $branchName ? trim($branchName) : null;
     }
 
     /**
@@ -67,10 +69,32 @@ class StockImport implements ToCollection, WithHeadingRow
             }
 
             if (!$variant) {
-                $this->skipped++;
-                $label = !empty($sku) ? "SKU '{$sku}'" : "Product '{$prodName}' Size '{$size}'";
-                $this->errors[] = "Row #{$rowNum}: Uniform variant not found for {$label}.";
-                continue;
+                if (!empty($prodName) && !empty($size)) {
+                    $cat = \App\Models\Category::firstOrCreate(['name' => 'General Uniforms']);
+                    $skuPrefix = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $prodName), 0, 4)) ?: 'PRD';
+                    $product = \App\Models\Product::firstOrCreate(
+                        ['name' => $prodName],
+                        ['sku_prefix' => $skuPrefix, 'category_id' => $cat->id]
+                    );
+
+                    $cleanSize = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $size));
+                    $genSku = !empty($sku) ? $sku : "{$product->sku_prefix}-{$cleanSize}";
+                    $variant = ProductVariant::create([
+                        'product_id'      => $product->id,
+                        'size'            => $size,
+                        'sku'             => $genSku,
+                        'barcode'         => 'BC-' . $genSku,
+                        'colour'          => 'Standard',
+                        'unit_of_measure' => 'Pieces',
+                        'selling_price'   => isset($row['selling_price']) && is_numeric($row['selling_price']) ? (float)$row['selling_price'] : 0.00,
+                        'stock_quantity'  => 0.00,
+                    ]);
+                } else {
+                    $this->skipped++;
+                    $label = !empty($sku) ? "SKU '{$sku}'" : "Product '{$prodName}' Size '{$size}'";
+                    $this->errors[] = "Row #{$rowNum}: Uniform variant not found for {$label}.";
+                    continue;
+                }
             }
 
             $entry->items()->create([
@@ -78,11 +102,19 @@ class StockImport implements ToCollection, WithHeadingRow
                 'quantity'           => $quantity,
             ]);
 
-            // Update stock according to selected mode
-            if ($this->mode === 'replace') {
-                $variant->update(['stock_quantity' => $quantity]);
+            // Update stock according to selected mode & branch
+            if (!empty($this->branchName)) {
+                if ($this->mode === 'replace') {
+                    $variant->setStockForBranch($this->branchName, $quantity);
+                } else {
+                    $variant->adjustStockForBranch($this->branchName, $quantity);
+                }
             } else {
-                $variant->increment('stock_quantity', $quantity);
+                if ($this->mode === 'replace') {
+                    $variant->update(['stock_quantity' => $quantity]);
+                } else {
+                    $variant->increment('stock_quantity', $quantity);
+                }
             }
 
             // Optional selling price sync from spreadsheet

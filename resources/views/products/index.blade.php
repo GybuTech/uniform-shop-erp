@@ -31,7 +31,7 @@
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    Bulk Import Products (.csv)
+                    Bulk Import Products (.xlsx, .csv)
                 </button>
                 @php
                     $isOwnerOrAdmin = in_array(strtolower(auth()->user()->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin', 'manager']);
@@ -221,15 +221,16 @@
                         </svg>
                     </div>
                     <div>
-                        <h3 class="font-extrabold text-base text-gray-900">Bulk Import Real Catalog (.csv)</h3>
-                        <p class="text-xs text-gray-500">Upload spreadsheet with products, sizes, categories, and prices</p>
+                        <h3 class="font-extrabold text-base text-gray-900">Bulk Import Products & Stock (.xlsx, .xls, .csv)</h3>
+                        <p class="text-xs text-gray-500">Upload Excel or CSV spreadsheet with products, sizes, prices, and stock counts</p>
                     </div>
                 </div>
 
-                <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 space-y-1">
-                    <p class="font-bold">Required CSV Columns:</p>
+                <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 space-y-1.5">
+                    <p class="font-bold">Flexible Supported Spreadsheet Columns:</p>
                     <code class="block font-mono text-[11px] bg-white p-1.5 border rounded text-indigo-950">category_name, product_name, sku_prefix, size, colour, selling_price, initial_stock</code>
-                    <p class="text-[11px] text-indigo-700">If the category or product does not exist, the system will create them automatically.</p>
+                    <p class="text-[11px] text-indigo-700">Or stocktaking sheets with: <span class="font-mono font-bold">sku, product_name, size, quantity, selling_price</span></p>
+                    <p class="text-[11px] text-indigo-600">✓ Works directly with Excel workbooks (.xlsx, .xls) and CSVs. Missing categories and products will be created automatically.</p>
                 </div>
 
                 <form method="POST" action="{{ route('products.import') }}" enctype="multipart/form-data" class="space-y-4">
@@ -237,20 +238,30 @@
 
                     <div>
                         <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                            Spreadsheet File (.csv) *
+                            Spreadsheet File (.xlsx, .xls, .csv) *
                         </label>
-                        <input type="file" name="catalog_file" required accept=".csv,.txt"
+                        <input type="file" name="catalog_file" required
+                               accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain"
                                class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-indigo-500">
+                        <p class="text-[11px] text-gray-500 mt-1">Select any Excel workbook (.xlsx, .xls) or CSV sheet from your computer.</p>
                     </div>
 
                     <div>
                         <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                            Default Receiving Branch (For Initial Stock, if any)
+                            Target Store / Branch (For Stock Counts) *
                         </label>
                         <select name="branch_name" class="w-full text-xs font-bold rounded-xl border-gray-300 focus:ring-indigo-500">
-                            <option value="Main Shop">Main Shop</option>
-                            <option value="STALL 35">STALL 35</option>
-                            <option value="Kyoi stage(sweaters)">Kyoi stage(sweaters)</option>
+                            @if(isset($branches) && $branches->isNotEmpty())
+                                @foreach($branches as $b)
+                                    <option value="{{ $b->name }}" {{ $b->name === 'STALL 35' ? 'selected' : '' }}>
+                                        Branch: {{ $b->name }}
+                                    </option>
+                                @endforeach
+                            @else
+                                <option value="Main Shop">Branch: Main Shop</option>
+                                <option value="STALL 35" selected>Branch: STALL 35</option>
+                                <option value="Kyoi stage(sweaters)">Branch: Kyoi stage(sweaters)</option>
+                            @endif
                         </select>
                     </div>
 
@@ -259,7 +270,7 @@
                             Cancel
                         </button>
                         <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
-                            Upload & Import Real Catalog
+                            Upload & Import Products & Stock
                         </button>
                     </div>
                 </form>

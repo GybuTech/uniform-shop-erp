@@ -139,8 +139,11 @@ class StockEntryController extends Controller
 
     public function import(Request $request)
     {
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
         $request->validate([
-            'stock_file'   => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:5120'],
+            'stock_file'   => ['required', 'file', 'max:25600'],
             'import_mode'  => ['nullable', 'in:replace,add'],
             'intake_date'  => ['nullable', 'date'],
             'branch_name'  => ['nullable', 'string'],
@@ -148,16 +151,15 @@ class StockEntryController extends Controller
         ]);
 
         $mode        = $request->input('import_mode', 'replace');
+        $branchName  = $request->input('branch_name') ?: 'Main Shop';
         $customNotes = $request->input('notes', 'Spreadsheet Opening Stock Intake');
-        if ($request->filled('branch_name')) {
-            $customNotes .= " | Branch: " . $request->input('branch_name');
-        }
+        $customNotes .= " | Branch: " . $branchName;
         if ($request->filled('intake_date')) {
             $customNotes .= " | Date: " . $request->input('intake_date');
         }
         $customNotes .= " | Mode: " . ($mode === 'replace' ? 'Set Opening Balance' : 'Add to Stock');
 
-        $importer = new StockImport(auth()->id(), $customNotes, $mode);
+        $importer = new StockImport(auth()->id(), $customNotes, $mode, $branchName);
         Excel::import($importer, $request->file('stock_file'));
 
         $actionWord = $mode === 'replace' ? 'set as opening balance' : 'added to stock';

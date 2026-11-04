@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Imports\ProductCatalogImport;
 use App\Models\Branch;
 use App\Models\BranchStock;
 use App\Models\Category;
@@ -21,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ProductController extends Controller
 {
@@ -54,8 +56,12 @@ class ProductController extends Controller
 
         $products = $query->paginate(15)->withQueryString();
         $categories = Category::orderBy('name')->get();
+        $branches = Branch::where('is_active', true)->orderBy('name')->get();
+        if ($branches->isEmpty()) {
+            $branches = Branch::orderBy('name')->get();
+        }
 
-        return view('products.index', compact('products', 'search', 'categories', 'categoryId'));
+        return view('products.index', compact('products', 'search', 'categories', 'categoryId', 'branches'));
     }
 
     public function create()
@@ -224,129 +230,39 @@ class ProductController extends Controller
     }
 
     /**
-     * Bulk import real products, categories, size variants, and prices from spreadsheet.
+     * Bulk import real products, categories, size variants, prices, and stock from Excel or CSV spreadsheet.
      */
     public function importCatalog(Request $request)
     {
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
         $request->validate([
-            'catalog_file' => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:5120'],
+            'catalog_file' => ['required', 'file', 'max:25600'],
             'branch_name'  => ['nullable', 'string'],
+        ], [
+            'catalog_file.required' => 'Please select a spreadsheet file (.xlsx, .xls, or .csv) to upload.',
         ]);
 
         $file = $request->file('catalog_file');
+        $ext = strtolower($file->getClientOriginalExtension());
+        if (!in_array($ext, ['xlsx', 'xls', 'csv', 'txt'])) {
+            return redirect()->back()->with('error', 'Unsupported file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) spreadsheet.');
+        }
+
         $branchName = $request->input('branch_name') ?: 'Main Shop';
 
-        $importedProducts = 0;
-        $importedVariants = 0;
-        $importedCategories = 0;
-
-        $path = $file->getRealPath();
-        $handle = fopen($path, 'r');
-        if ($handle === false) {
-            return redirect()->back()->with('error', 'Unable to open uploaded spreadsheet.');
-        }
-
-        $header = fgetcsv($handle);
-        if (!$header) {
-            fclose($handle);
-            return redirect()->back()->with('error', 'Uploaded file is empty.');
-        }
-
-        $header = array_map(fn($h) => strtolower(trim(preg_replace('/[^a-zA-Z0-9_]/', '', $h))), $header);
-
-        DB::beginTransaction();
         try {
-            while (($row = fgetcsv($handle)) !== false) {
-                if (empty(array_filter($row))) continue;
-                $data = array_combine($header, array_pad($row, count($header), ''));
+            $importer = new ProductCatalogImport($branchName);
+            Excel::import($importer, $file);
 
-                $catName   = trim($data['category_name'] ?? $data['category'] ?? 'General Uniforms');
-                $prodName  = trim($data['product_name'] ?? $data['product'] ?? '');
-                $skuPrefix = strtoupper(trim($data['sku_prefix'] ?? ''));
-                $size      = trim($data['size'] ?? '');
-                $colour    = trim($data['colour'] ?? $data['color'] ?? 'Standard');
-                $price     = (float) ($data['selling_price'] ?? $data['price'] ?? 0);
-                $stock     = (float) ($data['initial_stock'] ?? $data['stock'] ?? 0);
-
-                if (empty($prodName) || empty($size)) {
-                    continue;
-                }
-
-                // 1. Resolve Category
-                $category = Category::firstOrCreate(
-                    ['name' => $catName],
-                    ['description' => "Category for {$catName}"]
-                );
-                if ($category->wasRecentlyCreated) {
-                    $importedCategories++;
-                }
-
-                // 2. Resolve Product
-                if (empty($skuPrefix)) {
-                    $skuPrefix = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $prodName), 0, 4));
-                }
-
-                $product = Product::where('name', $prodName)->first();
-                if (!$product) {
-                    $effectivePrefix = $skuPrefix;
-                    $counter = 2;
-                    while (Product::where('sku_prefix', $effectivePrefix)->exists()) {
-                        $effectivePrefix = "{$skuPrefix}{$counter}";
-                        $counter++;
-                    }
-
-                    $product = Product::create([
-                        'name'        => $prodName,
-                        'sku_prefix'  => $effectivePrefix,
-                        'category_id' => $category->id,
-                        'description' => "Uniform item: {$prodName}",
-                    ]);
-                    $importedProducts++;
-                }
-
-                // 3. Resolve Product Variant
-                $variantSku = "{$product->sku_prefix}-" . strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $size));
-                if (!empty($colour) && strtolower($colour) !== 'standard') {
-                    $variantSku .= '-' . strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $colour), 0, 3));
-                }
-
-                $variant = ProductVariant::firstOrNew([
-                    'product_id' => $product->id,
-                    'size'       => $size,
-                ]);
-
-                if (!$variant->exists) {
-                    $vCounter = 2;
-                    $finalSku = $variantSku;
-                    while (ProductVariant::where('sku', $finalSku)->exists()) {
-                        $finalSku = "{$variantSku}-V{$vCounter}";
-                        $vCounter++;
-                    }
-                    $variant->sku = $finalSku;
-                }
-
-                $variant->barcode         = 'BC-' . $variant->sku;
-                $variant->colour          = $colour ?: 'Standard';
-                $variant->unit_of_measure = 'Pieces';
-                $variant->selling_price   = $price;
-                $variant->stock_quantity  = 0.00;
-                $variant->save();
-                $importedVariants++;
-
-                // 4. Initial stock if specified
-                if ($stock > 0) {
-                    $variant->adjustStockForBranch($branchName, $stock);
-                }
+            $msg = "Catalog and stock imported successfully into '{$branchName}'! Processed {$importer->importedVariants} new variant(s), {$importer->updatedVariants} updated variant(s) across {$importer->importedProducts} new product(s).";
+            if ($importer->skipped > 0) {
+                $msg .= " ({$importer->skipped} rows skipped).";
             }
 
-            DB::commit();
-            fclose($handle);
-
-            return redirect()->route('products.index')
-                ->with('success', "Catalog imported successfully! Added {$importedProducts} product(s), {$importedVariants} variant size(s) across {$importedCategories} category(ies).");
+            return redirect()->route('products.index')->with('success', $msg);
         } catch (\Throwable $e) {
-            DB::rollBack();
-            fclose($handle);
             return redirect()->route('products.index')->with('error', 'Import failed: ' . $e->getMessage());
         }
     }
