@@ -18,7 +18,7 @@
     <div class="py-8" x-data="{
         canOverride: {{ $isOwnerOrAdmin ? 'true' : 'false' }},
         enableOverride: false,
-        startingFloat: {{ (float) $defaultFloat }}
+        startingFloat: {{ (float) $startingFloat }}
     }">
         <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
 
@@ -40,34 +40,18 @@
                 </div>
             @endif
 
-            {{-- 1. Prominent Automatic Continuity Banner --}}
-            <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-300 rounded-2xl p-5 shadow-sm text-emerald-950 space-y-2">
-                <div class="flex items-center space-x-2.5">
-                    <div class="p-2 bg-emerald-600 text-white rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">Verified Drawer Continuity</span>
-                        <h3 class="font-black text-base text-emerald-950">
-                            Yesterday's Drawer Balance: <span class="font-mono text-emerald-800">KES {{ number_format($defaultFloat, 2) }}</span>
-                        </h3>
-                    </div>
-                </div>
-
-                <div class="text-xs text-emerald-900/90 pl-1">
-                    <p>
-                        Status: <strong class="underline decoration-emerald-400">{{ $statusLabel }}</strong>.
-                        @if($lastShift && !$lastShift->cash_collected_by_owner)
-                            Yesterday's closing cash remained in the drawer overnight and automatically rolls over as today's starting float.
-                        @elseif($lastShift && $lastShift->cash_collected_by_owner)
-                            Owner/Management collected KES {{ number_format($lastShift->amount_collected, 2) }}. The remaining float in drawer was KES {{ number_format($defaultFloat, 2) }}.
-                        @else
-                            No prior shift recorded for this station. Baseline float initialized at KES 0.00.
-                        @endif
-                    </p>
-                </div>
+            {{-- 1. Verified Branch Cash Float Alert Card --}}
+            <div class="alert alert-info border border-blue-200 bg-blue-50 text-blue-900 rounded-xl p-4 shadow-sm">
+                <h5 class="font-bold text-sm mb-1.5 flex items-center text-blue-950">
+                    <i class="fas fa-lock mr-2 text-blue-600"></i>
+                    <span>Verified Branch Cash Float</span>
+                </h5>
+                <p class="mb-0 text-xs text-blue-900 leading-relaxed">
+                    Last shift closed on <strong>{{ $lastShift && ($lastShift->closed_at ?? $lastShift->ended_at) ? ($lastShift->closed_at ?? $lastShift->ended_at)->format('M d, Y h:i A') : 'N/A' }}</strong> 
+                    with <strong>KES {{ number_format($startingFloat, 2) }}</strong> in the drawer.
+                    <br>
+                    <small class="text-blue-700">Please verify that the physical cash in the drawer matches this amount before opening.</small>
+                </p>
             </div>
 
             {{-- 2. Open Shift Card Form --}}
@@ -90,20 +74,22 @@
                                 </div>
                                 <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">Station Locked</span>
                             </div>
+                            <input type="hidden" name="branch_id" value="{{ $branchId }}">
                             <input type="hidden" name="branch_name" value="{{ $branchName }}">
                         @else
-                            <select name="branch_name" onchange="window.location.href = '{{ route('shifts.open') }}?branch=' + encodeURIComponent(this.value)"
+                            <select name="branch_id" onchange="window.location.href = '{{ route('shifts.open') }}?branch_id=' + encodeURIComponent(this.value)"
                                     class="w-full text-xs font-bold rounded-xl border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
                                 @foreach($branches as $b)
-                                    <option value="{{ $b->name }}" {{ $branchName === $b->name ? 'selected' : '' }}>
-                                        {{ $b->name }}
+                                    <option value="{{ $b->id }}" {{ $branchId == $b->id ? 'selected' : '' }}>
+                                        {{ $b->name }} ({{ $b->code }})
                                     </option>
                                 @endforeach
                             </select>
+                            <input type="hidden" name="branch_name" value="{{ $branchName }}">
                         @endif
                     </div>
 
-                    {{-- Starting Float Input --}}
+                    {{-- Starting Float Input (Readonly for Cashiers) --}}
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider">
@@ -125,12 +111,12 @@
                                    x-model="startingFloat"
                                    :readonly="!enableOverride"
                                    :class="enableOverride ? 'bg-amber-50/50 border-amber-400 text-amber-950 font-bold' : 'bg-gray-50 border-gray-300 text-gray-800 font-extrabold cursor-not-allowed'"
-                                   class="w-full pl-12 pr-4 py-3 text-base rounded-xl border focus:ring-indigo-500 focus:border-indigo-500 transition font-mono">
+                                   class="form-control w-full pl-12 pr-4 py-3 text-base rounded-xl border focus:ring-indigo-500 focus:border-indigo-500 transition font-mono">
                         </div>
 
                         @if(!$isOwnerOrAdmin)
                             <p class="text-[11px] text-gray-500 mt-1">
-                                Cashier Security Lockdown: Opening float is verified from yesterday's closing drawer balance. Contact an Owner or Branch Manager if physical cash differs.
+                                Cashier Security Lockdown: Opening float is verified from this branch's closing drawer balance. Contact an Owner or Branch Manager if physical cash differs.
                             </p>
                         @endif
                     </div>
@@ -140,7 +126,9 @@
                         <div class="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
                             <label class="flex items-center space-x-2 cursor-pointer select-none">
                                 <input type="checkbox" x-model="enableOverride" class="rounded text-amber-600 focus:ring-amber-500">
-                                <span class="text-xs font-bold text-amber-900">Owner / Manager Override: Change starting cash amount</span>
+                                <span class="text-xs font-bold text-amber-900">
+                                    <i class="fas fa-edit mr-1"></i> Authorize Float Adjustment (Owner / Admin Override)
+                                </span>
                             </label>
 
                             <div x-show="enableOverride" x-transition class="space-y-2 pt-2 border-t border-amber-200/80">

@@ -17,6 +17,7 @@ class Shift extends Model
         'branch_name',
         'started_at',
         'ended_at',
+        'closed_at',
         'opening_float',
         'expected_cash',
         'actual_cash',
@@ -39,6 +40,7 @@ class Shift extends Model
     protected $casts = [
         'started_at'              => 'datetime',
         'ended_at'                => 'datetime',
+        'closed_at'               => 'datetime',
         'opening_float'           => 'decimal:2',
         'expected_cash'           => 'decimal:2',
         'actual_cash'             => 'decimal:2',
@@ -105,7 +107,25 @@ class Shift extends Model
                 }
             })
             ->where('status', 'closed')
-            ->orderByDesc('ended_at')
+            ->where(function ($q) {
+                $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
+            })
+            ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
+     * Query the last closed shift strictly by branch_id.
+     */
+    public static function getLastClosedShiftForBranchId(int $branchId): ?self
+    {
+        return static::where('branch_id', $branchId)
+            ->where('status', 'closed')
+            ->where(function ($q) {
+                $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
+            })
+            ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
             ->orderByDesc('id')
             ->first();
     }
@@ -116,7 +136,9 @@ class Shift extends Model
      */
     public static function resolveOpeningFloatForBranch(string $branchName, ?int $branchId = null): array
     {
-        $lastShift = static::getLastClosedShiftForBranch($branchName, $branchId);
+        $lastShift = $branchId 
+            ? (static::getLastClosedShiftForBranchId($branchId) ?: static::getLastClosedShiftForBranch($branchName, $branchId))
+            : static::getLastClosedShiftForBranch($branchName, $branchId);
 
         if (!$lastShift) {
             return [0.00, null, 'Initial Shift (Brand New Store Baseline)'];
@@ -143,9 +165,21 @@ class Shift extends Model
             ->first();
 
         if (!$shift) {
+            $user = User::find($userId);
+            $branchId = $user?->branch_id;
+            if (!$branchId && $branchName) {
+                $branchId = Branch::where('name', $branchName)->value('id');
+            }
+            if (!$branchId) {
+                $branchId = Branch::where('is_active', true)->value('id') ?: 1;
+            }
+            $branch = Branch::find($branchId);
+            $effectiveBranchName = $branch ? $branch->name : ($branchName ?: 'Main Shop');
+
             $shift = static::create([
                 'user_id'            => $userId,
-                'branch_name'        => $branchName ?: 'Main Shop',
+                'branch_id'          => $branchId,
+                'branch_name'        => $effectiveBranchName,
                 'started_at'         => now(),
                 'opening_float'      => $openingFloat,
                 'expected_cash'      => $openingFloat,

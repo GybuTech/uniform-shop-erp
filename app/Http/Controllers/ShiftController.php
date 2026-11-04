@@ -60,11 +60,34 @@ class ShiftController extends Controller
             ]);
         }
 
-        $branchName = $isOwnerOrAdmin
-            ? ($request->get('branch') ?: ($user->branch_name ?: ($branches->first()->name ?? 'Main Shop')))
-            : ($user->branch_name ?: ($branches->first()->name ?? 'Main Shop'));
+        // Determine branch_id strictly per security spec
+        $branchId = null;
+        if ($isOwnerOrAdmin) {
+            if ($request->filled('branch_id')) {
+                $branchId = (int) $request->input('branch_id');
+            } elseif ($request->filled('branch')) {
+                $branchId = Branch::where('name', $request->input('branch'))->value('id');
+            }
+            if (!$branchId) {
+                $branchId = session('pos_branch_id') 
+                    ?: session('active_branch_id') 
+                    ?: ($user->branch_id ?: null);
+            }
+            if (!$branchId) {
+                $branchId = $branches->first()->id ?? 1;
+            }
+        } else {
+            $branchId = $user->branch_id;
+            if (!$branchId && $user->branch_name) {
+                $branchId = Branch::where('name', $user->branch_name)->value('id');
+            }
+            if (!$branchId) {
+                $branchId = $branches->first()->id ?? 1;
+            }
+        }
 
-        $branch = Branch::where('name', $branchName)->first();
+        $branch = Branch::find($branchId);
+        $branchName = $branch ? $branch->name : ($user->branch_name ?: 'Main Shop');
 
         // If cashier already has an active open shift, proceed straight to POS
         $existingShift = Shift::where('user_id', $user->id)
@@ -76,12 +99,50 @@ class ShiftController extends Controller
                 ->with('info', "You already have an active open shift at {$existingShift->branch_name}.");
         }
 
-        // Determine Default Float Automatically (Yesterday's Uncollected Rollover vs Float Remaining)
-        [$defaultFloat, $lastShift, $statusLabel] = Shift::resolveOpeningFloatForBranch($branchName, $branch?->id);
+        // Query the most recent closed shift for THIS specific branch
+        $lastShift = Shift::where('branch_id', $branchId)
+            ->where('status', 'closed')
+            ->where(function ($q) {
+                $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
+            })
+            ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
+            ->orderByDesc('id')
+            ->first();
+
+        // Fallback search by branch_name if branch_id was unpopulated on legacy records
+        if (!$lastShift && $branchName) {
+            $lastShift = Shift::where('branch_name', $branchName)
+                ->where('status', 'closed')
+                ->where(function ($q) {
+                    $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
+                })
+                ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        // Calculate the Automatic Starting Float
+        if ($lastShift) {
+            if ($lastShift->cash_collected_by_owner) {
+                $startingFloat = (float) ($lastShift->float_left_in_drawer ?? 0.00);
+                $statusLabel = 'Collected by Owner (Float Remaining in Drawer)';
+            } else {
+                $startingFloat = (float) ($lastShift->actual_cash ?? $lastShift->expected_cash);
+                $statusLabel = 'Uncollected Overnight Rollover';
+            }
+        } else {
+            $startingFloat = 0.00;
+            $statusLabel = 'Initial Shift (Brand New Store Baseline)';
+        }
+
+        $defaultFloat = $startingFloat;
 
         return view('shifts.open', compact(
             'branches',
+            'branch',
+            'branchId',
             'branchName',
+            'startingFloat',
             'defaultFloat',
             'lastShift',
             'statusLabel',
@@ -90,19 +151,54 @@ class ShiftController extends Controller
     }
 
     /**
+     * Alias for openForm.
+     */
+    public function open(Request $request)
+    {
+        return $this->openForm($request);
+    }
+
+    /**
      * Store opening shift and establish register float.
      */
     public function storeOpen(Request $request)
     {
         $user = auth()->user();
+        if (!$user) {
+            return redirect()->route('login');
+        }
+
         $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager']);
-
         $branches = Branch::where('is_active', true)->get();
-        $branchName = $isOwnerOrAdmin
-            ? ($request->input('branch_name') ?: ($user->branch_name ?: ($branches->first()->name ?? 'Main Shop')))
-            : ($user->branch_name ?: ($branches->first()->name ?? 'Main Shop'));
 
-        $branch = Branch::where('name', $branchName)->first();
+        // Determine branch_id strictly: Shift::create must NEVER save branch_id as NULL
+        $branchId = null;
+        if ($isOwnerOrAdmin) {
+            if ($request->filled('branch_id')) {
+                $branchId = (int) $request->input('branch_id');
+            } elseif ($request->filled('branch_name')) {
+                $branchId = Branch::where('name', $request->input('branch_name'))->value('id');
+            }
+            if (!$branchId) {
+                $branchId = session('pos_branch_id') 
+                    ?: session('active_branch_id') 
+                    ?: ($user->branch_id ?: null);
+            }
+            if (!$branchId) {
+                $branchId = Branch::where('is_active', true)->value('id') ?: 1;
+            }
+        } else {
+            $branchId = $user->branch_id;
+            if (!$branchId && $user->branch_name) {
+                $branchId = Branch::where('name', $user->branch_name)->value('id');
+            }
+            if (!$branchId) {
+                $branchId = Branch::where('is_active', true)->value('id') ?: 1;
+            }
+        }
+
+        $branch = Branch::find($branchId);
+        $branchName = $branch ? $branch->name : ($request->input('branch_name') ?: ($user->branch_name ?: 'Main Shop'));
 
         // Check if an open shift already exists for this user
         $existingShift = Shift::where('user_id', $user->id)
@@ -113,8 +209,34 @@ class ShiftController extends Controller
             return redirect()->route('pos.index');
         }
 
-        // Compute verified rollover float
-        [$defaultFloat, $lastShift, $statusLabel] = Shift::resolveOpeningFloatForBranch($branchName, $branch?->id);
+        // Query the most recent closed shift for THIS specific branch
+        $lastShift = Shift::where('branch_id', $branchId)
+            ->where('status', 'closed')
+            ->where(function ($q) {
+                $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
+            })
+            ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$lastShift && $branchName) {
+            $lastShift = Shift::where('branch_name', $branchName)
+                ->where('status', 'closed')
+                ->where(function ($q) {
+                    $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
+                })
+                ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        if ($lastShift) {
+            $defaultFloat = $lastShift->cash_collected_by_owner
+                ? (float) ($lastShift->float_left_in_drawer ?? 0.00)
+                : (float) ($lastShift->actual_cash ?? $lastShift->expected_cash);
+        } else {
+            $defaultFloat = 0.00;
+        }
 
         $submittedFloat = (float) $request->input('starting_float', $defaultFloat);
         $overrideReason = null;
@@ -133,7 +255,7 @@ class ShiftController extends Controller
 
         $shift = Shift::create([
             'user_id'             => $user->id,
-            'branch_id'           => $branch?->id,
+            'branch_id'           => $branchId, // Never NULL
             'branch_name'         => $branchName,
             'started_at'          => SystemTime::now(),
             'opening_float'       => $startingFloat,
@@ -182,13 +304,14 @@ class ShiftController extends Controller
     }
 
     /**
-     * Conclude active shift with cash counting, owner collection, and float rollover calculation.
+     * Conclude active shift with cash counting and drawer locking.
+     * Cashiers strictly count physical cash; zero owner collection prompts.
      */
     public function close(Request $request)
     {
         $validated = $request->validate([
             'actual_cash'             => ['required', 'numeric', 'min:0'],
-            'cash_collected_by_owner' => ['required', 'in:yes,no,1,0,true,false'],
+            'cash_collected_by_owner' => ['nullable'],
             'amount_collected'        => ['nullable', 'numeric', 'min:0'],
             'collected_by_name'       => ['nullable', 'string', 'max:150'],
             'handover_notes'          => ['nullable', 'string', 'max:500'],
@@ -196,6 +319,7 @@ class ShiftController extends Controller
         ]);
 
         $user = auth()->user();
+        $isOwnerOrAdmin = $user && $user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager']);
         $branch = $validated['branch_name'] ?? ($user->branch_name ?: 'Main Shop');
 
         $shift = Shift::where('user_id', $user->id)
@@ -211,23 +335,34 @@ class ShiftController extends Controller
         $actualCash = (float) $validated['actual_cash'];
         $variance = round($actualCash - (float) $shift->expected_cash, 2);
 
-        $isCollected = in_array(strtolower((string)$validated['cash_collected_by_owner']), ['yes', '1', 'true']);
+        // Security Rules: Cashiers NEVER decide or indicate whether owner collected money.
+        // All closing cash counted by a cashier remains locked in drawer overnight.
+        $isCollected = false;
         $amountCollected = 0.00;
         $floatLeftInDrawer = $actualCash;
+        $collectedByName = null;
 
-        if ($isCollected) {
-            $amountCollected = (float) ($validated['amount_collected'] ?? 0.00);
-            $floatLeftInDrawer = max(0.00, round($actualCash - $amountCollected, 2));
+        if ($isOwnerOrAdmin && $request->filled('cash_collected_by_owner')) {
+            $val = strtolower((string)$request->input('cash_collected_by_owner'));
+            if (in_array($val, ['yes', '1', 'true', 'on'])) {
+                $isCollected = true;
+                $amountCollected = (float) ($validated['amount_collected'] ?? 0.00);
+                $floatLeftInDrawer = max(0.00, round($actualCash - $amountCollected, 2));
+                $collectedByName = $validated['collected_by_name'] ?? $user->name;
+            }
         }
+
+        $now = SystemTime::now();
 
         $shift->actual_cash             = $actualCash;
         $shift->variance                = $variance;
         $shift->cash_collected_by_owner = $isCollected;
         $shift->amount_collected        = $amountCollected;
         $shift->float_left_in_drawer    = $floatLeftInDrawer;
-        $shift->collected_by_name       = $validated['collected_by_name'] ?? ($isCollected ? 'Owner / Management' : null);
+        $shift->collected_by_name       = $collectedByName;
         $shift->handover_notes          = $validated['handover_notes'] ?? null;
-        $shift->ended_at                = SystemTime::now();
+        $shift->ended_at                = $now;
+        $shift->closed_at               = $now;
         $shift->status                  = 'closed';
         $shift->save();
 
@@ -241,7 +376,15 @@ class ShiftController extends Controller
         }
 
         return redirect()->route('shifts.zReport', $shift)
-            ->with('success', 'Shift concluded successfully with cash handover recorded.');
+            ->with('success', 'Shift concluded successfully with cash drawer locked.');
+    }
+
+    /**
+     * Store shift closing (Module 2 specification alias).
+     */
+    public function storeClose(Request $request)
+    {
+        return $this->close($request);
     }
 
     /**
