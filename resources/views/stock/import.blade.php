@@ -1,4 +1,5 @@
 <x-app-layout>
+    <div x-data="{ showResetModal: false }">
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -9,7 +10,7 @@
                     Upload your physical stocktake spreadsheet or download the prefilled template.
                 </p>
             </div>
-            <div class="flex items-center space-x-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('stock-entries.template') }}"
                    class="inline-flex items-center px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -17,6 +18,18 @@
                     </svg>
                     Download Stock Template (.csv)
                 </a>
+                @php
+                    $isOwnerOrAdmin = in_array(strtolower(auth()->user()->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin', 'manager']);
+                @endphp
+                @if($isOwnerOrAdmin)
+                <button type="button" @click="showResetModal = true"
+                        class="inline-flex items-center px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete / Reset Test Stock
+                </button>
+                @endif
                 <a href="{{ route('stock-entries.index') }}" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition">
                     View Intake History
                 </a>
@@ -193,5 +206,69 @@
             </div>
 
         </div>
+    </div>
+
+    {{-- Delete / Reset Test Stock Modal (Owner/Admin Only) --}}
+    @if($isOwnerOrAdmin)
+    <div x-show="showResetModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="showResetModal = false"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left">
+                <div class="flex items-center space-x-3 text-rose-600">
+                    <div class="p-2.5 bg-rose-100 rounded-xl">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-base text-gray-900">Delete / Reset Test Stock</h3>
+                        <p class="text-xs text-gray-500">Prepare system for real physical opening stock</p>
+                    </div>
+                </div>
+
+                <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-900 space-y-1">
+                    <p class="font-bold">⚠️ Warning: Irreversible Inventory Reset</p>
+                    <p>Use this option to purge test stock numbers so Tshaprint Solutions can record clean, accurate physical stock counts.</p>
+                    <p class="text-[11px] text-rose-700">All product catalogs, uniform sizes, categories, and selling prices will remain 100% safe and intact.</p>
+                </div>
+
+                <form method="POST" action="{{ route('stock-entries.reset') }}" class="space-y-4">
+                    @csrf
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                            Reset Scope (Select Target)
+                        </label>
+                        <select name="branch_name" class="w-full text-xs font-bold rounded-xl border-gray-300 focus:ring-rose-500">
+                            <option value="all">Entire System (All Branches & Stores)</option>
+                            @foreach($branches as $b)
+                                <option value="{{ $b }}">Branch: {{ $b }} Only</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="p-3 bg-gray-50 border rounded-xl space-y-2">
+                        <label class="flex items-start space-x-2 cursor-pointer select-none">
+                            <input type="checkbox" name="wipe_transactions" value="1" checked class="mt-0.5 rounded text-rose-600 focus:ring-rose-500">
+                            <div class="text-xs">
+                                <span class="font-bold text-gray-900">Also delete test stock logs & adjustments</span>
+                                <p class="text-[11px] text-gray-500">Clears test inward delivery notes, opening imports, and adjustments so the master audit log starts completely pristine.</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end space-x-2 pt-2 border-t">
+                        <button type="button" @click="showResetModal = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                            Cancel
+                        </button>
+                        <button type="submit" onclick="return confirm('Are you sure you want to delete test stock counts? This cannot be undone.');" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
+                            Yes, Delete Test Stock Data
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    @endif
     </div>
 </x-app-layout>

@@ -213,10 +213,23 @@ class InventoryWorkflowController extends Controller
             'notes'            => 'nullable|string|max:500',
             'items'            => 'required|array|min:1',
             'items.*.product_variant_id' => 'required|exists:product_variants,id',
-            'items.*.quantity'           => 'required|numeric|min:0.1',
+            'items.*.quantity'           => 'nullable|numeric|min:0',
         ]);
 
-        DB::transaction(function () use ($validated, $branchName) {
+        // Filter only line items with a positive produced quantity
+        $receivedItems = collect($validated['items'])->filter(function ($item) {
+            return isset($item['quantity']) && (float) $item['quantity'] > 0;
+        });
+
+        if ($receivedItems->isEmpty()) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['items' => 'Please enter a received quantity of at least 1 piece for at least one produced item.']);
+        }
+
+        $totalUnits = 0;
+
+        DB::transaction(function () use ($validated, $receivedItems, $branchName, &$totalUnits) {
             $stockEntry = StockEntry::create([
                 'user_id'          => auth()->id(),
                 'source_type'      => 'factory_receipt',
@@ -227,9 +240,9 @@ class InventoryWorkflowController extends Controller
                 'notes'            => $validated['notes'] ?? ('Tailor batch received from ' . $validated['origin_workshop']),
             ]);
 
-            foreach ($validated['items'] as $itemData) {
+            foreach ($receivedItems as $itemData) {
                 $qty = (float) $itemData['quantity'];
-                if ($qty <= 0) continue;
+                $totalUnits += $qty;
 
                 $stockEntry->items()->create([
                     'product_variant_id' => $itemData['product_variant_id'],
@@ -244,6 +257,6 @@ class InventoryWorkflowController extends Controller
         });
 
         return redirect()->route('inventory.factory-receipts', ['branch_name' => $branchName])
-            ->with('success', "Factory receipt Delivery Note #{$validated['delivery_note_no']} received into {$branchName} inventory!");
+            ->with('success', "Factory receipt Delivery Note #{$validated['delivery_note_no']} recorded successfully! Added {$totalUnits} produced piece(s) across {$receivedItems->count()} uniform line item(s) into {$branchName} stock.");
     }
 }

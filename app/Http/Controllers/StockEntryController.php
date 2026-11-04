@@ -3,8 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Imports\StockImport;
+use App\Models\BranchStock;
 use App\Models\ProductVariant;
+use App\Models\StockAdjustment;
+use App\Models\StockAdjustmentItem;
 use App\Models\StockEntry;
+use App\Models\StockEntryItem;
+use App\Models\StockTransfer;
+use App\Models\StockTransferItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
@@ -71,12 +77,64 @@ class StockEntryController extends Controller
         }, 200, $headers);
     }
 
-    public function resetAllStock()
+    public function resetAllStock(Request $request)
     {
-        ProductVariant::query()->update(['stock_quantity' => 0]);
+        $user = auth()->user();
+        if (!$user || !$user->hasAnyRole(['owner', 'admin', 'system_administrator', 'manager'])) {
+            abort(403, 'Unauthorized. Only an Owner or System Administrator can reset inventory.');
+        }
 
-        return redirect()->route('stock-entries.import')
-            ->with('success', 'All inventory counts have been successfully reset to 0. You can now upload your fresh opening stock sheet.');
+        $wipeTransactions = $request->boolean('wipe_transactions', false);
+        $scope = $request->input('branch_name'); // optional single branch reset or 'all'
+
+        DB::transaction(function () use ($wipeTransactions, $scope) {
+            if ($scope && $scope !== 'all') {
+                // Reset a specific branch
+                BranchStock::where('branch_name', $scope)->update(['stock_quantity' => 0]);
+
+                // Recalculate aggregate product variants
+                $variants = ProductVariant::all();
+                foreach ($variants as $v) {
+                    $v->update(['stock_quantity' => $v->branchStocks()->sum('stock_quantity')]);
+                }
+
+                if ($wipeTransactions) {
+                    $entryIds = StockEntry::where('branch_name', $scope)->pluck('id');
+                    StockEntryItem::whereIn('stock_entry_id', $entryIds)->delete();
+                    StockEntry::where('branch_name', $scope)->delete();
+
+                    $adjIds = StockAdjustment::where('branch_name', $scope)->pluck('id');
+                    StockAdjustmentItem::whereIn('stock_adjustment_id', $adjIds)->delete();
+                    StockAdjustment::where('branch_name', $scope)->delete();
+                }
+            } else {
+                // 1. Reset all branch-level stocks to 0 across all branches
+                BranchStock::query()->update(['stock_quantity' => 0]);
+
+                // 2. Reset aggregate product variants stock to 0
+                ProductVariant::query()->update(['stock_quantity' => 0]);
+
+                if ($wipeTransactions) {
+                    // Wipe test stock entries & items
+                    StockEntryItem::query()->delete();
+                    StockEntry::query()->delete();
+
+                    // Wipe test adjustments & items
+                    StockAdjustmentItem::query()->delete();
+                    StockAdjustment::query()->delete();
+
+                    // Wipe test transfers & items
+                    StockTransferItem::query()->delete();
+                    StockTransfer::query()->delete();
+                }
+            }
+        });
+
+        $msg = $wipeTransactions
+            ? 'All test stock counts and stock transaction logs have been deleted successfully. The system is completely clean and ready for real opening stock.'
+            : 'All inventory stock counts across all branches have been successfully reset to 0.';
+
+        return redirect()->back()->with('success', $msg);
     }
 
     public function import(Request $request)
