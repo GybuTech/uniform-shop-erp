@@ -39,27 +39,83 @@
     <div class="py-6">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-4">
 
-            {{-- Alerts --}}
-            @if(session('success'))
-                <div class="bg-emerald-50 border border-emerald-300 text-emerald-800 p-3.5 rounded-lg text-sm font-medium flex items-center">
-                    <svg class="w-5 h-5 text-emerald-600 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            {{-- ═══════════════════════════════════════════════════════════════
+                 Import Results Summary Card (shown after a successful upload)
+                 ═══════════════════════════════════════════════════════════════ --}}
+            @if(session()->has('import_count'))
+            @php
+                $impCount   = session('import_count', 0);
+                $impSkipped = session('import_skipped', 0);
+                $impBranch  = session('import_branch', 'this branch');
+                $impAction  = session('import_action', 'processed');
+                $impErrors  = session('import_errors', []);
+            @endphp
+            <div class="rounded-xl border shadow-sm overflow-hidden">
+                {{-- Header bar --}}
+                <div class="{{ $impCount > 0 ? 'bg-emerald-600' : 'bg-amber-500' }} px-4 py-3 flex items-center space-x-2.5">
+                    <svg class="w-5 h-5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        @if($impCount > 0)
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        @else
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        @endif
                     </svg>
-                    <span>{{ session('success') }}</span>
+                    <span class="font-bold text-white text-sm">
+                        @if($impCount > 0)
+                            Stock Intake Complete — {{ number_format($impCount) }} items {{ $impAction }} for {{ $impBranch }}
+                        @else
+                            Stock Intake Completed With Warnings
+                        @endif
+                    </span>
                 </div>
+
+                {{-- Stat row --}}
+                <div class="bg-white px-4 py-3 grid grid-cols-3 divide-x divide-gray-100 text-center text-xs">
+                    <div class="pr-4">
+                        <div class="text-2xl font-black {{ $impCount > 0 ? 'text-emerald-600' : 'text-gray-400' }}">{{ number_format($impCount) }}</div>
+                        <div class="text-gray-500 mt-0.5">✅ Items Imported</div>
+                    </div>
+                    <div class="px-4">
+                        <div class="text-2xl font-black {{ $impSkipped > 0 ? 'text-amber-600' : 'text-gray-400' }}">{{ number_format($impSkipped) }}</div>
+                        <div class="text-gray-500 mt-0.5">⚠️ Rows Skipped</div>
+                    </div>
+                    <div class="pl-4">
+                        <div class="text-2xl font-black text-gray-400">{{ $impBranch }}</div>
+                        <div class="text-gray-500 mt-0.5">📦 Target Branch</div>
+                    </div>
+                </div>
+
+                {{-- Template download CTA --}}
+                @if($impSkipped > 0)
+                <div class="bg-amber-50 border-t border-amber-200 px-4 py-2.5 flex items-center justify-between gap-3">
+                    <p class="text-xs text-amber-800">
+                        📋 <strong>{{ number_format($impSkipped) }} rows were skipped</strong> because the product or SKU couldn't be matched.
+                        Download the pre-filled template below, correct the skipped items, and re-upload.
+                    </p>
+                    <a href="{{ route('stock-entries.template') }}"
+                       class="shrink-0 inline-flex items-center px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition">
+                        📥 Download Template
+                    </a>
+                </div>
+                @endif
+
+                {{-- Skipped row detail list --}}
+                @if(count($impErrors) > 0)
+                <div class="border-t bg-gray-50 px-4 py-3">
+                    <details class="text-xs">
+                        <summary class="font-bold text-gray-700 cursor-pointer select-none">Show skipped row details ({{ count($impErrors) }})</summary>
+                        <ul class="mt-2 space-y-1 max-h-48 overflow-y-auto list-disc list-inside text-amber-900 pl-1">
+                            @foreach($impErrors as $err)
+                                <li>{{ $err }}</li>
+                            @endforeach
+                        </ul>
+                    </details>
+                </div>
+                @endif
+            </div>
             @endif
 
-            @if(session('import_errors') && count(session('import_errors')) > 0)
-                <div class="bg-amber-50 border border-amber-300 text-amber-900 p-3.5 rounded-lg text-xs space-y-1">
-                    <div class="font-bold">Notices / Skipped Rows ({{ count(session('import_errors')) }} items):</div>
-                    <ul class="list-disc list-inside space-y-0.5 max-h-32 overflow-y-auto">
-                        @foreach(session('import_errors') as $err)
-                            <li>{{ $err }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
+            {{-- Validation errors (from Laravel form validation) --}}
             @if($errors->any())
                 <div class="bg-red-50 border border-red-300 text-red-800 p-3.5 rounded-lg text-xs">
                     <span class="font-bold">Please check the following:</span>
@@ -105,22 +161,22 @@
                       x-data="{ showAdvanced: false }">
                     @csrf
 
-                    {{-- File Picker --}}
+                    {{-- File Picker with real drag-and-drop --}}
                     <div>
                         <label for="stock_file" class="block text-xs font-bold text-gray-700 mb-1">
                             Spreadsheet File (.csv, .xlsx, .xls) <span class="text-rose-500">*</span>
                         </label>
-                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center hover:border-indigo-500 transition cursor-pointer bg-gray-50"
+                        <div id="stock_drop_zone"
+                             class="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center hover:border-indigo-500 transition cursor-pointer bg-gray-50 select-none"
                              onclick="document.getElementById('stock_file').click()">
                             <svg class="mx-auto h-8 w-8 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
                                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                             </svg>
-                            <p class="text-xs font-semibold text-gray-800">Click to select file or drag and drop</p>
+                            <p class="text-xs font-semibold text-gray-800">Click to select file — or drag & drop it here</p>
                             <p id="file_name_display" class="text-xs text-indigo-600 font-bold mt-1">No file selected</p>
                             <input type="file" id="stock_file" name="stock_file" class="hidden"
-                                   accept=".xlsx,.xls,.csv,.txt"
-                                   onchange="document.getElementById('file_name_display').textContent = this.files[0]?.name || 'No file selected'">
+                                   accept=".xlsx,.xls,.csv,.txt">
                         </div>
                     </div>
 
@@ -194,13 +250,56 @@
             </div>
 
             {{-- Compact Column Reference --}}
-            <div class="bg-gray-50 p-4 rounded-xl border text-xs text-gray-600 space-y-1.5">
-                <div class="font-bold text-gray-800">Spreadsheet Columns:</div>
-                <div class="font-mono text-[11px] bg-white p-2 border rounded text-gray-700 overflow-x-auto">
-                    sku, product_name, size, quantity, selling_price
+            <div class="bg-gray-50 p-4 rounded-xl border text-xs text-gray-600 space-y-2">
+                <div class="font-bold text-gray-800">📋 Accepted Spreadsheet Format &amp; Rules</div>
+                <div class="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-[11px] text-indigo-800 space-y-1">
+                    <p class="font-bold">⚠️ Important Rules</p>
+                    <ul class="list-disc list-inside space-y-0.5">
+                        <li>The importer <strong>auto-detects and skips</strong> title rows (e.g. "SWEATERS STOCK CARD FOR OCTOBER") — your file does not need to be cleaned first.</li>
+                        <li>Use the <strong>Download Stock Template</strong> button above for a pre-filled CSV with all correct SKUs and product names.</li>
+                        <li>Leave <code>selling_price</code> blank or zero to keep existing prices unchanged.</li>
+                        <li>Items not found by SKU or Name + Size are auto-created under "General Uniforms".</li>
+                    </ul>
                 </div>
                 <p class="text-[11px] text-gray-500">
-                    The importer matches items by <strong>SKU</strong>, or by <strong>Product Name + Size</strong> if the SKU is left empty. Use the template download above for a pre-filled list of all catalog items.
+                    Your spreadsheet can use <strong>any</strong> of the column names listed below — the system will automatically recognise them. Column order does not matter.
+                </p>
+                <table class="w-full text-[11px] border-collapse">
+                    <thead>
+                        <tr class="bg-gray-200 text-gray-700">
+                            <th class="text-left p-1.5 border border-gray-300 font-bold">Data Field</th>
+                            <th class="text-left p-1.5 border border-gray-300 font-bold">Accepted Column Names</th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-mono text-gray-600">
+                        <tr class="bg-white">
+                            <td class="p-1.5 border border-gray-200 font-semibold text-gray-800 font-sans">SKU / Code</td>
+                            <td class="p-1.5 border border-gray-200">sku, code, item_code, barcode, product_code, article, ref, reference</td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td class="p-1.5 border border-gray-200 font-semibold text-gray-800 font-sans">Product / Item Name</td>
+                            <td class="p-1.5 border border-gray-200">product_name, product, item_name, item, uniform, name, description, title, style, garment</td>
+                        </tr>
+                        <tr class="bg-white">
+                            <td class="p-1.5 border border-gray-200 font-semibold text-gray-800 font-sans">Size</td>
+                            <td class="p-1.5 border border-gray-200">size, sizes, sz, size_name, dimension</td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td class="p-1.5 border border-gray-200 font-semibold text-gray-800 font-sans">Colour</td>
+                            <td class="p-1.5 border border-gray-200">colour, color, col, clr</td>
+                        </tr>
+                        <tr class="bg-white">
+                            <td class="p-1.5 border border-gray-200 font-semibold text-gray-800 font-sans">Quantity / Stock</td>
+                            <td class="p-1.5 border border-gray-200">quantity, qty, stock, initial_stock, opening_stock, units, count, balance, on_hand, available</td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td class="p-1.5 border border-gray-200 font-semibold text-gray-800 font-sans">Selling Price</td>
+                            <td class="p-1.5 border border-gray-200">selling_price, price, unit_price, retail, retail_price, rate, value</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                    💡 <strong>Tip:</strong> The importer first tries to match by <strong>SKU</strong>, then by <strong>Product Name + Size</strong>. If neither matches an existing product, a new one is created automatically.
                 </p>
             </div>
 
@@ -271,6 +370,7 @@
     @endif
 
     <script>
+        // ── Reset modal helpers ──────────────────────────────────────────────
         function openResetModal() {
             var el = document.getElementById('resetModal');
             if (el) el.classList.remove('hidden');
@@ -279,12 +379,69 @@
             var el = document.getElementById('resetModal');
             if (el) el.classList.add('hidden');
         }
-
-        // Close on Escape key press
         document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                closeResetModal();
-            }
+            if (event.key === 'Escape') closeResetModal();
         });
+
+        // ── Drag-and-drop for stock file upload ─────────────────────────────
+        (function () {
+            var zone    = document.getElementById('stock_drop_zone');
+            var input   = document.getElementById('stock_file');
+            var display = document.getElementById('file_name_display');
+
+            if (!zone || !input) return;
+
+            function setFile(file) {
+                if (!file) return;
+                // Transfer the dropped file into the hidden <input type="file">
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                display.textContent = file.name;
+                zone.classList.add('border-indigo-500', 'bg-indigo-50');
+                zone.classList.remove('border-gray-300', 'bg-gray-50');
+            }
+
+            // Keep file name in sync when chosen via click
+            input.addEventListener('change', function () {
+                if (this.files && this.files[0]) {
+                    display.textContent = this.files[0].name;
+                    zone.classList.add('border-indigo-500', 'bg-indigo-50');
+                    zone.classList.remove('border-gray-300', 'bg-gray-50');
+                } else {
+                    display.textContent = 'No file selected';
+                }
+            });
+
+            zone.addEventListener('dragenter', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                zone.classList.add('border-indigo-500', 'bg-indigo-50');
+                zone.classList.remove('border-gray-300', 'bg-gray-50');
+            });
+
+            zone.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+            });
+
+            zone.addEventListener('dragleave', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Only revert style when leaving the zone itself, not a child element
+                if (!zone.contains(e.relatedTarget)) {
+                    zone.classList.remove('border-indigo-500', 'bg-indigo-50');
+                    zone.classList.add('border-gray-300', 'bg-gray-50');
+                }
+            });
+
+            zone.addEventListener('drop', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var file = e.dataTransfer.files && e.dataTransfer.files[0];
+                setFile(file);
+            });
+        })();
     </script>
 </x-app-layout>

@@ -133,7 +133,7 @@
         @endif
 
         {{-- 5. Stock & Inventory (Three Inward Doorways) --}}
-        @if(auth()->user()->can('view-stock-entries') || auth()->user()->can('create-stock-entries') || $isOwnerOrAdmin)
+        @can('view-stock-entries')
         <div x-data="{ open: activeMenu === 'purchases' || activeMenu === 'stock-entries' || activeMenu === 'admin' }">
             <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-800/80 hover:text-white transition">
                 <div class="flex items-center">
@@ -145,21 +145,35 @@
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
             <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+                @can('create-stock-entries')
                 <a href="{{ route('inventory.opening-stock') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('inventory.opening-stock*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
                     Opening Stock Intake
                 </a>
+                @endcan
+                @can('view-stock-entries')
                 <a href="{{ route('purchases.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('purchases.*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
                     Supplier Purchases
                 </a>
+                @endcan
+                @can('create-stock-entries')
                 <a href="{{ route('inventory.factory-receipts') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('inventory.factory-receipts*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
                     Factory Finished Receipts
                 </a>
+                @endcan
+                @can('view-stock-entries')
                 <a href="{{ route('stock-entries.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('stock-entries.index') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
                     Master Inward Stock Log
                 </a>
+                @endcan
+                @can('create-stock-entries')
+                <a href="{{ route('stock-entries.create') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('stock-entries.create') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
+                    Add Stock Entry (Manual)
+                </a>
+                @endcan
             </div>
         </div>
-        @endif
+        @endcan
+
 
         {{-- 6. Sell --}}
         @can('create-sales')
@@ -183,7 +197,8 @@
         </div>
         @endcan
 
-        {{-- 7. Stock Transfer --}}
+        {{-- 7. Stock Transfer (Inventory Staff & Admins) --}}
+        @if($isOwnerOrAdmin || auth()->user()->can('view-stock-entries'))
         <div x-data="{ open: activeMenu === 'transfers' }">
             <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-800/80 hover:text-white transition">
                 <div class="flex items-center">
@@ -216,6 +231,7 @@
                 @endif
             </div>
         </div>
+        @endif
 
         {{-- 8. Stock Adjustment (Strictly Owner & System Admin) --}}
         @if($isOwnerOrAdmin)

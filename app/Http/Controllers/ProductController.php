@@ -245,7 +245,7 @@ class ProductController extends Controller
         ]);
 
         $file = $request->file('catalog_file');
-        $ext = strtolower($file->getClientOriginalExtension());
+        $ext  = strtolower($file->getClientOriginalExtension());
         if (!in_array($ext, ['xlsx', 'xls', 'csv', 'txt'])) {
             return redirect()->back()->with('error', 'Unsupported file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) spreadsheet.');
         }
@@ -254,18 +254,22 @@ class ProductController extends Controller
 
         try {
             $importer = new ProductCatalogImport($branchName);
-            Excel::import($importer, $file);
+            $importer->importFile($file->getRealPath(), $ext);
 
-            $msg = "Catalog and stock imported successfully into '{$branchName}'! Processed {$importer->importedVariants} new variant(s), {$importer->updatedVariants} updated variant(s) across {$importer->importedProducts} new product(s).";
-            if ($importer->skipped > 0) {
-                $msg .= " ({$importer->skipped} rows skipped).";
-            }
-
-            return redirect()->route('products.index')->with('success', $msg);
+            return redirect()->route('products.index')
+                ->with('catalog_import_variants',   $importer->importedVariants)
+                ->with('catalog_import_updated',    $importer->updatedVariants)
+                ->with('catalog_import_products',   $importer->importedProducts)
+                ->with('catalog_import_categories', $importer->importedCategories)
+                ->with('catalog_import_skipped',    $importer->skipped)
+                ->with('catalog_import_branch',     $branchName)
+                ->with('catalog_import_errors',     $importer->errors);
         } catch (\Throwable $e) {
-            return redirect()->route('products.index')->with('error', 'Import failed: ' . $e->getMessage());
+            return redirect()->route('products.index')
+                ->with('error', 'Import failed: ' . $e->getMessage());
         }
     }
+
 
     /**
      * Purge all test products, variants, selling prices, and dependent test transactions.

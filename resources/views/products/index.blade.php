@@ -10,6 +10,7 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                @can('create-products')
                 <a href="{{ route('products.create') }}"
                    style="background-color: #000000 !important; color: #ffffff !important;"
                    class="inline-flex items-center px-3.5 py-2 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-lg shadow-md border border-black transition">
@@ -33,6 +34,7 @@
                     </svg>
                     Bulk Import Products (.xlsx, .csv)
                 </button>
+                @endcan
                 @php
                     $isOwnerOrAdmin = in_array(strtolower(auth()->user()->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin', 'manager']);
                 @endphp
@@ -51,6 +53,78 @@
 
     <div class="py-6 space-y-4">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
+
+            {{-- ═══ Import Results Card (shown after a successful bulk import) ═══ --}}
+            @if(session()->has('catalog_import_variants'))
+            @php
+                $impVariants   = session('catalog_import_variants', 0);
+                $impUpdated    = session('catalog_import_updated', 0);
+                $impProducts   = session('catalog_import_products', 0);
+                $impCategories = session('catalog_import_categories', 0);
+                $impSkipped    = session('catalog_import_skipped', 0);
+                $impBranch     = session('catalog_import_branch', 'this branch');
+                $impErrors     = session('catalog_import_errors', []);
+            @endphp
+            <div class="rounded-xl border shadow-sm overflow-hidden">
+                <div class="{{ ($impVariants + $impUpdated) > 0 ? 'bg-emerald-600' : 'bg-amber-500' }} px-4 py-3 flex items-center justify-between">
+                    <div class="flex items-center space-x-2.5">
+                        <svg class="w-5 h-5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            @if(($impVariants + $impUpdated) > 0)
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            @else
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            @endif
+                        </svg>
+                        <span class="font-bold text-white text-sm">
+                            Catalog Import Complete &mdash; {{ $impBranch }}
+                        </span>
+                    </div>
+                    <span class="text-white text-xs font-medium opacity-80">{{ now()->format('d M Y H:i') }}</span>
+                </div>
+
+                {{-- Stats grid --}}
+                <div class="bg-white px-4 py-3 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 text-center text-xs">
+                    <div class="pr-4 py-1">
+                        <div class="text-2xl font-black {{ $impCategories > 0 ? 'text-indigo-600' : 'text-gray-300' }}">{{ number_format($impCategories) }}</div>
+                        <div class="text-gray-500 mt-0.5">📂 Categories</div>
+                    </div>
+                    <div class="px-4 py-1">
+                        <div class="text-2xl font-black {{ $impProducts > 0 ? 'text-indigo-600' : 'text-gray-300' }}">{{ number_format($impProducts) }}</div>
+                        <div class="text-gray-500 mt-0.5">📦 New Products</div>
+                    </div>
+                    <div class="px-4 py-1">
+                        <div class="text-2xl font-black {{ $impVariants > 0 ? 'text-emerald-600' : 'text-gray-300' }}">{{ number_format($impVariants) }}</div>
+                        <div class="text-gray-500 mt-0.5">✅ New Variants</div>
+                    </div>
+                    <div class="pl-4 py-1">
+                        <div class="text-2xl font-black {{ $impSkipped > 0 ? 'text-amber-600' : 'text-gray-300' }}">{{ number_format($impSkipped) }}</div>
+                        <div class="text-gray-500 mt-0.5">⚠️ Skipped</div>
+                    </div>
+                </div>
+
+                @if($impSkipped > 0 && count($impErrors) > 0)
+                <div class="border-t bg-amber-50 px-4 py-3">
+                    <details class="text-xs">
+                        <summary class="font-bold text-amber-800 cursor-pointer select-none">Show skipped row details ({{ count($impErrors) }})</summary>
+                        <ul class="mt-2 space-y-1 max-h-40 overflow-y-auto list-disc list-inside text-amber-900 pl-1">
+                            @foreach($impErrors as $err)
+                                <li>{{ $err }}</li>
+                            @endforeach
+                        </ul>
+                    </details>
+                </div>
+                @endif
+            </div>
+            @endif
+
+            @if(session('error'))
+                <div class="bg-red-50 border border-red-300 text-red-800 p-3.5 rounded-lg text-xs font-semibold flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-red-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ session('error') }}</span>
+                </div>
+            @endif
 
             @if(session('success'))
                 <div class="bg-emerald-50 border border-emerald-300 text-emerald-800 p-3.5 rounded-lg text-xs font-semibold flex items-center">
@@ -163,10 +237,13 @@
                                            class="inline-flex items-center px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-xs font-bold transition">
                                             Variants ({{ $product->variants->count() }})
                                         </a>
+                                        @can('edit-products')
                                         <a href="{{ route('products.edit', $product) }}"
                                            class="inline-flex items-center px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-semibold transition">
                                             Edit
                                         </a>
+                                        @endcan
+                                        @can('delete-products')
                                         <form method="POST"
                                               action="{{ route('products.destroy', $product) }}"
                                               class="inline"
@@ -178,6 +255,7 @@
                                                 Delete
                                             </button>
                                         </form>
+                                        @endcan
                                     </td>
                                 </tr>
                             @empty
@@ -227,22 +305,41 @@
                 </div>
 
                 <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 space-y-1.5">
-                    <p class="font-bold">Flexible Supported Spreadsheet Columns:</p>
-                    <code class="block font-mono text-[11px] bg-white p-1.5 border rounded text-indigo-950">category_name, product_name, sku_prefix, size, colour, selling_price, initial_stock</code>
-                    <p class="text-[11px] text-indigo-700">Or stocktaking sheets with: <span class="font-mono font-bold">sku, product_name, size, quantity, selling_price</span></p>
-                    <p class="text-[11px] text-indigo-600">✓ Works directly with Excel workbooks (.xlsx, .xls) and CSVs. Missing categories and products will be created automatically.</p>
+                    <p class="font-bold">📊 Two formats supported — your file will be detected automatically:</p>
+                    <div class="space-y-1 text-[11px]">
+                        <div class="bg-white border border-indigo-100 rounded p-2">
+                            <p class="font-bold text-indigo-800">① Your actual stock sheets (wide format)</p>
+                            <code class="block font-mono text-[10px] text-gray-700 mt-0.5">TRACKSUITS ← category header row</code>
+                            <code class="block font-mono text-[10px] text-gray-700">SCHOOL/ITEM | 24 | 26 | 28 | 30 ← size columns</code>
+                            <code class="block font-mono text-[10px] text-gray-700">Accurate TK | 10 | 15 | 20 |  5 ← product + quantities</code>
+                        </div>
+                        <div class="bg-white border border-indigo-100 rounded p-2">
+                            <p class="font-bold text-indigo-800">② CSV template (tall format)</p>
+                            <code class="block font-mono text-[10px] text-gray-700 mt-0.5">category_name, product_name, sku_prefix, size, colour, selling_price, initial_stock</code>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-indigo-600">✓ Title rows, blank rows, and TOTAL columns are skipped automatically. Categories are auto-assigned from product names (Tracksuit → Tracksuits, Sweater → School Sweaters, etc.)</p>
                 </div>
 
                 <form method="POST" action="{{ route('products.import') }}" enctype="multipart/form-data" class="space-y-4">
                     @csrf
 
                     <div>
-                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                            Spreadsheet File (.xlsx, .xls, .csv) *
+                        <label for="catalog_file" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                            Spreadsheet File (.xlsx, .xls, .csv) <span class="text-rose-500">*</span>
                         </label>
-                        <input type="file" name="catalog_file" required
-                               accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain"
-                               class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-indigo-500">
+                        <div id="catalog_drop_zone"
+                             class="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center hover:border-indigo-500 transition cursor-pointer bg-gray-50 select-none"
+                             onclick="document.getElementById('catalog_file').click()">
+                            <svg class="mx-auto h-8 w-8 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                            <p class="text-xs font-semibold text-gray-800">Click to select file — or drag & drop it here</p>
+                            <p id="catalog_file_name_display" class="text-xs text-indigo-600 font-bold mt-1">No file selected</p>
+                            <input type="file" id="catalog_file" name="catalog_file" required class="hidden"
+                                   accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain">
+                        </div>
                         <p class="text-[11px] text-gray-500 mt-1">Select any Excel workbook (.xlsx, .xls) or CSV sheet from your computer.</p>
                     </div>
 
@@ -354,5 +451,63 @@
                 closePurgeModal();
             }
         });
+
+        // ── Drag-and-drop for Catalog Import Modal ─────────────────────────
+        (function () {
+            var zone    = document.getElementById('catalog_drop_zone');
+            var input   = document.getElementById('catalog_file');
+            var display = document.getElementById('catalog_file_name_display');
+
+            if (!zone || !input) return;
+
+            function setFile(file) {
+                if (!file) return;
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                display.textContent = file.name;
+                zone.classList.add('border-indigo-500', 'bg-indigo-50');
+                zone.classList.remove('border-gray-300', 'bg-gray-50');
+            }
+
+            input.addEventListener('change', function () {
+                if (this.files && this.files[0]) {
+                    display.textContent = this.files[0].name;
+                    zone.classList.add('border-indigo-500', 'bg-indigo-50');
+                    zone.classList.remove('border-gray-300', 'bg-gray-50');
+                } else {
+                    display.textContent = 'No file selected';
+                }
+            });
+
+            zone.addEventListener('dragenter', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                zone.classList.add('border-indigo-500', 'bg-indigo-50');
+                zone.classList.remove('border-gray-300', 'bg-gray-50');
+            });
+
+            zone.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+            });
+
+            zone.addEventListener('dragleave', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!zone.contains(e.relatedTarget)) {
+                    zone.classList.remove('border-indigo-500', 'bg-indigo-50');
+                    zone.classList.add('border-gray-300', 'bg-gray-50');
+                }
+            });
+
+            zone.addEventListener('drop', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var file = e.dataTransfer.files && e.dataTransfer.files[0];
+                setFile(file);
+            });
+        })();
     </script>
 </x-app-layout>

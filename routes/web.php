@@ -139,19 +139,24 @@ Route::middleware(['auth'])->group(function () {
     // Three Unified Inventory Inward Doorways
     // Doorway 1: Opening Stock Intake
     Route::get('/admin/inventory/opening-stock', [\App\Http\Controllers\InventoryWorkflowController::class, 'openingStockForm'])
-        ->name('inventory.opening-stock');
+        ->name('inventory.opening-stock')
+        ->middleware('permission:create-stock-entries');
     Route::post('/admin/inventory/opening-stock', [\App\Http\Controllers\InventoryWorkflowController::class, 'storeOpeningStock'])
-        ->name('inventory.opening-stock.store');
+        ->name('inventory.opening-stock.store')
+        ->middleware('permission:create-stock-entries');
 
     // Doorway 3: Factory Finished Receipts (Workshop Finished Goods)
     Route::get('/admin/inventory/factory-receipts', [\App\Http\Controllers\InventoryWorkflowController::class, 'factoryReceiptForm'])
-        ->name('inventory.factory-receipts');
+        ->name('inventory.factory-receipts')
+        ->middleware('permission:create-stock-entries');
     Route::post('/admin/inventory/factory-receipts', [\App\Http\Controllers\InventoryWorkflowController::class, 'storeFactoryReceipt'])
-        ->name('inventory.factory-receipts.store');
+        ->name('inventory.factory-receipts.store')
+        ->middleware('permission:create-stock-entries');
 
     // Doorway 2: Supplier Purchases Admin Route Alias
     Route::get('/admin/purchases', fn() => redirect()->route('purchases.index'))
         ->name('admin.purchases');
+
 
     // Stock Entries (Intake & Recalculating Corrections)
     Route::get('/stock-entries', [StockEntryController::class, 'index'])->name('stock-entries.index')->middleware('permission:view-stock-entries');

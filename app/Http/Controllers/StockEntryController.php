@@ -163,15 +163,16 @@ class StockEntryController extends Controller
         Excel::import($importer, $request->file('stock_file'));
 
         $actionWord = $mode === 'replace' ? 'set as opening balance' : 'added to stock';
-        $message = "Opening Stock Intake complete: {$importer->imported} uniform items {$actionWord} successfully.";
-        if ($importer->skipped > 0) {
-            $message .= " ({$importer->skipped} rows were skipped).";
-        }
 
         return redirect()->route('stock-entries.import')
-            ->with('success', $message)
-            ->with('import_errors', $importer->errors);
+            ->with('import_count',   $importer->imported)
+            ->with('import_skipped', $importer->skipped)
+            ->with('import_noise',   $importer->noise)
+            ->with('import_branch',  $branchName)
+            ->with('import_action',  $actionWord)
+            ->with('import_errors',  $importer->errors);
     }
+
 
     public function create()
     {

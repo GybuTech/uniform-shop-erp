@@ -1,9 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Record Factory Delivery Receipt (Workshop Production)</h2>
+            <div>
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">Add Stock Entry (Manual)</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Search for uniform variants and record quantities received or adjusted.</p>
+            </div>
             <a href="{{ route('stock-entries.index') }}" class="text-xs font-semibold text-gray-600 hover:text-gray-900">
-                &larr; Back to Stock Receipts
+                &larr; Back to Stock Log
             </a>
         </div>
     </x-slot>
@@ -11,11 +14,12 @@
     @php
         $variantsData = $variants->map(function($v) {
             return [
-                'id'    => $v->id,
-                'name'  => $v->product?->name ?? 'Uniform',
-                'sku'   => $v->sku,
-                'size'  => $v->size,
-                'stock' => $v->stock_quantity ?? 0,
+                'id'     => $v->id,
+                'name'   => $v->product?->name ?? 'Uniform',
+                'sku'    => $v->sku,
+                'size'   => $v->size,
+                'colour' => $v->colour ?? '',
+                'stock'  => (int)($v->stock_quantity ?? 0),
             ];
         });
     @endphp
@@ -83,18 +87,19 @@
                                                     <div x-show="item.open"
                                                          x-cloak
                                                          class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-56 overflow-y-auto text-xs divide-y divide-gray-100">
-                                                        <template x-for="v in filterVariants(item.search)" :key="v.id">
+                                                         <template x-for="v in filterVariants(item.search)" :key="v.id">
                                                             <div @click="selectVariant(item, v)"
                                                                  class="p-2.5 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition">
                                                                 <div>
                                                                     <span class="font-bold text-gray-900" x-text="v.name"></span>
                                                                     <span class="text-gray-500 text-[11px] block font-mono">
                                                                         SKU: <span x-text="v.sku"></span> &bull; Size: <strong x-text="v.size"></strong>
+                                                                        <span x-show="v.colour && v.colour !== '' && v.colour !== 'Standard'">&bull; <span x-text="v.colour"></span></span>
                                                                     </span>
                                                                 </div>
                                                                 <span class="px-2 py-0.5 rounded text-[11px] font-bold"
                                                                       :class="v.stock > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
-                                                                      x-text="'Current: ' + v.stock + ' pcs'">
+                                                                      x-text="'Stock: ' + v.stock + ' pcs'">
                                                                 </span>
                                                             </div>
                                                         </template>
@@ -146,16 +151,19 @@
                     if (!query || query.trim() === '') return [];
                     const q = query.toLowerCase().trim();
                     return this.allVariants.filter(v =>
-                        (v.name && v.name.toLowerCase().includes(q)) ||
-                        (v.sku && v.sku.toLowerCase().includes(q)) ||
+                        (v.name   && v.name.toLowerCase().includes(q))   ||
+                        (v.sku    && v.sku.toLowerCase().includes(q))     ||
+                        (v.colour && v.colour.toLowerCase().includes(q)) ||
                         (v.size !== undefined && v.size !== null && String(v.size).toLowerCase().includes(q))
                     ).slice(0, 30);
                 },
                 selectVariant(item, v) {
                     item.product_variant_id = v.id;
-                    item.search = v.name + ' (' + v.sku + ' - Size ' + v.size + ')';
-                    item.stock = v.stock;
-                    item.open = false;
+                    const colourPart = v.colour && v.colour !== '' && v.colour !== 'Standard'
+                        ? ' — ' + v.colour : '';
+                    item.search = v.name + ' (Size ' + v.size + colourPart + ')';
+                    item.stock  = v.stock;
+                    item.open   = false;
                 }
             };
         }

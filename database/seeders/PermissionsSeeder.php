@@ -44,13 +44,17 @@ class PermissionsSeeder extends Seeder
             'refund-sales',
             'void-sales',
 
-            // Stock Entries
+            // Stock Entries (Inventory Inward)
             'view-stock-entries',
             'create-stock-entries',
             'edit-stock-entries',
             'delete-stock-entries',
+            'approve-stock-entries',
 
-            // Inventory
+            // Stock Adjustments (Owner-only write-down / correction)
+            'adjust-stock',
+
+            // Inventory (General)
             'view-inventory',
             'adjust-inventory',
 
@@ -84,8 +88,13 @@ class PermissionsSeeder extends Seeder
         $allPermissions = Permission::all()->pluck('name')->toArray();
 
         $rolePermissions = [
-            'owner'                => $allPermissions,
+            // Owner: everything
+            'owner' => $allPermissions,
+
+            // System Administrator: everything
             'system_administrator' => $allPermissions,
+
+            // Manager / Branch Manager: can view + create stock, approve — cannot edit/delete/adjust
             'manager' => [
                 'view-dashboard',
                 'view-categories', 'create-categories', 'edit-categories',
@@ -93,10 +102,12 @@ class PermissionsSeeder extends Seeder
                 'view-product-variants', 'create-product-variants', 'edit-product-variants',
                 'view-customers', 'create-customers', 'edit-customers',
                 'view-sales', 'create-sales', 'refund-sales',
-                'view-stock-entries', 'create-stock-entries', 'edit-stock-entries',
+                'view-stock-entries', 'create-stock-entries', 'approve-stock-entries',
                 'view-inventory', 'adjust-inventory',
                 'view-reports', 'view-sales-reports', 'view-inventory-reports',
             ],
+
+            // Cashier: ZERO stock/inventory permissions — POS + customers only
             'cashier' => [
                 'view-dashboard',
                 'view-categories',
@@ -105,6 +116,8 @@ class PermissionsSeeder extends Seeder
                 'view-customers', 'create-customers', 'edit-customers',
                 'view-sales', 'create-sales',
             ],
+
+            // Store Keeper: can view + create stock entries, no sales
             'store_keeper' => [
                 'view-dashboard',
                 'view-categories',
@@ -114,6 +127,8 @@ class PermissionsSeeder extends Seeder
                 'view-inventory',
                 'view-inventory-reports',
             ],
+
+            // Accountant: read-only financial view
             'accountant' => [
                 'view-dashboard',
                 'view-customers',
