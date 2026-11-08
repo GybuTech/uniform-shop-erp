@@ -43,15 +43,33 @@
             {{-- 1. Verified Branch Cash Float Alert Card --}}
             <div class="alert alert-info border border-blue-200 bg-blue-50 text-blue-900 rounded-xl p-4 shadow-sm">
                 <h5 class="font-bold text-sm mb-1.5 flex items-center text-blue-950">
-                    <i class="fas fa-lock mr-2 text-blue-600"></i>
-                    <span>Verified Branch Cash Float</span>
+                    <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span>Verified Branch Opening Cash Float</span>
                 </h5>
-                <p class="mb-0 text-xs text-blue-900 leading-relaxed">
-                    Last shift closed on <strong>{{ $lastShift && ($lastShift->closed_at ?? $lastShift->ended_at) ? ($lastShift->closed_at ?? $lastShift->ended_at)->format('M d, Y h:i A') : 'N/A' }}</strong> 
-                    with <strong>KES {{ number_format($startingFloat, 2) }}</strong> in the drawer.
-                    <br>
-                    <small class="text-blue-700">Please verify that the physical cash in the drawer matches this amount before opening.</small>
-                </p>
+                <div class="text-xs text-blue-900 leading-relaxed">
+                    @if($lastShift && $lastShift->cash_collected_by_owner)
+                        <div class="flex items-center space-x-2 mb-1">
+                            <span class="inline-block bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded text-[11px]">
+                                Owner Cash Collection Recorded
+                            </span>
+                            <span class="text-gray-500 text-[11px]">&bull; Verified by {{ $lastShift->collected_by_name ?? 'Owner' }}</span>
+                        </div>
+                        <p class="mb-0">
+                            Cash left in shop for this shift: <strong class="text-emerald-900 font-black font-mono text-sm">KES {{ number_format($startingFloat, 2) }}</strong>
+                            @if($lastShift->amount_collected > 0)
+                                <span class="text-gray-500">(Owner collected KES {{ number_format($lastShift->amount_collected, 2) }} from previous drawer count)</span>
+                            @endif
+                        </p>
+                    @else
+                        <p class="mb-0">
+                            Last shift closed on <strong>{{ $lastShift && ($lastShift->closed_at ?? $lastShift->ended_at) ? ($lastShift->closed_at ?? $lastShift->ended_at)->format('M d, Y h:i A') : 'N/A' }}</strong> 
+                            with <strong>KES {{ number_format($startingFloat, 2) }}</strong> in the drawer.
+                        </p>
+                    @endif
+                    <div class="text-blue-700 mt-1 font-medium text-[11px]">Please verify that the physical cash notes and coins in the drawer match this amount before clicking confirm.</div>
+                </div>
             </div>
 
             {{-- 2. Open Shift Card Form --}}

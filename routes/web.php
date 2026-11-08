@@ -239,6 +239,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/shifts/{shift}/z-report', [ShiftController::class, 'zReport'])
         ->name('shifts.zReport')
         ->middleware('permission:view-sales');
+    Route::post('/shifts/{shift}/collect-cash', [ShiftController::class, 'recordCashCollection'])
+        ->name('shifts.collect-cash')
+        ->middleware('permission:view-sales');
 
     // Sales Log
     Route::get('/sales', [PosController::class, 'salesIndex'])

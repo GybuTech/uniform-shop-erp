@@ -18,6 +18,9 @@
     <div class="py-8" x-data="{
         expectedCash: {{ (float) $expectedCash }},
         actualCash: {{ (float) $expectedCash }},
+        ownerCollecting: false,
+        floatLeft: 0,
+        amountCol: 0,
         get variance() {
             return (parseFloat(this.actualCash) || 0) - this.expectedCash;
         }
@@ -85,7 +88,7 @@
                     </div>
 
                     {{-- Security Notice: Cash Remains Locked in Drawer --}}
-                    <div class="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start space-x-2.5">
+                    <div x-show="!ownerCollecting" class="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start space-x-2.5">
                         <svg class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
@@ -95,6 +98,63 @@
                             remains locked in this branch's drawer and will automatically roll over as the verified starting float for the next shift.
                         </div>
                     </div>
+
+                    {{-- Step 2: Owner Cash Collection & Next Shift Float (Owner / Admin) --}}
+                    @if($isOwnerOrAdmin)
+                    <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center space-x-2 cursor-pointer select-none">
+                                <input type="checkbox" name="cash_collected_by_owner" value="1" x-model="ownerCollecting" class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                                <span class="text-xs font-bold text-amber-950 uppercase">Owner / Admin Cash Collection</span>
+                            </label>
+                            <span class="text-[10px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded">Admin / Owner</span>
+                        </div>
+
+                        <div x-show="ownerCollecting" x-collapse class="space-y-3 pt-2 border-t border-amber-200">
+                            <p class="text-[11px] text-amber-900 leading-snug">
+                                Key in the amount left in the shop. This exact amount will automatically become the opening cash for the next shift at this branch.
+                            </p>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-800 mb-1">
+                                        Amount Left in Shop / Next Opening Float (KES) *
+                                    </label>
+                                    <div class="relative">
+                                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 font-bold text-xs">KES</span>
+                                        <input type="number" step="0.01" min="0" name="float_left_in_drawer"
+                                               x-model="floatLeft"
+                                               @input="amountCol = Math.max(0, (parseFloat(actualCash) || 0) - (parseFloat(floatLeft) || 0))"
+                                               class="w-full pl-11 pr-3 py-2 text-sm font-bold font-mono rounded-lg border-gray-300 focus:ring-amber-500 focus:border-amber-500"
+                                               placeholder="0.00">
+                                    </div>
+                                    <span class="text-[10px] text-gray-500">Left in drawer for tomorrow.</span>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-800 mb-1">
+                                        Amount Collected / Taken by Owner (KES)
+                                    </label>
+                                    <div class="relative">
+                                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 font-bold text-xs">KES</span>
+                                        <input type="number" step="0.01" min="0" name="amount_collected"
+                                               x-model="amountCol"
+                                               @input="floatLeft = Math.max(0, (parseFloat(actualCash) || 0) - (parseFloat(amountCol) || 0))"
+                                               class="w-full pl-11 pr-3 py-2 text-sm font-bold font-mono rounded-lg border-gray-300 focus:ring-amber-500 focus:border-amber-500"
+                                               placeholder="0.00">
+                                    </div>
+                                    <span class="text-[10px] text-gray-500">Removed from shop for safe/banking.</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Collector Name</label>
+                                <input type="text" name="collected_by_name" value="{{ auth()->user()->name }}"
+                                       class="w-full text-xs rounded-lg border-gray-300 focus:ring-amber-500 focus:border-amber-500">
+                            </div>
+                        </div>
+                    </div>
+                    @endif
 
                     {{-- Step 2: Handover Notes / Discrepancy Reason --}}
                     <div>

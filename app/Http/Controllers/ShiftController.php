@@ -33,9 +33,30 @@ class ShiftController extends Controller
             $query->where('status', $request->status);
         }
 
-        $shifts = $query->paginate(20);
+        $shifts = $query->paginate(20)->appends($request->query());
 
-        return view('shifts.index', compact('shifts'));
+        $branchSummaries = [];
+        if ($isGlobal) {
+            $branches = Branch::where('is_active', true)->orderBy('name')->get();
+            foreach ($branches as $b) {
+                [$resolvedFloat, $lastClosed, $label] = Shift::resolveOpeningFloatForBranch($b->name, $b->id);
+                $activeShift = Shift::where(function($q) use ($b) {
+                        $q->where('branch_id', $b->id)->orWhere('branch_name', $b->name);
+                    })
+                    ->where('status', 'open')
+                    ->first();
+
+                $branchSummaries[] = [
+                    'branch'      => $b,
+                    'activeShift' => $activeShift,
+                    'lastClosed'  => $lastClosed,
+                    'nextFloat'   => $resolvedFloat,
+                    'statusLabel' => $label,
+                ];
+            }
+        }
+
+        return view('shifts.index', compact('shifts', 'isGlobal', 'branchSummaries'));
     }
 
     /**
@@ -299,8 +320,9 @@ class ShiftController extends Controller
         $startingFloat = (float) $shift->opening_float;
         $cashSales = $shift->getCashSalesAmount();
         $expectedCash = (float) $shift->expected_cash;
+        $isOwnerOrAdmin = $user && $user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager']);
 
-        return view('shifts.close', compact('shift', 'startingFloat', 'cashSales', 'expectedCash'));
+        return view('shifts.close', compact('shift', 'startingFloat', 'cashSales', 'expectedCash', 'isOwnerOrAdmin'));
     }
 
     /**
@@ -313,6 +335,7 @@ class ShiftController extends Controller
             'actual_cash'             => ['required', 'numeric', 'min:0'],
             'cash_collected_by_owner' => ['nullable'],
             'amount_collected'        => ['nullable', 'numeric', 'min:0'],
+            'float_left_in_drawer'    => ['nullable', 'numeric', 'min:0'],
             'collected_by_name'       => ['nullable', 'string', 'max:150'],
             'handover_notes'          => ['nullable', 'string', 'max:500'],
             'branch_name'             => ['nullable', 'string', 'max:100'],
@@ -335,8 +358,7 @@ class ShiftController extends Controller
         $actualCash = (float) $validated['actual_cash'];
         $variance = round($actualCash - (float) $shift->expected_cash, 2);
 
-        // Security Rules: Cashiers NEVER decide or indicate whether owner collected money.
-        // All closing cash counted by a cashier remains locked in drawer overnight.
+        // Security Rules: Cashiers count actual cash; Owner/Admin can record collection and exact float left
         $isCollected = false;
         $amountCollected = 0.00;
         $floatLeftInDrawer = $actualCash;
@@ -346,8 +368,15 @@ class ShiftController extends Controller
             $val = strtolower((string)$request->input('cash_collected_by_owner'));
             if (in_array($val, ['yes', '1', 'true', 'on'])) {
                 $isCollected = true;
-                $amountCollected = (float) ($validated['amount_collected'] ?? 0.00);
-                $floatLeftInDrawer = max(0.00, round($actualCash - $amountCollected, 2));
+                if ($request->filled('float_left_in_drawer')) {
+                    $floatLeftInDrawer = (float) $request->input('float_left_in_drawer');
+                    $amountCollected = $request->filled('amount_collected')
+                        ? (float) $request->input('amount_collected')
+                        : max(0.00, round($actualCash - $floatLeftInDrawer, 2));
+                } else {
+                    $amountCollected = (float) ($validated['amount_collected'] ?? 0.00);
+                    $floatLeftInDrawer = max(0.00, round($actualCash - $amountCollected, 2));
+                }
                 $collectedByName = $validated['collected_by_name'] ?? $user->name;
             }
         }
@@ -428,5 +457,52 @@ class ShiftController extends Controller
         $currency = BusinessSetting::get('business_currency', 'KES');
 
         return view('shifts.z_report', compact('shift', 'businessName', 'currency'));
+    }
+
+    /**
+     * Record or update cash collection by Owner/Admin and key in the amount left in shop
+     * which serves as the opening cash for the next shift at that branch.
+     */
+    public function recordCashCollection(Request $request, Shift $shift)
+    {
+        $user = auth()->user();
+        if (!$user || !$user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager'])) {
+            abort(403, 'Unauthorized. Only store owners or managers can record cash collections.');
+        }
+
+        $validated = $request->validate([
+            'float_left_in_drawer' => ['required', 'numeric', 'min:0'],
+            'amount_collected'     => ['nullable', 'numeric', 'min:0'],
+            'collected_by_name'    => ['nullable', 'string', 'max:150'],
+            'collection_notes'     => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $totalCash = (float) ($shift->actual_cash ?? $shift->expected_cash);
+        $floatLeft = (float) $validated['float_left_in_drawer'];
+
+        // If amount collected was not explicitly set, calculate it as difference
+        if (!isset($validated['amount_collected']) || $validated['amount_collected'] === null || $validated['amount_collected'] === '') {
+            $amountCollected = max(0.00, round($totalCash - $floatLeft, 2));
+        } else {
+            $amountCollected = (float) $validated['amount_collected'];
+        }
+
+        $collectorName = trim($validated['collected_by_name'] ?? '') ?: $user->name;
+
+        $shift->cash_collected_by_owner = true;
+        $shift->amount_collected        = $amountCollected;
+        $shift->float_left_in_drawer    = $floatLeft;
+        $shift->collected_by_name       = $collectorName;
+
+        if (!empty($validated['collection_notes'])) {
+            $stamp = date('d M Y H:i');
+            $noteLine = "[{$stamp} Cash Collection by {$collectorName}] " . trim($validated['collection_notes']) . " (Collected: KES " . number_format($amountCollected, 2) . ", Left in Shop: KES " . number_format($floatLeft, 2) . ")";
+            $shift->handover_notes = trim(($shift->handover_notes ? $shift->handover_notes . "\n" : '') . $noteLine);
+        }
+
+        $shift->save();
+
+        return redirect()->back()
+            ->with('success', "Cash collection recorded for {$shift->branch_name}. KES " . number_format($amountCollected, 2) . " collected; KES " . number_format($floatLeft, 2) . " left in shop as opening float for the next shift.");
     }
 }
