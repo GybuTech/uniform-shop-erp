@@ -109,23 +109,32 @@
                     <input type="hidden" name="branch_name" value="{{ $selectedBranch }}">
 
                     {{-- Workshop Batch Delivery Header --}}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50/70 border rounded-xl">
-                        {{-- Delivery Note # --}}
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50/70 border rounded-xl">
+                        {{-- Tailor / Artisan Name --}}
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                                Workshop Delivery Note # *
+                                Tailor / Artisan Responsible *
                             </label>
-                            <input type="text" name="delivery_note_no" value="{{ old('delivery_note_no') }}" required placeholder="e.g. DN-2026-104 or BATCH-01"
-                                   class="w-full text-xs font-mono font-bold rounded-lg border-gray-300 focus:ring-amber-500 focus:border-amber-500">
+                            <input type="text" name="tailor_name" value="{{ old('tailor_name') }}" required placeholder="e.g. Tailor Kamau / Tailor Joyce"
+                                   class="w-full text-xs font-semibold rounded-lg border-gray-300 focus:ring-amber-500 focus:border-amber-500">
                         </div>
 
-                        {{-- Origin Workshop / Tailor --}}
+                        {{-- Production Date --}}
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                                Origin Workshop / Tailor Name *
+                                Production Date *
                             </label>
-                            <input type="text" name="origin_workshop" value="{{ old('origin_workshop') }}" required placeholder="e.g. Tailor Kamau / Kayole Unit 2"
+                            <input type="date" name="production_date" value="{{ old('production_date', date('Y-m-d')) }}" required
                                    class="w-full text-xs font-semibold rounded-lg border-gray-300 focus:ring-amber-500 focus:border-amber-500">
+                        </div>
+
+                        {{-- Delivery Note / Batch # --}}
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                                Delivery Note / Batch # *
+                            </label>
+                            <input type="text" name="delivery_note_no" value="{{ old('delivery_note_no') }}" required placeholder="e.g. BATCH-01 or DN-104"
+                                   class="w-full text-xs font-mono font-bold rounded-lg border-gray-300 focus:ring-amber-500 focus:border-amber-500">
                         </div>
 
                         {{-- Notes --}}
@@ -133,7 +142,7 @@
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                                 Production Notes (Optional)
                             </label>
-                            <input type="text" name="notes" value="{{ old('notes') }}" placeholder="e.g. 5 tracksuits sewn for Term 1 delivery"
+                            <input type="text" name="notes" value="{{ old('notes') }}" placeholder="e.g. Term 1 restock batch"
                                    class="w-full text-xs rounded-lg border-gray-300 focus:ring-amber-500 focus:border-amber-500">
                         </div>
                     </div>
@@ -237,7 +246,7 @@
                         <tr>
                             <th class="px-5 py-3 text-left">Receipt #</th>
                             <th class="px-5 py-3 text-left">Delivery Note #</th>
-                            <th class="px-5 py-3 text-left">Workshop / Tailor</th>
+                            <th class="px-5 py-3 text-left">Tailor / Artisan</th>
                             <th class="px-5 py-3 text-left">Items Received</th>
                             <th class="px-5 py-3 text-left">Received Date</th>
                             <th class="px-5 py-3 text-left">Receiver</th>
@@ -248,8 +257,13 @@
                         <tr>
                             <td class="px-5 py-3 font-mono font-bold text-indigo-600">{{ $rr->reference_no }}</td>
                             <td class="px-5 py-3 font-mono font-bold text-gray-900">{{ $rr->delivery_note_no }}</td>
-                            <td class="px-5 py-3 font-semibold text-gray-800">{{ $rr->origin_workshop }}</td>
-                            <td class="px-5 py-3 text-gray-700 font-bold">{{ $rr->items->count() }} uniform item type(s)</td>
+                            <td class="px-5 py-3 font-semibold text-gray-800">
+                                <div>{{ $rr->origin_workshop }}</div>
+                                @if($rr->notes)
+                                    <div class="text-[10px] text-gray-400 font-normal mt-0.5">{{ $rr->notes }}</div>
+                                @endif
+                            </td>
+                            <td class="px-5 py-3 text-gray-700 font-bold">{{ $rr->items->count() }} item type(s)</td>
                             <td class="px-5 py-3 text-gray-500">{{ $rr->created_at->format('M d, Y H:i') }}</td>
                             <td class="px-5 py-3 text-gray-700">{{ $rr->user->name ?? 'Staff' }}</td>
                         </tr>

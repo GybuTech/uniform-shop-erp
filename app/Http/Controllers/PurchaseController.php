@@ -13,7 +13,12 @@ class PurchaseController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $status = $request->input('status');
         $query = Purchase::with(['user', 'items.productVariant.product'])->latest();
+
+        if ($status) {
+            $query->where('status', $status);
+        }
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -24,10 +29,10 @@ class PurchaseController extends Controller
             });
         }
 
-        $purchases = $query->paginate(15);
+        $purchases = $query->paginate(15)->appends($request->query());
         $totalPurchasesAmount = Purchase::where('status', 'received')->sum('total_amount');
 
-        return view('purchases.index', compact('purchases', 'search', 'totalPurchasesAmount'));
+        return view('purchases.index', compact('purchases', 'search', 'status', 'totalPurchasesAmount'));
     }
 
     public function create()
@@ -52,7 +57,7 @@ class PurchaseController extends Controller
             'invoice_number'             => ['nullable', 'string', 'max:100'],
             'branch_name'                => ['required', 'string', 'max:100'],
             'purchase_date'              => ['required', 'date'],
-            'status'                     => ['required', 'in:received,pending,ordered'],
+            'status'                     => ['required', 'in:received,pending,ordered,returned'],
             'notes'                      => ['nullable', 'string'],
             'items'                      => ['required', 'array', 'min:1'],
             'items.*.item_name'          => ['required', 'string', 'max:200'],

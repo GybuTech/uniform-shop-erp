@@ -209,12 +209,19 @@ class InventoryWorkflowController extends Controller
 
         $validated = $request->validate([
             'delivery_note_no' => 'required|string|max:100',
-            'origin_workshop'  => 'required|string|max:150',
+            'origin_workshop'  => 'nullable|string|max:150',
+            'tailor_name'      => 'nullable|string|max:150',
+            'production_date'  => 'nullable|date',
             'notes'            => 'nullable|string|max:500',
             'items'            => 'required|array|min:1',
             'items.*.product_variant_id' => 'required|exists:product_variants,id',
             'items.*.quantity'           => 'nullable|numeric|min:0',
         ]);
+
+        $tailorName = trim($validated['tailor_name'] ?? ($validated['origin_workshop'] ?? 'In-House Production'));
+        $productionDate = !empty($validated['production_date']) ? $validated['production_date'] : date('Y-m-d');
+        $customNotes = trim($validated['notes'] ?? '');
+        $composedNotes = "Tailor: {$tailorName} produced on {$productionDate}" . ($customNotes ? " | {$customNotes}" : '');
 
         // Filter only line items with a positive produced quantity
         $receivedItems = collect($validated['items'])->filter(function ($item) {
@@ -229,15 +236,15 @@ class InventoryWorkflowController extends Controller
 
         $totalUnits = 0;
 
-        DB::transaction(function () use ($validated, $receivedItems, $branchName, &$totalUnits) {
+        DB::transaction(function () use ($validated, $tailorName, $composedNotes, $receivedItems, $branchName, &$totalUnits) {
             $stockEntry = StockEntry::create([
                 'user_id'          => auth()->id(),
                 'source_type'      => 'factory_receipt',
                 'delivery_note_no' => $validated['delivery_note_no'],
-                'origin_workshop'  => $validated['origin_workshop'],
+                'origin_workshop'  => $tailorName,
                 'branch_name'      => $branchName,
                 'reference_no'     => 'FCT-' . strtoupper($validated['delivery_note_no']),
-                'notes'            => $validated['notes'] ?? ('Tailor batch received from ' . $validated['origin_workshop']),
+                'notes'            => $composedNotes,
             ]);
 
             foreach ($receivedItems as $itemData) {

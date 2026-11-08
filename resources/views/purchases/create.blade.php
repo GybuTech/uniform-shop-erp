@@ -68,9 +68,10 @@
                         <div class="md:col-span-2">
                             <x-input-label for="status" value="Order Status *" />
                             <select name="status" id="status" required class="w-full mt-1 border-gray-300 rounded-md shadow-sm text-sm">
-                                <option value="received">Received (Increments inventory stock)</option>
+                                <option value="received">Received (Supplier stock accepted)</option>
                                 <option value="ordered">Ordered (Awaiting delivery)</option>
                                 <option value="pending">Pending Payment</option>
+                                <option value="returned">Returned (Supplier return / claim)</option>
                             </select>
                         </div>
                     </div>

@@ -526,6 +526,40 @@
                     <span id="shiftVarianceAmount" class="font-mono font-black text-sm">KES 0.00</span>
                 </div>
 
+                @if(!$isLockedBranch)
+                {{-- Owner Cash Collection & Set Next Shift Float --}}
+                <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                    <label class="flex items-center space-x-2 cursor-pointer select-none">
+                        <input type="checkbox" id="posOwnerCollectingCheck" class="rounded border-gray-300 text-amber-600 focus:ring-amber-500" onchange="togglePosOwnerCollection(this.checked)">
+                        <span class="text-xs font-bold text-amber-950 uppercase">Owner Cash Collection (Set Opening Float)</span>
+                    </label>
+
+                    <div id="posOwnerCollectionFields" class="hidden space-y-2 pt-2 border-t border-amber-200">
+                        <p class="text-[10px] text-amber-900 leading-snug">
+                            Key in the amount left in the shop. This exact amount will automatically become the opening cash for the next shift at this branch.
+                        </p>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-700 mb-0.5">Amount Left in Shop (KES) *</label>
+                                <input type="number" step="0.01" min="0" id="posFloatLeftInput"
+                                       class="w-full text-xs font-bold font-mono rounded-lg border-gray-300 py-1.5 focus:ring-amber-500 focus:border-amber-500"
+                                       placeholder="e.g. 2000"
+                                       oninput="onPosFloatLeftInput()">
+                                <span class="text-[9px] text-gray-500">Next opening cash</span>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-700 mb-0.5">Amount Collected (KES)</label>
+                                <input type="number" step="0.01" min="0" id="posAmountCollectedInput"
+                                       class="w-full text-xs font-bold font-mono rounded-lg border-gray-300 py-1.5 focus:ring-amber-500 focus:border-amber-500"
+                                       placeholder="e.g. 20000"
+                                       oninput="onPosAmountCollectedInput()">
+                                <span class="text-[9px] text-gray-500">Taken by owner</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
                 <div>
                     <label class="block text-xs font-bold text-gray-700 mb-1">Handover Notes / Remarks (Optional)</label>
                     <textarea id="shiftHandoverNotes" rows="2"
@@ -570,6 +604,15 @@
             updateParkedBadge();
             if (window.location.hash === '#end-shift') {
                 openEndShiftModal();
+            }
+            const branchEl = document.getElementById('branchSelect');
+            if (branchEl && branchEl.tagName === 'SELECT') {
+                branchEl.addEventListener('change', () => {
+                    const searchInput = document.getElementById('posSearchInput');
+                    if (searchInput && searchInput.value.trim().length >= 2) {
+                        handleSearchInput(searchInput.value);
+                    }
+                });
             }
         });
 
@@ -683,8 +726,13 @@
 
                 const brandPill = v.brand_name ? `<span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold mr-1.5">${v.brand_name}</span>` : '';
 
+                let otherStockNotice = '';
+                if (v.stock_quantity <= 0 && v.other_branches_info) {
+                    otherStockNotice = `<span class="text-[10px] text-indigo-700 block mt-0.5 font-bold">In stock at: ${v.other_branches_info}</span>`;
+                }
+
                 const stockBadge = v.stock_quantity <= 0
-                    ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">Out of Stock (0)</span>`
+                    ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">Out of Stock at this station</span>${otherStockNotice}`
                     : (v.stock_quantity <= 5
                         ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">Low Stock (${v.stock_quantity} left)</span>`
                         : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${v.stock_quantity} ${v.unit_of_measure || 'units'})</span>`);
@@ -1435,6 +1483,35 @@
             }
         }
 
+        function togglePosOwnerCollection(checked) {
+            const fields = document.getElementById('posOwnerCollectionFields');
+            if (fields) {
+                if (checked) {
+                    fields.classList.remove('hidden');
+                } else {
+                    fields.classList.add('hidden');
+                }
+            }
+        }
+
+        function onPosFloatLeftInput() {
+            const counted = parseFloat(document.getElementById('actualCashInput')?.value) || 0;
+            const floatLeft = parseFloat(document.getElementById('posFloatLeftInput')?.value) || 0;
+            const colInput = document.getElementById('posAmountCollectedInput');
+            if (colInput) {
+                colInput.value = Math.max(0, counted - floatLeft).toFixed(2);
+            }
+        }
+
+        function onPosAmountCollectedInput() {
+            const counted = parseFloat(document.getElementById('actualCashInput')?.value) || 0;
+            const collected = parseFloat(document.getElementById('posAmountCollectedInput')?.value) || 0;
+            const floatLeftInput = document.getElementById('posFloatLeftInput');
+            if (floatLeftInput) {
+                floatLeftInput.value = Math.max(0, counted - collected).toFixed(2);
+            }
+        }
+
         function submitEndShift(event) {
             event.preventDefault();
 
@@ -1446,8 +1523,13 @@
             btn.disabled = true;
             btn.innerText = 'Closing Shift...';
 
+            const isOwnerCol = document.getElementById('posOwnerCollectingCheck')?.checked || false;
             const payload = {
                 actual_cash: parseFloat(document.getElementById('actualCashInput').value) || 0,
+                cash_collected_by_owner: isOwnerCol ? 'yes' : 'no',
+                float_left_in_drawer: isOwnerCol ? (parseFloat(document.getElementById('posFloatLeftInput')?.value) || 0) : null,
+                amount_collected: isOwnerCol ? (parseFloat(document.getElementById('posAmountCollectedInput')?.value) || 0) : null,
+                collected_by_name: '{{ auth()->user()->name }}',
                 handover_notes: document.getElementById('shiftHandoverNotes').value.trim(),
                 branch_name: document.getElementById('branchSelect').value,
                 _token: '{{ csrf_token() }}'

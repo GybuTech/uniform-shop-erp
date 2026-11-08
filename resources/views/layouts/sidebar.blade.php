@@ -125,36 +125,49 @@
                 @can('edit-product-variants')
                 <a href="{{ route('products.prices') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('products.prices*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">Update Price Groups</a>
                 @endcan
-                @can('create-stock-entries')
-                <a href="{{ route('stock-entries.import') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('stock-entries.import*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">Opening Stock Intake (Import)</a>
-                @endcan
             </div>
         </div>
         @endif
 
-        {{-- 5. Stock & Inventory (Three Inward Doorways) --}}
-        @can('view-stock-entries')
-        <div x-data="{ open: activeMenu === 'purchases' || activeMenu === 'stock-entries' || activeMenu === 'admin' }">
+        {{-- 5. Purchases --}}
+        @if($isOwnerOrAdmin || auth()->user()->can('view-stock-entries'))
+        <div x-data="{ open: activeMenu === 'purchases' }">
             <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-800/80 hover:text-white transition">
                 <div class="flex items-center">
-                    <svg class="w-4 h-4 mr-2.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    <svg class="w-4 h-4 mr-2.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
-                    <span>Stock & Inventory</span>
+                    <span>Purchases</span>
                 </div>
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
             <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
-                @can('create-stock-entries')
-                <a href="{{ route('inventory.opening-stock') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('inventory.opening-stock*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    Opening Stock Intake
+                <a href="{{ route('purchases.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('purchases.index') && !request()->has('status') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
+                    List Purchases
                 </a>
-                @endcan
-                @can('view-stock-entries')
-                <a href="{{ route('purchases.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('purchases.*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    Supplier Purchases
+                <a href="{{ route('purchases.create') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('purchases.create') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
+                    Add Purchase
                 </a>
-                @endcan
+                <a href="{{ route('purchases.index', ['status' => 'returned']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('purchases.index') && request()->get('status') === 'returned' ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
+                    List Purchases Return
+                </a>
+            </div>
+        </div>
+        @endif
+
+        {{-- 6. Workshop Production (Factory Finished Goods) --}}
+        @if($isOwnerOrAdmin || auth()->user()->can('create-stock-entries') || auth()->user()->can('view-stock-entries'))
+        <div x-data="{ open: activeMenu === 'inventory' || activeMenu === 'stock-entries' }">
+            <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-800/80 hover:text-white transition">
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 mr-2.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span>Workshop Production</span>
+                </div>
+                <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 @can('create-stock-entries')
                 <a href="{{ route('inventory.factory-receipts') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('inventory.factory-receipts*') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
                     Factory Finished Receipts
@@ -162,20 +175,15 @@
                 @endcan
                 @can('view-stock-entries')
                 <a href="{{ route('stock-entries.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('stock-entries.index') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    Master Inward Stock Log
-                </a>
-                @endcan
-                @can('create-stock-entries')
-                <a href="{{ route('stock-entries.create') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('stock-entries.create') ? 'text-indigo-400 font-bold' : 'text-slate-400' }}">
-                    Add Stock Entry (Manual)
+                    Production Batch History
                 </a>
                 @endcan
             </div>
         </div>
-        @endcan
+        @endif
 
 
-        {{-- 6. Sell --}}
+        {{-- 7. Sell --}}
         @can('create-sales')
         <div x-data="{ open: activeMenu === 'pos' || activeMenu === 'sales' || activeMenu === 'quotations' || activeMenu === 'shifts' }">
             <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-800/80 hover:text-white transition">
@@ -197,7 +205,7 @@
         </div>
         @endcan
 
-        {{-- 7. Stock Transfer (Inventory Staff & Admins) --}}
+        {{-- 8. Stock Transfer (Inventory Staff & Admins) --}}
         @if($isOwnerOrAdmin || auth()->user()->can('view-stock-entries'))
         <div x-data="{ open: activeMenu === 'transfers' }">
             <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-800/80 hover:text-white transition">
@@ -233,7 +241,7 @@
         </div>
         @endif
 
-        {{-- 8. Stock Adjustment (Strictly Owner & System Admin) --}}
+        {{-- 9. Stock Adjustment (Strictly Owner & System Admin) --}}
         @if($isOwnerOrAdmin)
         <div x-data="{ open: activeMenu === 'adjustments' }">
             <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-800/80 hover:text-white transition">

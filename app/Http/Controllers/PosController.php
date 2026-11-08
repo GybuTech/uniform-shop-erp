@@ -91,20 +91,30 @@ class PosController extends Controller
                 ->first();
 
             if ($exactVariant) {
+                $exactBranchStock = $exactVariant->getStockForBranch($branchName);
+                $otherExactInfo = '';
+                if ($exactBranchStock <= 0 && $exactVariant->branchStocks->isNotEmpty()) {
+                    $other = $exactVariant->branchStocks->filter(fn($bs) => $bs->quantity > 0 && $bs->branch_name !== $branchName);
+                    if ($other->isNotEmpty()) {
+                        $otherExactInfo = $other->map(fn($o) => "{$o->branch_name} ({$o->quantity})")->join(', ');
+                    }
+                }
+
                 return response()->json([
                     [
-                        'id'              => $exactVariant->id,
-                        'sku'             => $exactVariant->sku,
-                        'barcode'         => $exactVariant->barcode,
-                        'product_name'    => $exactVariant->product?->name ?? 'Product',
-                        'brand_name'      => $exactVariant->brand_name,
-                        'unit_of_measure' => $exactVariant->unit_of_measure ?? 'Piece',
-                        'formatted_title' => $exactVariant->formatted_title,
-                        'size'            => $exactVariant->size,
-                        'colour'          => $exactVariant->colour,
-                        'selling_price'   => $exactVariant->selling_price,
-                        'stock_quantity'  => $exactVariant->getStockForBranch($branchName),
-                        'exact_match'     => true,
+                        'id'                  => $exactVariant->id,
+                        'sku'                 => $exactVariant->sku,
+                        'barcode'             => $exactVariant->barcode,
+                        'product_name'        => $exactVariant->product?->name ?? 'Product',
+                        'brand_name'          => $exactVariant->brand_name,
+                        'unit_of_measure'     => $exactVariant->unit_of_measure ?? 'Piece',
+                        'formatted_title'     => $exactVariant->formatted_title,
+                        'size'                => $exactVariant->size,
+                        'colour'              => $exactVariant->colour,
+                        'selling_price'       => $exactVariant->selling_price,
+                        'stock_quantity'      => $exactBranchStock,
+                        'other_branches_info' => $otherExactInfo,
+                        'exact_match'         => true,
                     ]
                 ]);
             }
@@ -130,19 +140,29 @@ class PosController extends Controller
             ->get();
 
         return response()->json($variants->map(function($variant) use ($branchName) {
+            $branchStock = $variant->getStockForBranch($branchName);
+            $otherInfo = '';
+            if ($branchStock <= 0 && $variant->branchStocks->isNotEmpty()) {
+                $other = $variant->branchStocks->filter(fn($bs) => $bs->quantity > 0 && $bs->branch_name !== $branchName);
+                if ($other->isNotEmpty()) {
+                    $otherInfo = $other->map(fn($o) => "{$o->branch_name} ({$o->quantity})")->join(', ');
+                }
+            }
+
             return [
-                'id'              => $variant->id,
-                'sku'             => $variant->sku,
-                'barcode'         => $variant->barcode,
-                'product_name'    => $variant->product?->name ?? 'Product',
-                'brand_name'      => $variant->brand_name,
-                'unit_of_measure' => $variant->unit_of_measure ?? 'Piece',
-                'formatted_title' => $variant->formatted_title,
-                'size'            => $variant->size,
-                'colour'          => $variant->colour,
-                'selling_price'   => $variant->selling_price,
-                'stock_quantity'  => $variant->getStockForBranch($branchName),
-                'exact_match'     => false,
+                'id'                  => $variant->id,
+                'sku'                 => $variant->sku,
+                'barcode'             => $variant->barcode,
+                'product_name'        => $variant->product?->name ?? 'Product',
+                'brand_name'          => $variant->brand_name,
+                'unit_of_measure'     => $variant->unit_of_measure ?? 'Piece',
+                'formatted_title'     => $variant->formatted_title,
+                'size'                => $variant->size,
+                'colour'              => $variant->colour,
+                'selling_price'       => $variant->selling_price,
+                'stock_quantity'      => $branchStock,
+                'other_branches_info' => $otherInfo,
+                'exact_match'         => false,
             ];
         }));
     }

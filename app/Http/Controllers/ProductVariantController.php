@@ -48,43 +48,30 @@ class ProductVariantController extends Controller
 
     /**
      * Generate a concise SKU abbreviation for a variant.
-     * Keeps SKUs clean, human-readable, and prevents repetition across all retail verticals.
-     * - Uniforms: Product "Accurate Sweater" (ACC-SW), Size 24, Colour "Navy Blue" -> "ACC-SW-24-NB"
-     * - Hardware/Agrovet: Brand "Bamburi", Product "Cement" (BAM-CEM), Unit "50kg" -> "BAM-CEM-50KG"
-     * - Single items: Product "Hammer" (HAM), Brand "Stanley" -> "HAM-STA" or "HAM-PCS"
+     * Generates: [PREFIX]-[SIZE]-[COLOUR]
+     * e.g. GWTS-24 or GWTS-24-NB
      */
-    private function generateVariantSku(Product $product, ?string $size = null, ?string $colour = null, ?string $unit = null, ?string $brand = null): string
+    private function generateVariantSku(Product $product, ?string $size = null, ?string $colour = null): string
     {
         $prefix = strtoupper(trim($product->sku_prefix ?: 'PRD'));
         $tokens = [];
-
-        if (!empty($brand)) {
-            $cleanBrand = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $brand));
-            $brandAbbr = substr($cleanBrand, 0, 3);
-            if (!empty($brandAbbr) && !str_contains($prefix, $brandAbbr)) {
-                $tokens[] = $brandAbbr;
-            }
-        }
 
         if (!empty($size)) {
             $cleanSize = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $size));
             if (!empty($cleanSize)) {
                 $tokens[] = $cleanSize;
             }
-        } elseif (!empty($unit) && !in_array(strtolower($unit), ['piece', 'pcs'])) {
-            $cleanUnit = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $unit));
-            if (!empty($cleanUnit)) {
-                $tokens[] = substr($cleanUnit, 0, 4);
-            }
         }
 
         if (!empty($colour) && strtolower($colour) !== 'standard') {
-            $normColour = strtolower(preg_replace('/[^a-z0-9]/', '', $colour));
-            $normProd   = strtolower(preg_replace('/[^a-z0-9]/', '', $product->name));
-            if (!empty($normColour) && $normColour !== $normProd && !str_contains($normProd, $normColour)) {
-                $words = preg_split('/\s+/', trim(preg_replace('/[^A-Za-z0-9\s]/', ' ', $colour)));
-                $abbr  = implode('', array_map(fn($w) => strtoupper(substr($w, 0, 1)), $words));
-                $tokens[] = substr($abbr, 0, 4);
+            $words = preg_split('/\s+/', trim($colour));
+            if (count($words) > 1) {
+                $abbr = implode('', array_map(fn($w) => strtoupper(substr($w, 0, 1)), $words));
+            } else {
+                $abbr = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $colour), 0, 4));
+            }
+            if (!empty($abbr)) {
+                $tokens[] = $abbr;
             }
         }
 
@@ -151,19 +138,15 @@ class ProductVariantController extends Controller
     public function store(Request $request, Product $product)
     {
         $validated = $request->validate([
-            'size'            => ['nullable', 'string', 'max:20'],
-            'colour'          => ['nullable', 'string', 'max:50'],
-            'unit_of_measure' => ['nullable', 'string', 'max:50'],
-            'brand_name'      => ['nullable', 'string', 'max:100'],
-            'selling_price'   => ['required', 'numeric', 'min:0'],
+            'size'          => ['nullable', 'string', 'max:20'],
+            'colour'        => ['nullable', 'string', 'max:50'],
+            'selling_price' => ['required', 'numeric', 'min:0'],
         ]);
 
         $size   = trim($validated['size'] ?? '') ?: null;
         $colour = trim($validated['colour'] ?? '') ?: null;
-        $unit   = trim($validated['unit_of_measure'] ?? '') ?: 'Piece';
-        $brand  = trim($validated['brand_name'] ?? '') ?: null;
 
-        $sku = $this->generateVariantSku($product, $size, $colour, $unit, $brand);
+        $sku = $this->generateVariantSku($product, $size, $colour);
         $barcode = 'BC-' . $sku;
 
         $product->variants()->create([
@@ -171,8 +154,7 @@ class ProductVariantController extends Controller
             'barcode'         => $barcode,
             'size'            => $size,
             'colour'          => $colour,
-            'unit_of_measure' => $unit,
-            'brand_name'      => $brand,
+            'unit_of_measure' => 'Pieces',
             'selling_price'   => $validated['selling_price'],
             'stock_quantity'  => 0,
         ]);
@@ -295,33 +277,27 @@ class ProductVariantController extends Controller
     public function update(Request $request, Product $product, ProductVariant $variant)
     {
         $validated = $request->validate([
-            'size'            => ['nullable', 'string', 'max:20'],
-            'colour'          => ['nullable', 'string', 'max:50'],
-            'unit_of_measure' => ['nullable', 'string', 'max:50'],
-            'brand_name'      => ['nullable', 'string', 'max:100'],
-            'selling_price'   => ['required', 'numeric', 'min:0'],
+            'size'          => ['nullable', 'string', 'max:20'],
+            'colour'        => ['nullable', 'string', 'max:50'],
+            'selling_price' => ['required', 'numeric', 'min:0'],
         ]);
 
         $size   = trim($validated['size'] ?? '') ?: null;
         $colour = trim($validated['colour'] ?? '') ?: null;
-        $unit   = trim($validated['unit_of_measure'] ?? '') ?: ($variant->unit_of_measure ?: 'Piece');
-        $brand  = trim($validated['brand_name'] ?? '') ?: null;
 
-        // If key attributes changed, compute a new SKU; otherwise keep the current SKU
+        // If size or colour changed, generate a clean updated SKU; otherwise retain the current SKU
         $sku = $variant->sku;
-        if ($size !== $variant->size || $colour !== $variant->colour || $unit !== $variant->unit_of_measure || $brand !== $variant->brand_name) {
-            $sku = $this->generateVariantSku($product, $size, $colour, $unit, $brand);
+        if ($size !== $variant->size || $colour !== $variant->colour) {
+            $sku = $this->generateVariantSku($product, $size, $colour);
         }
         $barcode = 'BC-' . $sku;
 
         $variant->update([
-            'sku'             => $sku,
-            'barcode'         => $barcode,
-            'size'            => $size,
-            'colour'          => $colour,
-            'unit_of_measure' => $unit,
-            'brand_name'      => $brand,
-            'selling_price'   => $validated['selling_price'],
+            'sku'           => $sku,
+            'barcode'       => $barcode,
+            'size'          => $size,
+            'colour'        => $colour,
+            'selling_price' => $validated['selling_price'],
         ]);
 
         return redirect()->route('products.variants.index', $product)
