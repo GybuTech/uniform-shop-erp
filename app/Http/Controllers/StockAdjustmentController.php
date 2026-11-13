@@ -122,60 +122,69 @@ class StockAdjustmentController extends Controller
         $stockFilter = $request->input('stock_filter', 'all');
 
         $categories = Category::withCount('products')->orderBy('name')->get();
-        $products = Product::orderBy('name')->get(['id', 'name', 'category_id']);
+        $productsList = Product::orderBy('name')->get(['id', 'name', 'category_id']);
         $branches = Branch::where('is_active', true)->pluck('name')->toArray();
         if (empty($branches)) {
             $branches = ['Main Branch', 'Branch 2 Sweaters', 'Branch 3 Sweaters'];
         }
 
-        $query = ProductVariant::with(['product.category']);
+        $query = Product::with(['category', 'variants' => function ($vq) {
+            $vq->with('branchStocks')->orderByRaw('CAST(size AS UNSIGNED), size');
+        }]);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('sku', 'like', "%{$search}%")
-                  ->orWhere('size', 'like', "%{$search}%")
-                  ->orWhere('colour', 'like', "%{$search}%")
-                  ->orWhereHas('product', function ($pq) use ($search) {
-                      $pq->where('name', 'like', "%{$search}%");
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku_prefix', 'like', "%{$search}%")
+                  ->orWhereHas('variants', function ($vq) use ($search) {
+                      $vq->where('sku', 'like', "%{$search}%")
+                         ->orWhere('size', 'like', "%{$search}%")
+                         ->orWhere('colour', 'like', "%{$search}%");
                   });
             });
         }
 
         if ($categoryId) {
-            $query->whereHas('product', function ($pq) use ($categoryId) {
-                $pq->where('category_id', $categoryId);
-            });
+            $query->where('category_id', $categoryId);
         }
 
         if ($productId) {
-            $query->where('product_id', $productId);
+            $query->where('id', $productId);
         }
 
         if ($stockFilter === 'zero') {
-            $query->where(function ($q) {
-                $q->whereNull('stock_quantity')->orWhere('stock_quantity', '<=', 0);
+            $query->whereHas('variants', function ($vq) {
+                $vq->whereNull('stock_quantity')->orWhere('stock_quantity', '<=', 0);
             });
         } elseif ($stockFilter === 'in_stock') {
-            $query->where('stock_quantity', '>', 0);
+            $query->whereHas('variants', function ($vq) {
+                $vq->where('stock_quantity', '>', 0);
+            });
         } elseif ($stockFilter === 'low') {
-            $query->whereBetween('stock_quantity', [1, 5]);
+            $query->whereHas('variants', function ($vq) {
+                $vq->whereBetween('stock_quantity', [1, 5]);
+            });
         }
 
         $user = auth()->user();
         $selectedBranch = $request->input('branch', $user->branch_name ?: ($branches[0] ?? 'Main Shop'));
 
-        $variants = $query->orderBy('product_id')->orderBy('size')->paginate(30)->withQueryString();
+        $perPage = $request->input('per_page', 15);
+        $limit = ($perPage === 'all' || $perPage == -1) ? 500 : max(5, (int)$perPage);
+
+        $products = $query->orderBy('name')->paginate($limit)->appends($request->query());
 
         return view('adjustments.edit_stock', compact(
-            'variants',
-            'categories',
             'products',
+            'categories',
+            'productsList',
             'branches',
             'selectedBranch',
             'search',
             'categoryId',
             'productId',
-            'stockFilter'
+            'stockFilter',
+            'perPage'
         ));
     }
 

@@ -54,14 +54,17 @@ class ProductController extends Controller
             $query->where('category_id', $categoryId);
         }
 
-        $products = $query->paginate(15)->withQueryString();
+        $perPageInput = $request->input('per_page', 25);
+        $perPage = ($perPageInput === 'all') ? 1000 : max(10, min(500, (int)$perPageInput));
+        $products = $query->paginate($perPage)->withQueryString();
+
         $categories = Category::orderBy('name')->get();
         $branches = Branch::where('is_active', true)->orderBy('name')->get();
         if ($branches->isEmpty()) {
             $branches = Branch::orderBy('name')->get();
         }
 
-        return view('products.index', compact('products', 'search', 'categories', 'categoryId', 'branches'));
+        return view('products.index', compact('products', 'search', 'categories', 'categoryId', 'branches', 'perPageInput'));
     }
 
     public function create()

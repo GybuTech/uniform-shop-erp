@@ -38,130 +38,66 @@
                 </div>
             @endif
 
-            {{-- Top Split: Quick Size Tier Update & Category Size Matrix --}}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                {{-- 1. Fast Update by Size: Sweaters with Badge & Categories --}}
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center space-x-3 mb-3">
-                            <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
-                                1
-                            </div>
-                            <div>
-                                <h3 class="font-extrabold text-slate-900 text-base">Sweaters with Badge & Size Tier Pricing</h3>
-                                <p class="text-xs text-slate-500">Update all variants of a specific size (e.g. all Sweaters with Badge Size 22 to KES 450)</p>
-                            </div>
+            {{-- Category & Uniform Size Price Matrix --}}
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div>
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm">
+                            1
                         </div>
-
-                        <form method="POST" action="{{ route('products.prices.by-size') }}" class="space-y-4 mt-4">
-                            @csrf
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Target Uniform Scope</label>
-                                <select name="target_type" class="w-full rounded-lg border-slate-300 text-sm font-bold text-indigo-950 focus:border-indigo-500 focus:ring focus:ring-indigo-200">
-                                    <option value="sweater_with_badge" selected>Sweaters with Badge (All products matching "badge")</option>
-                                    <option value="sweater_plain">Plain Sweaters (Without Badge)</option>
-                                    <option value="all">All Uniform Categories by Size</option>
-                                    <optgroup label="Or By Specific Category">
-                                        @foreach($categories as $category)
-                                            <option value="category_{{ $category->id }}">
-                                                {{ $category->name }} ({{ $category->products_count }} products)
-                                            </option>
-                                        @endforeach
-                                    </optgroup>
-                                </select>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Uniform Size</label>
-                                    <select name="size" class="w-full rounded-lg border-slate-300 text-sm font-bold text-indigo-600 focus:border-indigo-500 focus:ring focus:ring-indigo-200" required>
-                                        <option value="">-- Choose Size --</option>
-                                        @foreach($distinctSizes as $sz)
-                                            <option value="{{ $sz }}" {{ old('size') == $sz ? 'selected' : '' }}>Size {{ $sz }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">New Price (KES)</label>
-                                    <input type="number" step="0.01" min="0" name="selling_price" value="{{ old('selling_price') }}" placeholder="e.g. 450.00" class="w-full rounded-lg border-slate-300 text-sm font-bold text-slate-900 focus:border-indigo-500 focus:ring focus:ring-indigo-200" required>
-                                </div>
-                            </div>
-
-                            <div class="pt-2">
-                                <button type="submit" onclick="return confirm('Apply this price across all items matching the selected size and scope?');" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm shadow-sm transition flex items-center justify-center">
-                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                    Apply Price to Size Tier
-                                </button>
-                            </div>
-                        </form>
+                        <div>
+                            <h3 class="font-extrabold text-slate-900 text-base">Category & Uniform Size Price Matrix</h3>
+                            <p class="text-xs text-slate-500">Set the full price progression across standard sizes for any uniform category (sweaters, tracksuits, fleece jackets, skirts, shirts).</p>
+                        </div>
                     </div>
-                </div>
 
-                {{-- 2. Category Size Matrix (Multi-size Ladder) --}}
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center space-x-3 mb-3">
-                            <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm">
-                                2
-                            </div>
-                            <div>
-                                <h3 class="font-extrabold text-slate-900 text-base">Sweaters & Category Size Matrix</h3>
-                                <p class="text-xs text-slate-500">Set the full price progression across standard sizes in 1 submission</p>
-                            </div>
-                        </div>
-
-                        <form method="POST" action="{{ route('products.prices.matrix') }}" class="space-y-4 mt-4">
-                            @csrf
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Select Target Scope to Price</label>
-                                <select name="target_type" class="w-full rounded-lg border-slate-300 text-sm font-semibold focus:border-emerald-500 focus:ring focus:ring-emerald-200" required>
-                                    <option value="sweater_with_badge" selected>Sweaters with Badge (Full Size Matrix)</option>
-                                    <option value="sweater_plain">Plain Sweaters (Without Badge)</option>
-                                    <optgroup label="Or By Category">
-                                        @foreach($categories as $category)
-                                            <option value="cat_{{ $category->id }}">
-                                                {{ $category->name }} ({{ $category->products_count }} products)
-                                            </option>
-                                        @endforeach
-                                    </optgroup>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Size Prices (KES)</label>
-                                <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                                    @foreach($matrixSizes as $ms)
-                                    <div class="bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-center">
-                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">Sz {{ $ms }}</span>
-                                        <input type="number" step="0.01" min="0" name="matrix[{{ $ms }}]" placeholder="KES" class="w-full text-center p-1 text-xs font-bold rounded border-slate-300 focus:ring-0">
-                                    </div>
+                    <form method="POST" action="{{ route('products.prices.matrix') }}" class="space-y-4 mt-4">
+                        @csrf
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Select Target Scope to Price</label>
+                            <select name="target_type" class="w-full rounded-lg border-slate-300 text-sm font-semibold focus:border-emerald-500 focus:ring focus:ring-emerald-200" required>
+                                <option value="sweater_with_badge" selected>Sweaters with Badge (Full Size Matrix)</option>
+                                <option value="sweater_plain">Plain Sweaters (Without Badge)</option>
+                                <optgroup label="Or By Category">
+                                    @foreach($categories as $category)
+                                        <option value="cat_{{ $category->id }}">
+                                            {{ $category->name }} ({{ $category->products_count }} products)
+                                        </option>
                                     @endforeach
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Size Prices (KES)</label>
+                            <div class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
+                                @foreach($matrixSizes as $ms)
+                                <div class="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
+                                    <span class="block text-[11px] font-bold text-slate-600 mb-1">Sz {{ $ms }}</span>
+                                    <input type="number" step="0.01" min="0" name="matrix[{{ $ms }}]" value="{{ old('matrix.'.$ms, 0) }}" placeholder="0.00" class="w-full text-center p-1 text-xs font-bold rounded border-slate-300 focus:ring-0">
                                 </div>
+                                @endforeach
                             </div>
+                        </div>
 
-                            <div class="pt-2">
-                                <button type="submit" onclick="return confirm('Apply this price matrix to all products in the selected scope?');" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-sm shadow-sm transition flex items-center justify-center">
-                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Save Size Matrix
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                        <div class="pt-2 flex justify-end">
+                            <button type="submit" onclick="return confirm('Apply this price matrix to all products in the selected scope?');" class="py-2.5 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-sm shadow-sm transition flex items-center justify-center">
+                                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Save Size Matrix
+                            </button>
+                        </div>
+                    </form>
                 </div>
-
             </div>
 
-            {{-- 3. Size Range Group Pricing (e.g. 22-26 @ 900, 28-30 @ 1000) --}}
+            {{-- 2. Size Range Group Pricing (e.g. 22-26 @ 900, 28-30 @ 1000) --}}
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4" x-data="priceGroupsManager()">
                 <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-100">
                     <div class="flex items-center space-x-3">
                         <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
-                            3
+                            2
                         </div>
                         <div>
                             <h3 class="font-extrabold text-slate-900 text-base">Size Range Group Pricing</h3>
@@ -181,32 +117,20 @@
                 <form method="POST" action="{{ route('products.prices.groups') }}" class="space-y-4">
                     @csrf
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Target Uniform Scope</label>
-                            <select name="target_type" class="w-full rounded-lg border-slate-300 text-xs font-bold text-indigo-950 focus:border-purple-500 focus:ring focus:ring-purple-200">
-                                <option value="sweater_with_badge" selected>Sweaters with Badge (All products matching "badge")</option>
-                                <option value="sweater_plain">Plain Sweaters (Without Badge)</option>
-                                <option value="all">All Uniform Categories</option>
-                                <optgroup label="Or By Category">
-                                    @foreach($categories as $category)
-                                        <option value="category_{{ $category->id }}">
-                                            {{ $category->name }} ({{ $category->products_count }} products)
-                                        </option>
-                                    @endforeach
-                                </optgroup>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Or Specific Single Product (Optional)</label>
-                            <select name="product_id" class="w-full rounded-lg border-slate-300 text-xs font-medium focus:border-purple-500 focus:ring focus:ring-purple-200">
-                                <option value="">-- Apply to selected scope above --</option>
-                                @foreach($products as $prod)
-                                    <option value="{{ $prod->id }}">{{ $prod->name }} ({{ $prod->sku_prefix }})</option>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Target Uniform Scope</label>
+                        <select name="target_type" class="w-full rounded-lg border-slate-300 text-xs font-bold text-indigo-950 focus:border-purple-500 focus:ring focus:ring-purple-200">
+                            <option value="sweater_with_badge" selected>Sweaters with Badge (All products matching "badge")</option>
+                            <option value="sweater_plain">Plain Sweaters (Without Badge)</option>
+                            <option value="all">All Uniform Categories</option>
+                            <optgroup label="Or By Category">
+                                @foreach($categories as $category)
+                                    <option value="category_{{ $category->id }}">
+                                        {{ $category->name }} ({{ $category->products_count }} products)
+                                    </option>
                                 @endforeach
-                            </select>
-                        </div>
+                            </optgroup>
+                        </select>
                     </div>
 
                     {{-- Group Range Rows --}}
@@ -292,19 +216,19 @@
                     {{-- Quick Filter Pills --}}
                     <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60">
                         <span class="text-xs font-bold text-slate-500 mr-1">Quick Select:</span>
-                        <a href="{{ route('products.prices', ['filter_type' => 'all']) }}"
+                        <a href="{{ route('products.prices', array_merge(request()->query(), ['filter_type' => 'all', 'page' => 1])) }}"
                            class="px-3 py-1 rounded-full text-xs font-bold transition {{ $filterType === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200' }}">
                             All Uniforms
                         </a>
-                        <a href="{{ route('products.prices', ['filter_type' => 'sweater_badge']) }}"
+                        <a href="{{ route('products.prices', array_merge(request()->query(), ['filter_type' => 'sweater_badge', 'page' => 1])) }}"
                            class="px-3 py-1 rounded-full text-xs font-bold transition {{ $filterType === 'sweater_badge' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200' }}">
                             Sweaters with Badge
                         </a>
-                        <a href="{{ route('products.prices', ['filter_type' => 'sweater_plain']) }}"
+                        <a href="{{ route('products.prices', array_merge(request()->query(), ['filter_type' => 'sweater_plain', 'page' => 1])) }}"
                            class="px-3 py-1 rounded-full text-xs font-bold transition {{ $filterType === 'sweater_plain' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200' }}">
                             Plain Sweaters
                         </a>
-                        <a href="{{ route('products.prices', ['filter_type' => 'tracksuits']) }}"
+                        <a href="{{ route('products.prices', array_merge(request()->query(), ['filter_type' => 'tracksuits', 'page' => 1])) }}"
                            class="px-3 py-1 rounded-full text-xs font-bold transition {{ $filterType === 'tracksuits' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200' }}">
                             Tracksuits
                         </a>
@@ -423,10 +347,10 @@
         function priceGroupsManager() {
             return {
                 groups: [
-                    { from_size: '22', to_size: '26', price: 900 },
-                    { from_size: '28', to_size: '30', price: 1000 },
-                    { from_size: '32', to_size: '36', price: 1100 },
-                    { from_size: '38', to_size: '42', price: 1250 }
+                    { from_size: '22', to_size: '26', price: 0 },
+                    { from_size: '28', to_size: '30', price: 0 },
+                    { from_size: '32', to_size: '36', price: 0 },
+                    { from_size: '38', to_size: '42', price: 0 }
                 ],
                 addGroupRow() {
                     this.groups.push({ from_size: '', to_size: '', price: 0 });
@@ -438,10 +362,10 @@
                 },
                 loadSchoolUniformPresets() {
                     this.groups = [
-                        { from_size: '22', to_size: '26', price: 900 },
-                        { from_size: '28', to_size: '30', price: 1000 },
-                        { from_size: '32', to_size: '36', price: 1100 },
-                        { from_size: '38', to_size: '42', price: 1250 }
+                        { from_size: '22', to_size: '26', price: 0 },
+                        { from_size: '28', to_size: '30', price: 0 },
+                        { from_size: '32', to_size: '36', price: 0 },
+                        { from_size: '38', to_size: '42', price: 0 }
                     ];
                 }
             };
