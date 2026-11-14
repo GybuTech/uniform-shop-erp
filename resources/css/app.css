@@ -1,3 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Global Input Caret and Cursor Visibility Fix */
+input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+textarea,
+[contenteditable="true"] {
+    caret-color: #4f46e5 !important;
+    cursor: text !important;
+}
+
+button,
+input[type="button"],
+input[type="submit"],
+input[type="checkbox"],
+input[type="radio"],
+select {
+    cursor: pointer;
+}
+
+.pointer-events-none {
+    pointer-events: none !important;
+}

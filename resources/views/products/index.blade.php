@@ -86,19 +86,19 @@
                 <div class="bg-white px-4 py-3 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 text-center text-xs">
                     <div class="pr-4 py-1">
                         <div class="text-2xl font-black {{ $impCategories > 0 ? 'text-indigo-600' : 'text-gray-300' }}">{{ number_format($impCategories) }}</div>
-                        <div class="text-gray-500 mt-0.5">📂 Categories</div>
+                        <div class="text-gray-500 mt-0.5">Categories</div>
                     </div>
                     <div class="px-4 py-1">
                         <div class="text-2xl font-black {{ $impProducts > 0 ? 'text-indigo-600' : 'text-gray-300' }}">{{ number_format($impProducts) }}</div>
-                        <div class="text-gray-500 mt-0.5">📦 New Products</div>
+                        <div class="text-gray-500 mt-0.5">New Products</div>
                     </div>
                     <div class="px-4 py-1">
                         <div class="text-2xl font-black {{ $impVariants > 0 ? 'text-emerald-600' : 'text-gray-300' }}">{{ number_format($impVariants) }}</div>
-                        <div class="text-gray-500 mt-0.5">✅ New Variants</div>
+                        <div class="text-gray-500 mt-0.5">New Variants</div>
                     </div>
                     <div class="pl-4 py-1">
                         <div class="text-2xl font-black {{ $impSkipped > 0 ? 'text-amber-600' : 'text-gray-300' }}">{{ number_format($impSkipped) }}</div>
-                        <div class="text-gray-500 mt-0.5">⚠️ Skipped</div>
+                        <div class="text-gray-500 mt-0.5">Skipped</div>
                     </div>
                 </div>
 
@@ -185,20 +185,60 @@
                     </div>
                 </form>
 
-                <div class="mt-2.5 pt-2 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+                <div class="mt-2.5 pt-2 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs text-gray-500">
                     <span>
                         Showing {{ $products->firstItem() ?? 0 }}-{{ $products->lastItem() ?? 0 }} of {{ $products->total() }} products
                         @if($search)
                             for query <strong class="text-indigo-600">"{{ $search }}"</strong>
                         @endif
                     </span>
+
+                    {{-- Per Page Dropdown & Exports --}}
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                        <div class="flex items-center space-x-1.5">
+                            <label for="productPerPage" class="font-bold text-gray-600">Show:</label>
+                            <select id="productPerPage" onchange="changeDataTablePerPage(this.value)"
+                                    class="py-1 px-2.5 text-xs font-bold rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="25" {{ ($perPageInput ?? 25) == 25 ? 'selected' : '' }}>25</option>
+                                <option value="50" {{ ($perPageInput ?? 25) == 50 ? 'selected' : '' }}>50</option>
+                                <option value="100" {{ ($perPageInput ?? 25) == 100 ? 'selected' : '' }}>100</option>
+                                <option value="all" {{ ($perPageInput ?? 25) === 'all' ? 'selected' : '' }}>All</option>
+                            </select>
+                        </div>
+
+                        {{-- Instant Live Filter on Visible Rows --}}
+                        <div class="relative">
+                            <input type="text" id="productInstantFilter" onkeyup="instantFilterTable(this.value, 'productsDataTable')"
+                                   placeholder="Filter on page..."
+                                   class="py-1 pl-7 pr-2.5 text-xs rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-40 sm:w-48 placeholder-gray-400">
+                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+
+                        {{-- Export Toolbar --}}
+                        <div class="flex items-center space-x-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                            <button type="button" onclick="exportTableToCSV('productsDataTable', 'products_catalog.csv')"
+                                    class="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded text-xs transition shadow-2xs">
+                                CSV
+                            </button>
+                            <button type="button" onclick="exportTableToCSV('productsDataTable', 'products_catalog.xlsx')"
+                                    class="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded text-xs transition shadow-2xs">
+                                Excel
+                            </button>
+                            <button type="button" onclick="printDataTable('productsDataTable', 'GybuTech Products Catalog')"
+                                    class="px-2.5 py-1 bg-white hover:bg-slate-50 text-blue-700 font-bold rounded text-xs transition shadow-2xs">
+                                Print
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {{-- Products Table --}}
             <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 text-left">
+                    <table id="productsDataTable" class="min-w-full divide-y divide-gray-200 text-left">
                         <thead class="bg-gray-50 text-gray-600 text-xs font-bold uppercase tracking-wider">
                             <tr>
                                 <th class="px-5 py-3 w-12">#</th>
@@ -304,8 +344,8 @@
                     </div>
                 </div>
 
-                <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 space-y-1.5">
-                    <p class="font-bold">📊 Two formats supported — your file will be detected automatically:</p>
+                <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 space-y-1.5">
+                    <p class="font-bold">Two formats supported — your file will be detected automatically:</p>
                     <div class="space-y-1 text-[11px]">
                         <div class="bg-white border border-indigo-100 rounded p-2">
                             <p class="font-bold text-indigo-800">① Your actual stock sheets (wide format)</p>
@@ -509,5 +549,98 @@
                 setFile(file);
             });
         })();
+
+        // Universal DataTable Helpers
+        function changeDataTablePerPage(val) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('per_page', val);
+            url.searchParams.delete('page');
+            window.location.href = url.toString();
+        }
+
+        function instantFilterTable(query, tableId) {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+            const rows = table.querySelectorAll('tbody tr');
+            const q = query.trim().toLowerCase();
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                if (!q || text.includes(q)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function exportTableToCSV(tableId, filename) {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+
+            let csv = [];
+            const rows = table.querySelectorAll('tr');
+
+            rows.forEach(row => {
+                if (row.style.display === 'none') return;
+                let rowData = [];
+                const cols = row.querySelectorAll('th, td');
+                const totalCols = cols.length;
+                cols.forEach((col, idx) => {
+                    if (idx === totalCols - 1 && (col.textContent.includes('Actions') || col.querySelector('a, button'))) {
+                        return;
+                    }
+                    let data = col.innerText.replace(/(\r\n|\n|\r)/gm, ' ').replace(/\s+/g, ' ').trim();
+                    data = data.replace(/"/g, '""');
+                    rowData.push('"' + data + '"');
+                });
+                if (rowData.length > 0) {
+                    csv.push(rowData.join(','));
+                }
+            });
+
+            const csvString = '\uFEFF' + csv.join('\r\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename || 'export.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function printDataTable(tableId, title) {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+
+            const printWin = window.open('', '_blank', 'width=900,height=700');
+            printWin.document.write(`
+                <html>
+                <head>
+                    <title>${title || 'Export'}</title>
+                    <style>
+                        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; color: #1e293b; }
+                        h2 { margin-bottom: 4px; }
+                        p { font-size: 12px; color: #64748b; margin-top: 0; margin-bottom: 16px; }
+                        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                        th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
+                        th { background: #f1f5f9; font-weight: bold; }
+                        tr:nth-child(even) { background: #f8fafc; }
+                        th:last-child, td:last-child { display: none; }
+                    </style>
+                </head>
+                <body>
+                    <h2>${title || 'GybuTech POS Report'}</h2>
+                    <p>Printed on: ${new Date().toLocaleString()} &bull; Store: GybuTech Uniforms ERP</p>
+                    ${table.outerHTML}
+                    <script>
+                        window.onload = function() { window.print(); window.close(); };
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWin.document.close();
+        }
     </script>
 </x-app-layout>
