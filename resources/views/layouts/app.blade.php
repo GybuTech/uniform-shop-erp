@@ -28,6 +28,27 @@
                 font-family: 'Plus Jakarta Sans', sans-serif;
             }
 
+            /* Global Input Caret and Cursor Visibility Fix */
+            input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+            textarea,
+            [contenteditable="true"] {
+                caret-color: #2563eb !important;
+                cursor: text !important;
+            }
+
+            button,
+            input[type="button"],
+            input[type="submit"],
+            input[type="checkbox"],
+            input[type="radio"],
+            select {
+                cursor: pointer;
+            }
+
+            .pointer-events-none {
+                pointer-events: none !important;
+            }
+
             /* Print Stylesheet: cleanly hides navigation, sidebar, on-screen action buttons when printing */
             @media print {
                 .no-print, header, aside, nav, .card-tools, button:not(.printable), .btn-action, form.filter-form {
@@ -96,7 +117,7 @@
             }
         </style>
     </head>
-    <body class="font-sans antialiased text-slate-800 bg-slate-100 selection:bg-indigo-500 selection:text-white"
+    <body class="font-sans antialiased text-slate-800 bg-slate-100 selection:bg-blue-600 selection:text-white"
           x-data="{
               sidebarOpen: window.innerWidth >= 1024,
               toggleSidebar() { this.sidebarOpen = !this.sidebarOpen; }
@@ -129,25 +150,44 @@
                             @endisset
                         </div>
 
-                        <!-- Official Anti-Tamper Server Clock -->
-                        <div class="hidden lg:flex items-center space-x-2 bg-slate-100/90 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono select-none" title="Official Tamper-Proof Operational Business Time">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span class="font-bold text-slate-500 text-[10px] uppercase">Business Time:</span>
-                            <span id="liveServerClockDisplay" class="font-bold text-slate-900">{{ \App\Services\SystemTime::now()->format('Y-m-d H:i:s') }}</span>
-                            <span class="text-[9px] bg-slate-200 text-slate-600 px-1 py-0.5 rounded font-sans font-bold">EAT</span>
+                        <!-- Modern Top Utility Bar -->
+                        <div class="mr-3">
+                            @include('layouts.top_utility_bar')
                         </div>
 
-                        <!-- Right User Badge & Quick Profile Link -->
-                        <div class="flex items-center space-x-4 pl-4 border-l border-slate-200">
-                            <a href="{{ route('profile.edit') }}" class="flex items-center space-x-3 p-1.5 rounded-lg hover:bg-slate-100 transition">
-                                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 text-white font-bold flex items-center justify-center text-xs shadow-sm">
-                                    {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 2)) }}
+                        <!-- User Greeting & Profile (UltimatePOS Style) -->
+                        <div class="flex items-center space-x-3 pl-3 border-l border-slate-200" x-data="{ userMenuOpen: false }">
+                            <div class="text-right hidden sm:block">
+                                <span class="block text-[11px] font-medium text-slate-500 leading-tight">Welcome,</span>
+                                <span class="block text-xs font-bold text-slate-800 leading-tight">{{ Auth::user()->name ?? 'User' }}</span>
+                            </div>
+                            <div class="relative">
+                                <button @click="userMenuOpen = !userMenuOpen" @click.away="userMenuOpen = false" type="button"
+                                        class="flex items-center space-x-1.5 p-1 rounded-lg hover:bg-slate-100 transition focus:outline-none">
+                                    <div class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shadow-xs">
+                                        {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 2)) }}
+                                    </div>
+                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+                                <div x-show="userMenuOpen" x-cloak
+                                     class="absolute right-0 mt-2 w-48 rounded-xl bg-white shadow-lg border border-slate-200 py-1 z-50 text-xs">
+                                    <div class="px-4 py-2 border-b border-slate-100">
+                                        <div class="font-bold text-slate-800">{{ Auth::user()->name }}</div>
+                                        <div class="text-[11px] text-slate-500 capitalize">{{ Auth::user()->roles->first()?->name ?? 'Staff' }}</div>
+                                    </div>
+                                    <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-slate-700 hover:bg-slate-50 transition">
+                                        Profile Settings
+                                    </a>
+                                    <form method="POST" action="{{ route('logout') }}">
+                                        @csrf
+                                        <button type="submit" class="w-full text-left px-4 py-2 text-rose-600 hover:bg-rose-50 transition font-semibold">
+                                            Log Out
+                                        </button>
+                                    </form>
                                 </div>
-                                <div class="hidden md:block text-left">
-                                    <span class="block text-xs font-bold text-slate-900 leading-none">{{ Auth::user()->name ?? 'User' }}</span>
-                                    <span class="text-[11px] text-slate-500 leading-tight font-semibold capitalize">{{ Auth::user()->roles->first()?->name ?? 'Staff' }}</span>
-                                </div>
-                            </a>
+                            </div>
                         </div>
                     </div>
                 </header>
