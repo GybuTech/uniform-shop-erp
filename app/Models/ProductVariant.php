@@ -83,7 +83,16 @@ class ProductVariant extends Model
             ->where('branch_name', trim($branchName))
             ->first();
 
-        return $bs ? (float) $bs->stock_quantity : 0.00;
+        if ($bs) {
+            return (float) $bs->stock_quantity;
+        }
+
+        // Fallback: If no branch stocks record exists for this variant, use baseline stock_quantity
+        if ($this->branchStocks()->count() === 0) {
+            return (float) $this->stock_quantity;
+        }
+
+        return 0.00;
     }
 
     /**
@@ -119,6 +128,12 @@ class ProductVariant extends Model
         $branch = Branch::where('name', trim($branchName))->first()
             ?? Branch::firstOrCreate(['name' => trim($branchName)], ['code' => 'BR-' . rand(10, 99)]);
 
+        // If no branch_stocks record exists, initialize with existing variant stock_quantity
+        $initialQty = 0.00;
+        if ($this->branchStocks()->count() === 0 && (float)$this->stock_quantity > 0) {
+            $initialQty = (float) $this->stock_quantity;
+        }
+
         $bs = BranchStock::firstOrCreate(
             [
                 'branch_id'          => $branch->id,
@@ -126,7 +141,7 @@ class ProductVariant extends Model
             ],
             [
                 'branch_name'        => $branch->name,
-                'stock_quantity'     => 0.00,
+                'stock_quantity'     => $initialQty,
             ]
         );
 
