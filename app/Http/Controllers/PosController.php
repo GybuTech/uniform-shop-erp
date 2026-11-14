@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\BusinessSetting;
+use App\Models\Category;
 use App\Models\Customer;
 use App\Models\ProductVariant;
 use App\Models\Quotation;
@@ -224,8 +225,10 @@ class PosController extends Controller
                     }
 
                     $qty = (float) $item['quantity'];
-                    if ($variant->stock_quantity < $qty) {
-                        throw new \Exception("Insufficient stock for {$variant->sku}. Available: {$variant->stock_quantity}, Requested: {$qty}");
+                    $branchStock = $variant->getStockForBranch($branchName);
+                    $effectiveStock = max($branchStock, (float) $variant->stock_quantity);
+                    if ($effectiveStock < $qty) {
+                        throw new \Exception("Insufficient stock for {$variant->sku}. Available: {$effectiveStock}, Requested: {$qty}");
                     }
 
                     $unitPrice = round($variant->selling_price * $tierMultiplier, 2);
@@ -491,10 +494,22 @@ class PosController extends Controller
             }
         }
 
-        $sales = $query->latest()->paginate(15);
+        $statusFilter = $request->get('status');
+        if ($statusFilter === 'credit') {
+            $query->where(function($q) {
+                $q->where('payment_status', 'credit')->orWhere('payment_method', 'Credit');
+            });
+        } elseif ($statusFilter) {
+            $query->where('payment_status', $statusFilter);
+        }
+
+        $perPageInput = $request->get('per_page', 25);
+        $perPage = ($perPageInput === 'all') ? 1000 : max(10, min(500, (int)$perPageInput));
+
+        $sales = $query->latest()->paginate($perPage)->appends($request->query());
         $branches = Branch::where('is_active', true)->orderBy('name')->pluck('name');
 
-        return view('sales.index', compact('sales', 'search', 'branchFilter', 'branches', 'lockedBranch'));
+        return view('sales.index', compact('sales', 'search', 'branchFilter', 'branches', 'lockedBranch', 'perPageInput', 'statusFilter'));
     }
 
     public function salesShow(Sale $sale)

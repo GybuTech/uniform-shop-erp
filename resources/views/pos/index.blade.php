@@ -64,12 +64,13 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
 
             {{-- Checkout Error Notice --}}
-            @if($errors->has('pos_error'))
+            @if($errors->any())
                 <div class="bg-rose-50 border-l-4 border-rose-500 text-rose-800 p-4 rounded-lg shadow-sm text-xs font-medium flex justify-between items-center">
                     <div>
                         <strong class="font-bold">Checkout Notice:</strong>
-                        <span>{{ $errors->first('pos_error') }}</span>
+                        <span>{{ $errors->first('pos_error') ?: $errors->first() }}</span>
                     </div>
+                    <button type="button" onclick="this.parentElement.remove()" class="text-rose-500 hover:text-rose-700 font-bold ml-4">✕</button>
                 </div>
             @endif
 
@@ -108,13 +109,13 @@
                         </div>
                     </div>
 
-                    {{-- Search Results Container --}}
+                    {{-- Search Results Container (Pure Search & Fast Barcode Scan) --}}
                     <div id="searchResults" class="space-y-2 flex-1 overflow-y-auto max-h-[580px] pr-1">
                         <div class="text-center py-16">
-                            <svg class="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-12 h-12 mx-auto text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
-                            <p class="text-gray-400 text-xs">Scan a barcode with your handheld scanner, or type 2+ characters to search products.</p>
+                            <p class="text-slate-400 text-xs">Scan a barcode with your scanner, or type 2+ characters to search products.</p>
                         </div>
                     </div>
                 </div>
@@ -212,12 +213,12 @@
                         </div>
                     </div>
 
-                    {{-- Bottom Anchored Section --}}
+                    {{-- Bottom Anchored Section: High-Speed Checkout Bar --}}
                     <div>
                         {{-- Massive Anchor Total Display --}}
                         <div class="bg-slate-900 border border-slate-800 text-white rounded-xl p-3.5 shadow-md mb-3">
                             <div class="flex justify-between items-center text-xs text-slate-400 font-semibold mb-1">
-                                <span>TOTAL AMOUNT DUE</span>
+                                <span class="uppercase tracking-wider">TOTAL AMOUNT PAYABLE</span>
                                 <span id="bannerTierBadge" class="bg-indigo-600/60 text-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Retail</span>
                             </div>
                             <div class="flex justify-between items-baseline">
@@ -226,105 +227,177 @@
                             </div>
                         </div>
 
-                        {{-- Payment Method Selection --}}
-                        <div class="mb-3">
-                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Payment Channel *</label>
-                            <select id="paymentMethod" onchange="onPaymentMethodChange(this.value)"
-                                class="block w-full border-gray-300 rounded-lg shadow-sm text-xs font-bold text-gray-800 focus:ring-indigo-500 focus:border-indigo-500">
-                                <option value="Cash">Cash (Immediate Collection)</option>
-                                <option value="M-Pesa">M-Pesa (Mobile Money Till / Paybill)</option>
-                                <option value="Split">Multiple Pay (Split Cash + M-Pesa)</option>
-                                <option value="Card">Bank Card / Debit</option>
-                                <option value="Credit">Credit Sale (On-Account / Customer Debt Ledger)</option>
-                            </select>
-                        </div>
+                        {{-- HIGH-SPEED CHECKOUT BAR --}}
+                        <div class="space-y-2 mb-2">
+                            {{-- Row 1: Instant Primary Channels --}}
+                            <div class="grid grid-cols-2 gap-2">
+                                {{-- 1. CASH (Emerald Green) --}}
+                                <button type="button" id="btnFastCash" onclick="triggerFastCashCheckout()"
+                                    class="py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs shadow-md transition flex items-center justify-center space-x-2">
+                                    <svg class="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    <span>CASH (Enter)</span>
+                                </button>
 
-                        {{-- M-Pesa Counter Confirmation & Reference Code (Visible when M-Pesa or Split selected) --}}
-                        <div id="mpesaRefPanel" class="hidden mb-3 p-3 bg-emerald-50/80 border border-emerald-300 rounded-xl space-y-1.5">
-                            <div class="flex justify-between items-center">
-                                <label for="paymentReferenceInput" class="block text-[11px] font-bold text-emerald-950 uppercase tracking-wider">
-                                    M-Pesa SMS Code / Ref
-                                </label>
-                                @if($till = \App\Models\BusinessSetting::get('mpesa_till_number'))
-                                    <span class="text-[10px] bg-emerald-200 text-emerald-900 font-mono font-bold px-1.5 py-0.5 rounded">Till: {{ $till }}</span>
-                                @elseif($paybill = \App\Models\BusinessSetting::get('mpesa_paybill_number'))
-                                    <span class="text-[10px] bg-emerald-200 text-emerald-900 font-mono font-bold px-1.5 py-0.5 rounded">Paybill: {{ $paybill }}</span>
-                                @endif
-                            </div>
-                            <input type="text" id="paymentReferenceInput" placeholder="e.g. TKI459032X (from shop phone SMS)" maxlength="30"
-                                   class="w-full text-xs font-mono font-bold uppercase rounded-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 py-1.5 px-2 bg-white text-gray-800">
-                            <p class="text-[10px] text-emerald-700 leading-tight">Confirm SMS on the business phone, then record the code here to print on customer receipt.</p>
-                        </div>
-
-                        {{-- Split Payment Inline Summary Box (visible when Split selected) --}}
-                        <div id="splitPaymentPanel" class="hidden mb-3 p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-2">
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs font-bold text-indigo-900">Multiple Pay Split Breakdown</span>
-                                <button type="button" onclick="openSplitPaymentModal()" class="text-xs text-indigo-600 hover:text-indigo-800 font-bold hover:underline">
-                                    Configure &rarr;
+                                {{-- 2. M-PESA (Safaricom Green) --}}
+                                <button type="button" id="btnFastMpesa" onclick="triggerFastMpesaCheckout()"
+                                    class="py-3 px-3 rounded-xl bg-[#00a651] hover:bg-[#008f45] active:scale-95 text-white font-extrabold text-xs shadow-md transition flex items-center justify-center space-x-2">
+                                    <svg class="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                    <span>M-PESA (F8)</span>
                                 </button>
                             </div>
-                            <div class="grid grid-cols-2 gap-2 text-xs">
-                                <div class="bg-white p-2 rounded border">
-                                    <span class="text-[10px] text-gray-500 block uppercase font-bold">Cash Portion</span>
-                                    <span id="splitCashDisplay" class="font-bold text-gray-900 font-mono">KES 0.00</span>
-                                </div>
-                                <div class="bg-white p-2 rounded border">
-                                    <span class="text-[10px] text-gray-500 block uppercase font-bold">M-Pesa Portion</span>
-                                    <span id="splitMpesaDisplay" class="font-bold text-gray-900 font-mono">KES 0.00</span>
-                                </div>
+
+                            {{-- Row 2: Secondary Channels (3 Columns, No Log) --}}
+                            <div class="grid grid-cols-3 gap-2">
+                                {{-- 3. SPLIT PAY --}}
+                                <button type="button" onclick="openSplitPaymentModal()"
+                                    class="py-2.5 px-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs shadow-xs transition flex items-center justify-center space-x-1.5 active:scale-95">
+                                    <svg class="w-3.5 h-3.5 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                    </svg>
+                                    <span>SPLIT PAY</span>
+                                </button>
+
+                                {{-- 4. CREDIT SALE --}}
+                                <button type="button" onclick="triggerCreditSale()"
+                                    class="py-2.5 px-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center space-x-1.5 active:scale-95">
+                                    <svg class="w-3.5 h-3.5 text-amber-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <span>CREDIT</span>
+                                </button>
+
+                                {{-- 5. QUOTATION --}}
+                                <button type="button" onclick="generatePosQuotation()"
+                                    class="py-2.5 px-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs shadow-xs transition flex items-center justify-center space-x-1.5 active:scale-95">
+                                    <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <span>QUOTE</span>
+                                </button>
                             </div>
-                            <p id="splitBalanceStatus" class="text-[11px] font-bold text-amber-600">Balance remaining: KES 0.00</p>
                         </div>
 
-                        {{-- Credit Notice Box (visible when Credit selected) --}}
-                        <div id="creditNoticePanel" class="hidden mb-3 p-2.5 bg-amber-50 border border-amber-300 text-amber-800 rounded-lg text-xs">
-                            <span class="font-bold block">Credit / Debt Ledger Sale:</span>
-                            <span id="creditCustomerNotice">Stock will be decremented and the total will post to the customer's outstanding balance statement.</span>
-                        </div>
-
-                        {{-- Secondary Actions Row: Park Sale & Quotation Mode --}}
-                        <div class="grid grid-cols-2 gap-2 mb-2">
-                            <button type="button" onclick="parkCurrentSale()"
-                                class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 px-3 rounded-lg text-xs transition border border-slate-300 flex items-center justify-center space-x-1">
-                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>Suspend / Park</span>
-                            </button>
-
-                            <button type="button" onclick="generatePosQuotation()"
-                                class="w-full bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold py-2 px-3 rounded-lg text-xs transition border border-sky-300 flex items-center justify-center space-x-1">
-                                <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <span>Create Quotation</span>
-                            </button>
-                        </div>
-
-                        {{-- Checkout Submit Form --}}
+                        {{-- Hidden Core Checkout Form --}}
                         <form id="checkoutForm" method="POST" action="{{ route('pos.store') }}" onsubmit="return validateCheckout()">
                             @csrf
                             <div id="hiddenInputs"></div>
                             <input type="hidden" name="customer_id" id="formCustomerId">
-                            <input type="hidden" name="payment_method" id="formPaymentMethod">
+                            <input type="hidden" name="payment_method" id="formPaymentMethod" value="Cash">
                             <input type="hidden" name="pricing_tier" id="formPricingTier" value="retail">
                             <input type="hidden" name="cash_amount" id="formCashAmount" value="0">
                             <input type="hidden" name="mpesa_amount" id="formMpesaAmount" value="0">
                             <input type="hidden" name="payment_reference" id="formPaymentReference">
                             <input type="hidden" name="branch_name" id="formBranchName">
-
-                            <button type="submit" id="checkoutBtn" disabled
-                                class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-extrabold py-3 px-4 rounded-xl shadow transition text-sm tracking-wide flex items-center justify-center space-x-2">
-                                <span id="checkoutBtnText">Complete Sale</span>
-                                <svg class="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-                                </svg>
-                            </button>
+                            <input type="hidden" id="paymentMethod" value="Cash">
                         </form>
                     </div>
 
                 </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- MODAL: Fast Cash Checkout --}}
+    <div id="fastCashModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-100" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base">Cash Tendered & Checkout</h3>
+                        <p class="text-xs text-slate-400">Enter cash amount received and print receipt</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeFastCashModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl leading-none">&times;</button>
+            </div>
+
+            <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 text-center space-y-1">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Payable</span>
+                <div id="fastCashTotalPayable" class="text-3xl font-black font-mono text-emerald-700">KES 0.00</div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Amount Tendered by Customer (KES)</label>
+                <div class="relative">
+                    <span class="absolute left-3.5 top-3 text-slate-400 font-bold font-mono text-sm">KES</span>
+                    <input type="number" step="1" min="0" id="fastCashTenderedInput"
+                        class="w-full pl-14 pr-4 py-3 text-xl font-black font-mono rounded-xl border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 shadow-inner"
+                        placeholder="0.00" oninput="onFastCashInput()" onkeydown="handleFastCashKey(event)">
+                </div>
+            </div>
+
+            {{-- Quick Cash Chips --}}
+            <div class="grid grid-cols-5 gap-1.5">
+                <button type="button" onclick="setExactCashTender()" class="py-1.5 px-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-200">Exact</button>
+                <button type="button" onclick="addCashTender(100)" class="py-1.5 px-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-200">+100</button>
+                <button type="button" onclick="addCashTender(200)" class="py-1.5 px-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-200">+200</button>
+                <button type="button" onclick="addCashTender(500)" class="py-1.5 px-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-200">+500</button>
+                <button type="button" onclick="addCashTender(1000)" class="py-1.5 px-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-200">+1000</button>
+            </div>
+
+            {{-- Change Box --}}
+            <div id="fastCashChangeBox" class="p-3.5 rounded-2xl border flex justify-between items-center bg-slate-100 border-slate-200">
+                <span class="text-xs font-bold text-slate-600 uppercase">Change Due:</span>
+                <span id="fastCashChangeDisplay" class="font-mono font-black text-lg text-slate-800">KES 0.00</span>
+            </div>
+
+            <div class="flex space-x-2 pt-2">
+                <button type="button" onclick="closeFastCashModal()" class="w-1/3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold rounded-xl transition">
+                    Cancel (Esc)
+                </button>
+                <button type="button" id="btnConfirmFastCash" onclick="confirmFastCash()" class="w-2/3 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+                    <span>Complete & Print (Enter)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- MODAL: Fast M-PESA Checkout --}}
+    <div id="fastMpesaModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-100" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base">Safaricom M-PESA Checkout</h3>
+                        <p class="text-xs text-slate-400">Verify customer message and transaction code</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeFastMpesaModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl leading-none">&times;</button>
+            </div>
+
+            <div class="bg-[#f0faf4] rounded-2xl p-4 border border-[#b2e5cb] text-center space-y-1">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-[#008f45]">M-Pesa Amount Payable</span>
+                <div id="fastMpesaAmountDisplay" class="text-3xl font-black font-mono text-[#00a651]">KES 0.00</div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">M-PESA Confirmation Code</label>
+                <input type="text" id="fastMpesaCodeInput" maxlength="15"
+                    class="w-full px-4 py-3 text-lg font-black font-mono uppercase tracking-widest rounded-xl border-slate-300 focus:ring-[#00a651] focus:border-[#00a651] shadow-inner placeholder-slate-300"
+                    placeholder="e.g. SHG72619X" onkeydown="handleFastMpesaKey(event)">
+                <span class="text-[11px] text-slate-500 mt-1 block">Enter the 10-character code from the customer's SMS</span>
+            </div>
+
+            <div class="flex space-x-2 pt-2">
+                <button type="button" onclick="closeFastMpesaModal()" class="w-1/3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold rounded-xl transition">
+                    Cancel (Esc)
+                </button>
+                <button type="button" id="btnConfirmFastMpesa" onclick="confirmFastMpesa()" class="w-2/3 py-3 bg-[#00a651] hover:bg-[#008f45] active:scale-98 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+                    <span>Confirm & Print Receipt</span>
+                </button>
             </div>
         </div>
     </div>
@@ -399,6 +472,12 @@
                            class="w-full text-sm font-mono font-bold rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
                            oninput="onSplitInputChange()">
                 </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">M-Pesa Confirmation Code (Optional)</label>
+                    <input type="text" id="splitMpesaRefInput" maxlength="15"
+                           class="w-full text-xs font-mono font-bold uppercase rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-400"
+                           placeholder="e.g. SDF93821K">
+                </div>
                 <div class="flex space-x-2">
                     <button type="button" onclick="splitFiftyFifty()" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded">50 / 50 Split</button>
                     <button type="button" onclick="fillRemainderToMpesa()" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded">Rest to M-Pesa</button>
@@ -413,7 +492,7 @@
             <div class="flex justify-end space-x-2 pt-2 border-t">
                 <button type="button" onclick="closeSplitPaymentModal()" class="px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
                 <button type="button" onclick="applySplitPayment()" id="splitApplyBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm">
-                    Confirm Split
+                    Confirm & Complete Sale
                 </button>
             </div>
         </div>
@@ -529,7 +608,7 @@
                 @if(!$isLockedBranch)
                 {{-- Owner Cash Collection & Set Next Shift Float --}}
                 <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                    <label class="flex items-center space-x-2 cursor-pointer select-none">
+                    <label class="flex items-center space-x-2 cursor-pointer">
                         <input type="checkbox" id="posOwnerCollectingCheck" class="rounded border-gray-300 text-amber-600 focus:ring-amber-500" onchange="togglePosOwnerCollection(this.checked)">
                         <span class="text-xs font-bold text-amber-950 uppercase">Owner Cash Collection (Set Opening Float)</span>
                     </label>
@@ -1048,8 +1127,24 @@
         function applySplitPayment() {
             splitCash = parseFloat(document.getElementById('splitCashInput').value) || 0;
             splitMpesa = parseFloat(document.getElementById('splitMpesaInput').value) || 0;
-            updateSplitDisplays(calculateCartTotal());
+            const total = calculateCartTotal();
+            const totalSplit = splitCash + splitMpesa;
+            if (Math.abs(total - totalSplit) >= 0.05) {
+                alert(`Split payment error: The sum of Cash (KES ${splitCash.toFixed(2)}) + M-Pesa (KES ${splitMpesa.toFixed(2)}) must equal Total KES ${total.toFixed(2)}.`);
+                return;
+            }
+
+            const splitRef = document.getElementById('splitMpesaRefInput')?.value.trim();
+            if (splitRef) {
+                document.getElementById('formPaymentReference').value = splitRef.toUpperCase();
+            } else {
+                document.getElementById('formPaymentReference').value = 'SPLIT-PAY';
+            }
+
+            document.getElementById('paymentMethod').value = 'Split';
+            updateSplitDisplays(total);
             closeSplitPaymentModal();
+            executeCheckout();
         }
 
         function updateSplitDisplays(total) {
@@ -1412,9 +1507,19 @@
             document.getElementById('formCashAmount').value = splitCash;
             document.getElementById('formMpesaAmount').value = splitMpesa;
             const checkoutRefInput = document.getElementById('paymentReferenceInput');
-            document.getElementById('formPaymentReference').value = checkoutRefInput ? checkoutRefInput.value.trim() : '';
+            if (checkoutRefInput && checkoutRefInput.value.trim()) {
+                document.getElementById('formPaymentReference').value = checkoutRefInput.value.trim();
+            }
             document.getElementById('formBranchName').value = document.getElementById('branchSelect').value;
 
+            return true;
+        }
+
+        function executeCheckout() {
+            if (!validateCheckout()) {
+                return false;
+            }
+            document.getElementById('checkoutForm').submit();
             return true;
         }
 
@@ -1561,5 +1666,246 @@
                 alert('A network error occurred while closing shift.');
             });
         }
+
+        // ==========================================
+        // 10. FAST HIGH-SPEED POS CHECKOUT HANDLERS
+        // ==========================================
+
+        // CASH FAST CHECKOUT
+        function triggerFastCashCheckout() {
+            if (cart.length === 0) {
+                alert('Your cart is empty. Scan or select items before checking out.');
+                return;
+            }
+            const total = calculateCartTotal();
+            document.getElementById('fastCashTotalPayable').innerText = 'KES ' + total.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const input = document.getElementById('fastCashTenderedInput');
+            input.value = total.toFixed(0);
+            onFastCashInput();
+            document.getElementById('fastCashModal').classList.remove('hidden');
+            setTimeout(() => {
+                input.focus();
+                input.select();
+            }, 80);
+        }
+
+        function closeFastCashModal() {
+            document.getElementById('fastCashModal').classList.add('hidden');
+        }
+
+        function onFastCashInput() {
+            const total = calculateCartTotal();
+            const tendered = parseFloat(document.getElementById('fastCashTenderedInput').value) || 0;
+            const change = tendered - total;
+            const changeDisplay = document.getElementById('fastCashChangeDisplay');
+            const changeBox = document.getElementById('fastCashChangeBox');
+
+            if (tendered < total) {
+                changeDisplay.innerText = '- KES ' + Math.abs(change).toFixed(2) + ' (Insufficient)';
+                changeBox.className = 'p-3.5 rounded-2xl border flex justify-between items-center bg-rose-50 border-rose-200 text-rose-700 font-bold';
+            } else {
+                changeDisplay.innerText = 'KES ' + change.toFixed(2);
+                changeBox.className = 'p-3.5 rounded-2xl border flex justify-between items-center bg-emerald-50 border-emerald-200 text-emerald-800 font-bold';
+            }
+        }
+
+        function addCashTender(extra) {
+            const input = document.getElementById('fastCashTenderedInput');
+            const current = parseFloat(input.value) || calculateCartTotal();
+            input.value = (current + extra).toFixed(0);
+            onFastCashInput();
+            input.focus();
+        }
+
+        function setExactCashTender() {
+            const input = document.getElementById('fastCashTenderedInput');
+            input.value = calculateCartTotal().toFixed(0);
+            onFastCashInput();
+            input.focus();
+        }
+
+        function handleFastCashKey(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                confirmFastCash();
+            } else if (event.key === 'Escape') {
+                closeFastCashModal();
+            }
+        }
+
+        function confirmFastCash() {
+            const total = calculateCartTotal();
+            const tendered = parseFloat(document.getElementById('fastCashTenderedInput').value) || 0;
+            if (tendered < total) {
+                if (!confirm(`Tendered amount (KES ${tendered.toFixed(2)}) is less than total payable (KES ${total.toFixed(2)}). Proceed as exact cash?`)) {
+                    return;
+                }
+            }
+
+            document.getElementById('paymentMethod').value = 'Cash';
+            splitCash = total;
+            splitMpesa = 0;
+            closeFastCashModal();
+            executeCheckout();
+        }
+
+        // M-PESA FAST CHECKOUT
+        function triggerFastMpesaCheckout() {
+            if (cart.length === 0) {
+                alert('Your cart is empty. Scan or select items before checking out.');
+                return;
+            }
+            const total = calculateCartTotal();
+            document.getElementById('fastMpesaAmountDisplay').innerText = 'KES ' + total.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const input = document.getElementById('fastMpesaCodeInput');
+            input.value = '';
+            document.getElementById('fastMpesaModal').classList.remove('hidden');
+            setTimeout(() => input.focus(), 80);
+        }
+
+        function closeFastMpesaModal() {
+            document.getElementById('fastMpesaModal').classList.add('hidden');
+        }
+
+        function handleFastMpesaKey(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                confirmFastMpesa();
+            } else if (event.key === 'Escape') {
+                closeFastMpesaModal();
+            }
+        }
+
+        function confirmFastMpesa() {
+            const total = calculateCartTotal();
+            const codeInput = document.getElementById('fastMpesaCodeInput');
+            const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
+
+            if (!code) {
+                if (!confirm('No M-PESA transaction code entered. Do you want to complete this sale with code PENDING?')) {
+                    codeInput.focus();
+                    return;
+                }
+            }
+
+            document.getElementById('paymentMethod').value = 'M-Pesa';
+            splitMpesa = total;
+            splitCash = 0;
+            document.getElementById('formPaymentReference').value = code || 'MPESA-PENDING';
+            closeFastMpesaModal();
+            executeCheckout();
+        }
+
+        // CREDIT SALE (DEBT LEDGER)
+        function triggerCreditSale() {
+            if (cart.length === 0) {
+                alert('Your cart is empty.');
+                return;
+            }
+            const customerId = document.getElementById('customerSelect').value;
+            if (!customerId) {
+                alert('Credit sale error: Please select or quick-register a customer before recording a credit sale.');
+                document.getElementById('customerSelect').focus();
+                return;
+            }
+
+            const customerName = document.getElementById('customerSelect').selectedOptions[0]?.text || 'the selected customer';
+            const total = calculateCartTotal();
+            if (!confirm(`Record this sale of KES ${total.toLocaleString('en-KE', { minimumFractionDigits: 2 })} on CREDIT to ${customerName}?\n\nThis balance will be added to the customer debt ledger.`)) {
+                return;
+            }
+
+            document.getElementById('paymentMethod').value = 'Credit';
+            splitCash = 0;
+            splitMpesa = 0;
+            executeCheckout();
+        }
+
+        // POS QUOTATION GENERATOR
+        function generatePosQuotation() {
+            if (cart.length === 0) {
+                alert('Your cart is empty. Add items to generate a quotation.');
+                return;
+            }
+
+            const customerId = document.getElementById('customerSelect').value;
+            const customerName = document.getElementById('customerSelect').selectedOptions[0]?.text || '';
+            const branchName = document.getElementById('branchSelect').value;
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ route("pos.quotation") }}';
+
+            const csrf = document.createElement('input');
+            csrf.type = 'hidden';
+            csrf.name = '_token';
+            csrf.value = '{{ csrf_token() }}';
+            form.appendChild(csrf);
+
+            if (customerId) {
+                const cId = document.createElement('input');
+                cId.type = 'hidden';
+                cId.name = 'customer_id';
+                cId.value = customerId;
+                form.appendChild(cId);
+            }
+
+            const cName = document.createElement('input');
+            cName.type = 'hidden';
+            cName.name = 'customer_name';
+            cName.value = customerName;
+            form.appendChild(cName);
+
+            const bName = document.createElement('input');
+            bName.type = 'hidden';
+            bName.name = 'branch_name';
+            bName.value = branchName;
+            form.appendChild(bName);
+
+            const pTier = document.createElement('input');
+            pTier.type = 'hidden';
+            pTier.name = 'pricing_tier';
+            pTier.value = pricingTier;
+            form.appendChild(pTier);
+
+            cart.forEach((item, i) => {
+                const varInp = document.createElement('input');
+                varInp.type = 'hidden';
+                varInp.name = `items[${i}][variant_id]`;
+                varInp.value = item.id;
+                form.appendChild(varInp);
+
+                const qtyInp = document.createElement('input');
+                qtyInp.type = 'hidden';
+                qtyInp.name = `items[${i}][quantity]`;
+                qtyInp.value = item.qty;
+                form.appendChild(qtyInp);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // GLOBAL KEYBOARD SHORTCUTS
+        document.addEventListener('keydown', function(e) {
+            // F8 -> M-Pesa Checkout
+            if (e.key === 'F8') {
+                e.preventDefault();
+                triggerFastMpesaCheckout();
+                return;
+            }
+
+            // Escape closes open modals
+            if (e.key === 'Escape') {
+                closeFastCashModal();
+                closeFastMpesaModal();
+                closeRecentSalesDrawer();
+                closeSplitPaymentModal();
+                closeQuickCustomerModal();
+                closeParkedSalesModal();
+                closeEndShiftModal();
+                return;
+            }
+        });
     </script>
 </x-app-layout>
