@@ -1832,58 +1832,39 @@
             const customerName = document.getElementById('customerSelect').selectedOptions[0]?.text || '';
             const branchName = document.getElementById('branchSelect').value;
 
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '{{ route("pos.quotation") }}';
-
-            const csrf = document.createElement('input');
-            csrf.type = 'hidden';
-            csrf.name = '_token';
-            csrf.value = '{{ csrf_token() }}';
-            form.appendChild(csrf);
-
-            if (customerId) {
-                const cId = document.createElement('input');
-                cId.type = 'hidden';
-                cId.name = 'customer_id';
-                cId.value = customerId;
-                form.appendChild(cId);
-            }
-
-            const cName = document.createElement('input');
-            cName.type = 'hidden';
-            cName.name = 'customer_name';
-            cName.value = customerName;
-            form.appendChild(cName);
-
-            const bName = document.createElement('input');
-            bName.type = 'hidden';
-            bName.name = 'branch_name';
-            bName.value = branchName;
-            form.appendChild(bName);
-
-            const pTier = document.createElement('input');
-            pTier.type = 'hidden';
-            pTier.name = 'pricing_tier';
-            pTier.value = pricingTier;
-            form.appendChild(pTier);
-
-            cart.forEach((item, i) => {
-                const varInp = document.createElement('input');
-                varInp.type = 'hidden';
-                varInp.name = `items[${i}][variant_id]`;
-                varInp.value = item.id;
-                form.appendChild(varInp);
-
-                const qtyInp = document.createElement('input');
-                qtyInp.type = 'hidden';
-                qtyInp.name = `items[${i}][quantity]`;
-                qtyInp.value = item.qty;
-                form.appendChild(qtyInp);
+            // Use fetch with Accept: application/json for immediate redirect
+            fetch('{{ route("pos.quotation") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    customer_id: customerId || null,
+                    customer_name: customerName,
+                    branch_name: branchName,
+                    pricing_tier: pricingTier,
+                    items: cart.map(item => ({
+                        variant_id: item.id,
+                        quantity: item.qty
+                    }))
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.redirect_url) {
+                    cart = [];
+                    sessionStorage.removeItem('pos_cart');
+                    updateCartDisplay();
+                    window.location.href = data.redirect_url;
+                } else {
+                    alert('Error creating quotation: ' + (data.message || 'Unknown error occurred.'));
+                }
+            })
+            .catch(err => {
+                alert('Quotation submission error: ' + err.message);
             });
-
-            document.body.appendChild(form);
-            form.submit();
         }
 
         // GLOBAL KEYBOARD SHORTCUTS

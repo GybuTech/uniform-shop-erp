@@ -407,17 +407,26 @@ class PosController extends Controller
                 return $quotation;
             });
 
-            return response()->json([
-                'success'          => true,
-                'quotation_number' => $quotation->quotation_number,
-                'redirect_url'     => route('quotations.show', $quotation),
-                'message'          => "Quotation {$quotation->quotation_number} generated successfully."
-            ]);
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success'          => true,
+                    'quotation_number' => $quotation->quotation_number,
+                    'redirect_url'     => route('quotations.show', $quotation),
+                    'message'          => "Quotation {$quotation->quotation_number} generated successfully."
+                ]);
+            }
+
+            return redirect()->route('quotations.show', $quotation)
+                ->with('success', "Quotation {$quotation->quotation_number} generated successfully.");
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create quotation: ' . $e->getMessage()
-            ], 500);
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create quotation: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return back()->withErrors(['pos_error' => 'Failed to create quotation: ' . $e->getMessage()]);
         }
     }
 

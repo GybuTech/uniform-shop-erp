@@ -2,7 +2,7 @@
     $navUser = Auth::user();
     $isSuperAdmin = $navUser && $navUser->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager']);
     $allBranches = \App\Models\Branch::where('is_active', true)->orderBy('name')->get();
-    $currentBranchName = session('active_branch') ?: ($navUser?->branch_name ?: ($allBranches->first()?->name ?? 'Main Shop'));
+    $currentBranchName = $navUser?->branch_name ?: ($allBranches->first()?->name ?? 'Main Shop');
 @endphp
 
 <div x-data="topUtilityBar()" 
@@ -10,14 +10,14 @@
      @keydown.window="handleGlobalKeys($event)" 
      class="flex items-center space-x-2 text-xs">
 
-    {{-- 1. Branch Identity Pill --}}
+    {{-- 1. Branch Identity Pill (Current Operating Station Location Only) --}}
     @if($isSuperAdmin)
         {{-- Interactive Branch Dropdown for Admin/Owner --}}
         <div class="relative" x-data="{ open: false }">
             <button @click="open = !open" type="button" 
                     class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 font-bold transition shadow-2xs">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="text-xs">{{ $currentBranchName === 'all' ? 'All Branches' : $currentBranchName }}</span>
+                <span class="text-xs">{{ $currentBranchName }}</span>
                 <svg class="w-3.5 h-3.5 text-slate-500 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>

@@ -2,13 +2,17 @@
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    <form method="POST" action="{{ route('login') }}">
+    <form method="POST" action="{{ route('login') }}" autocomplete="off">
         @csrf
+
+        {{-- Dummy inputs to intercept and defeat aggressive browser password managers --}}
+        <input type="text" style="position:fixed; opacity:0; pointer-events:none; left:-9999px;" tabindex="-1" name="fake_username_trap" autocomplete="off" />
+        <input type="password" style="position:fixed; opacity:0; pointer-events:none; left:-9999px;" tabindex="-1" name="fake_password_trap" autocomplete="off" />
 
         <!-- Username -->
         <div>
             <x-input-label for="login" :value="__('Username')" />
-            <x-text-input id="login" class="block mt-1 w-full" type="text" name="login" :value="old('login')" required autofocus autocomplete="username" placeholder="Enter your username" />
+            <x-text-input id="login" class="block mt-1 w-full" type="text" name="login" :value="old('login')" required autofocus autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Enter your username" />
             <x-input-error :messages="$errors->get('login')" class="mt-2" />
         </div>
 
@@ -19,17 +23,10 @@
             <x-text-input id="password" class="block mt-1 w-full"
                             type="password"
                             name="password"
-                            required autocomplete="current-password" />
+                            required autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"
+                            placeholder="Enter your password" />
 
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <!-- Remember Me -->
-        <div class="block mt-4">
-            <label for="remember_me" class="inline-flex items-center">
-                <input id="remember_me" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                <span class="ms-2 text-sm text-gray-600">{{ __('Remember me') }}</span>
-            </label>
         </div>
 
         <div class="flex items-center justify-end mt-4">
