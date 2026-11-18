@@ -28,4 +28,4 @@ A robust, enterprise-grade Laravel Point of Sale (POS) and Enterprise Resource P
 ## Author & Maintainer
 
 - **Developer:** Gabriel Mbugua ([@GybuTech](https://github.com/GybuTech))
-- **Organization:** Tshaprint Solutions / GybuStudios
+- **Organization:** GybuStudios
