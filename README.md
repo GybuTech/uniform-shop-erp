@@ -1,6 +1,6 @@
 # Tshaprint Solutions POS & Multi-Branch ERP
 
-A robust, enterprise-grade Laravel Point of Sale (POS) and Enterprise Resource Planning (ERP) platform built for uniform manufacturing, inventory management, inter-branch logistics, and multi-store retail operations.
+A robust, enterprise-grade Laravel Point of Sale (POS) and Enterprise Resource Planning (ERP) platform built for multi-store retail operations.
 
 ---
 
