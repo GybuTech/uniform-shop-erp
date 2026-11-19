@@ -15,7 +15,15 @@ class SaleItem extends Model
         'product_variant_id',
         'quantity',
         'unit_price',
+        'cost_price',
         'line_total',
+    ];
+
+    protected $casts = [
+        'quantity'   => 'decimal:2',
+        'unit_price' => 'decimal:2',
+        'cost_price' => 'decimal:2',
+        'line_total' => 'decimal:2',
     ];
 
     public function sale(): BelongsTo

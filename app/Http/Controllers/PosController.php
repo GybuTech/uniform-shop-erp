@@ -3,14 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\BranchStock;
 use App\Models\BusinessSetting;
 use App\Models\Category;
 use App\Models\Customer;
+use App\Models\ParkedSale;
 use App\Models\ProductVariant;
 use App\Models\Quotation;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Shift;
+use App\Models\StockMovement;
 use App\Services\SystemTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -205,15 +208,20 @@ class PosController extends Controller
             default     => 1.00, // Standard retail
         };
 
+        $customer = null;
         if ($paymentMethod === 'Credit') {
             if (empty($request->customer_id)) {
                 return back()->withErrors(['pos_error' => 'A registered customer account must be selected to record a Credit / On-Account sale.'])->withInput();
+            }
+            $customer = Customer::find($request->customer_id);
+            if (!$customer) {
+                return back()->withErrors(['pos_error' => 'Selected customer account does not exist.'])->withInput();
             }
             $paymentStatus = 'credit';
         }
 
         try {
-            DB::transaction(function () use ($request, $branchName, $paymentMethod, $paymentStatus, $tierMultiplier) {
+            DB::transaction(function () use ($request, $branchName, $paymentMethod, $paymentStatus, $tierMultiplier, $customer) {
                 $total = 0;
                 $saleItems = [];
 
@@ -224,23 +232,41 @@ class PosController extends Controller
                         throw new \Exception("Product variant no longer exists.");
                     }
 
-                    $qty = (float) $item['quantity'];
-                    $branchStock = $variant->getStockForBranch($branchName);
-                    $effectiveStock = max($branchStock, (float) $variant->stock_quantity);
-                    if ($effectiveStock < $qty) {
-                        throw new \Exception("Insufficient stock for {$variant->sku}. Available: {$effectiveStock}, Requested: {$qty}");
+                    $requestedQty = (float) $item['quantity'];
+
+                    // REFACTORED STRICT CHECK: No fallback to global stock
+                    $branchStockRecord = BranchStock::where('branch_name', $branchName)
+                        ->where('product_variant_id', $item['variant_id'])
+                        ->lockForUpdate()
+                        ->first();
+
+                    $availableQty = $branchStockRecord ? (float) $branchStockRecord->stock_quantity : 0.00;
+
+                    if ($availableQty < $requestedQty) {
+                        throw new \Exception("Stock error: '{$variant->sku}' has only {$availableQty} units available at {$branchName}. (Requested: {$requestedQty})");
                     }
 
                     $unitPrice = round($variant->selling_price * $tierMultiplier, 2);
-                    $lineTotal = round($unitPrice * $qty, 2);
+                    $lineTotal = round($unitPrice * $requestedQty, 2);
                     $total += $lineTotal;
 
                     $saleItems[] = [
-                        'variant'    => $variant,
-                        'quantity'   => $qty,
-                        'unit_price' => $unitPrice,
-                        'line_total' => $lineTotal,
+                        'variant'             => $variant,
+                        'branch_stock_record' => $branchStockRecord,
+                        'quantity'            => $requestedQty,
+                        'unit_price'          => $unitPrice,
+                        'cost_price'          => (float) ($variant->cost_price ?? 0.00),
+                        'line_total'          => $lineTotal,
                     ];
+                }
+
+                // Phase 5: Enforce Customer Credit Limit
+                if ($paymentMethod === 'Credit' && $customer && (float) $customer->credit_limit > 0) {
+                    $outstandingBalance = (float) $customer->outstanding_balance;
+                    if (($outstandingBalance + $total) > (float) $customer->credit_limit) {
+                        $exceeded = ($outstandingBalance + $total) - (float) $customer->credit_limit;
+                        throw new \Exception("Credit Limit Exceeded: '{$customer->name}' has a limit of KES " . number_format($customer->credit_limit, 2) . ". Current balance: KES " . number_format($outstandingBalance, 2) . ". This sale of KES " . number_format($total, 2) . " exceeds the limit by KES " . number_format($exceeded, 2) . ".");
+                    }
                 }
 
                 $storedPaymentMethod = $paymentMethod;
@@ -270,19 +296,41 @@ class PosController extends Controller
                     'updated_at'        => $now,
                 ]);
 
-                foreach ($saleItems as $item) {
+                $branch = Branch::where('name', $branchName)->first();
+
+                foreach ($saleItems as $sItem) {
+                    $variant = $sItem['variant'];
+                    $qty = $sItem['quantity'];
+                    $branchStockRecord = $sItem['branch_stock_record'];
+
                     SaleItem::create([
                         'sale_id'            => $sale->id,
-                        'product_variant_id' => $item['variant']->id,
-                        'quantity'           => $item['quantity'],
-                        'unit_price'         => $item['unit_price'],
-                        'line_total'         => $item['line_total'],
+                        'product_variant_id' => $variant->id,
+                        'quantity'           => $qty,
+                        'unit_price'         => $sItem['unit_price'],
+                        'cost_price'         => $sItem['cost_price'],
+                        'line_total'         => $sItem['line_total'],
                         'created_at'         => $now,
                         'updated_at'         => $now,
                     ]);
 
-                    // Deduct stock for that specific store branch
-                    $item['variant']->adjustStockForBranch($branchName, -1 * $item['quantity']);
+                    // Decrement inventory strictly on BranchStock
+                    $branchStockRecord->decrement('stock_quantity', $qty);
+                    $variant->update(['stock_quantity' => $variant->branchStocks()->sum('stock_quantity')]);
+
+                    // Immutable stock movement ledger entry
+                    StockMovement::create([
+                        'branch_id'          => $branch?->id,
+                        'branch_name'        => $branchName,
+                        'product_variant_id' => $variant->id,
+                        'quantity'           => -1 * $qty,
+                        'balance_after'      => (float) $branchStockRecord->fresh()->stock_quantity,
+                        'movement_type'      => 'sale',
+                        'reference_id'       => $sale->id,
+                        'reference_no'       => $sale->receipt_number,
+                        'user_id'            => auth()->id(),
+                        'notes'              => "POS Sale #{$sale->receipt_number}",
+                    ]);
                 }
 
                 $shift->recalculateTotals();
@@ -525,5 +573,74 @@ class PosController extends Controller
     {
         $sale->load(['customer', 'user', 'saleItems.productVariant.product']);
         return view('pos.receipt', compact('sale'));
+    }
+
+    public function parkSale(Request $request)
+    {
+        $request->validate([
+            'cart'             => ['required', 'array', 'min:1'],
+            'parked_reference' => ['required', 'string', 'max:150'],
+            'branch_name'      => ['nullable', 'string', 'max:100'],
+            'customer_id'      => ['nullable', 'exists:customers,id'],
+            'total_amount'     => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $user = auth()->user();
+        $branchName = $request->branch_name ?: ($user->branch_name ?: 'Main Shop');
+
+        $parked = ParkedSale::create([
+            'user_id'          => $user->id,
+            'branch_name'      => $branchName,
+            'customer_id'      => $request->customer_id ?: null,
+            'parked_reference' => $request->parked_reference,
+            'cart_payload'     => $request->cart,
+            'total_amount'     => $request->total_amount,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Sale suspended and saved to Parked Sales.",
+            'parked'  => $parked,
+        ]);
+    }
+
+    public function getParkedSales(Request $request)
+    {
+        $user = auth()->user();
+        $branchName = $request->branch_name ?: ($user->branch_name ?: 'Main Shop');
+
+        $parkedSales = ParkedSale::with('customer')
+            ->where('branch_name', $branchName)
+            ->latest()
+            ->get();
+
+        return response()->json($parkedSales);
+    }
+
+    public function resumeParkedSale(ParkedSale $parkedSale)
+    {
+        $payload = $parkedSale->cart_payload;
+        $customerId = $parkedSale->customer_id;
+        $ref = $parkedSale->parked_reference;
+
+        $parkedSale->delete();
+
+        return response()->json([
+            'success'     => true,
+            'cart'        => $payload,
+            'customer_id' => $customerId,
+            'reference'   => $ref,
+            'message'     => "Parked sale restored into cart.",
+        ]);
+    }
+
+    public function destroyParkedSale(ParkedSale $parkedSale)
+    {
+        $parkedSale->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Parked sale discarded.",
+        ]);
     }
 }

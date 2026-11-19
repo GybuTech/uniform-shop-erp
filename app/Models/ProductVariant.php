@@ -21,7 +21,14 @@ class ProductVariant extends Model
         'unit_of_measure',
         'brand_name',
         'selling_price',
+        'cost_price',
         'stock_quantity',
+    ];
+
+    protected $casts = [
+        'selling_price'  => 'decimal:2',
+        'cost_price'     => 'decimal:2',
+        'stock_quantity' => 'decimal:2',
     ];
 
     /**
@@ -85,11 +92,6 @@ class ProductVariant extends Model
 
         if ($bs) {
             return (float) $bs->stock_quantity;
-        }
-
-        // Fallback: If no branch stocks record exists for this variant, use baseline stock_quantity
-        if ($this->branchStocks()->count() === 0) {
-            return (float) $this->stock_quantity;
         }
 
         return 0.00;
