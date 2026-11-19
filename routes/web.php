@@ -53,7 +53,11 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('expenses', ExpenseController::class)->except(['show', 'edit', 'update', 'destroy']);
 
     // Purchases (Supplier Invoices & Procurements)
+    Route::post('purchases/{purchase}/receive', [PurchaseController::class, 'receiveGoods'])->name('purchases.receive');
     Route::resource('purchases', PurchaseController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+
+    // Sale Returns & Refunds
+    Route::resource('returns', \App\Http\Controllers\SaleReturnController::class)->only(['index', 'create', 'store', 'show']);
 
     // Quotations
     Route::resource('quotations', QuotationController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
@@ -181,6 +185,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update')->middleware('permission:edit-customers');
     Route::patch('/customers/{customer}', [CustomerController::class, 'update']);
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy')->middleware('permission:delete-customers');
+    Route::post('/customers/{customer}/payments', [CustomerController::class, 'storePayment'])->name('customers.payments.store')->middleware('permission:create-sales');
 
     // POS Terminal
     Route::get('/pos', [PosController::class, 'index'])
@@ -203,6 +208,18 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:create-sales');
     Route::get('/pos/receipt', [PosController::class, 'receipt'])
         ->name('pos.receipt')
+        ->middleware('permission:create-sales');
+    Route::post('/pos/park', [PosController::class, 'parkSale'])
+        ->name('pos.park')
+        ->middleware('permission:create-sales');
+    Route::get('/pos/parked', [PosController::class, 'getParkedSales'])
+        ->name('pos.parked')
+        ->middleware('permission:create-sales');
+    Route::post('/pos/resume/{parkedSale}', [PosController::class, 'resumeParkedSale'])
+        ->name('pos.resume')
+        ->middleware('permission:create-sales');
+    Route::delete('/pos/parked/{parkedSale}', [PosController::class, 'destroyParkedSale'])
+        ->name('pos.destroy_parked')
         ->middleware('permission:create-sales');
 
     // Cashier Shifts & Cash Rollover Continuity

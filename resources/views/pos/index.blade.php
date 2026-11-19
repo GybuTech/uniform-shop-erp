@@ -1175,6 +1175,10 @@
             const custOption = custSelect.options[custSelect.selectedIndex];
             const custName = custOption ? custOption.getAttribute('data-name') : 'Walk-in Customer';
             const refInput = document.getElementById('paymentReferenceInput');
+            const total = calculateCartTotal();
+
+            const refNote = prompt("Enter a reference for this parked cart (e.g. 'Customer fetching cash'):", `Cart #${getParkedSales().length + 1} (${custName})`);
+            if (refNote === null) return; // User cancelled prompt
 
             const parkedItem = {
                 id: 'park_' + Date.now(),
@@ -1182,13 +1186,31 @@
                 date: new Date().toLocaleDateString(),
                 customerId: custSelect.value,
                 customerName: custName,
+                parkedReference: refNote.trim() || `Cart #${getParkedSales().length + 1}`,
                 pricingTier: pricingTier,
                 paymentMethod: document.getElementById('paymentMethod').value,
                 paymentReference: refInput ? refInput.value : '',
                 branch: document.getElementById('branchSelect').value,
                 items: JSON.parse(JSON.stringify(cart)),
-                total: calculateCartTotal()
+                total: total
             };
+
+            // Post to backend database
+            fetch('{{ route("pos.park") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    cart: parkedItem.items,
+                    parked_reference: parkedItem.parkedReference,
+                    branch_name: parkedItem.branch,
+                    customer_id: parkedItem.customerId || null,
+                    total_amount: total
+                })
+            }).catch(e => console.log('Offline/Local fallback for parked cart'));
 
             let queue = getParkedSales();
             queue.unshift(parkedItem);
@@ -1201,8 +1223,6 @@
             if (refInput) refInput.value = '';
             renderCart();
             updateParkedBadge();
-
-            alert(`Sale parked successfully (${parkedItem.items.length} items, KES ${parkedItem.total.toFixed(2)}). You can now attend to the next customer.`);
         }
 
         function getParkedSales() {
@@ -1869,11 +1889,42 @@
 
         // GLOBAL KEYBOARD SHORTCUTS
         document.addEventListener('keydown', function(e) {
+            // F2 -> Focus Search Bar and select text
+            if (e.key === 'F2') {
+                e.preventDefault();
+                const searchInp = document.getElementById('searchInput');
+                if (searchInp) {
+                    searchInp.focus();
+                    searchInp.select();
+                }
+                return;
+            }
+
+            // F4 -> Suspend / Park Sale or View Parked Sales
+            if (e.key === 'F4') {
+                e.preventDefault();
+                if (cart.length > 0) {
+                    parkCurrentSale();
+                } else {
+                    openParkedSalesModal();
+                }
+                return;
+            }
+
             // F8 -> M-Pesa Checkout
             if (e.key === 'F8') {
                 e.preventDefault();
                 triggerFastMpesaCheckout();
                 return;
+            }
+
+            // Enter on search input when empty and cart has items -> Instant Cash Checkout
+            if (e.key === 'Enter' && document.activeElement && document.activeElement.id === 'searchInput') {
+                if (document.activeElement.value.trim() === '' && cart.length > 0) {
+                    e.preventDefault();
+                    triggerFastCashCheckout();
+                    return;
+                }
             }
 
             // Escape closes open modals
