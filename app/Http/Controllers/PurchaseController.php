@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\BranchStock;
 use App\Models\ProductVariant;
 use App\Models\Purchase;
+use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -88,11 +90,13 @@ class PurchaseController extends Controller
                 'user_id'         => auth()->id(),
             ]);
 
+            $branch = Branch::where('name', $validated['branch_name'])->first();
+
             foreach ($validated['items'] as $item) {
                 $subtotal = $item['unit_cost'] * $item['quantity'];
                 $variantId = !empty($item['product_variant_id']) ? $item['product_variant_id'] : null;
 
-                $purchase->items()->create([
+                $pItem = $purchase->items()->create([
                     'item_name'          => $item['item_name'],
                     'unit'               => $item['unit'] ?? 'Pcs',
                     'product_variant_id' => $variantId,
@@ -101,19 +105,88 @@ class PurchaseController extends Controller
                     'subtotal'           => $subtotal,
                 ]);
 
-                // Note: Purchases and Stock are separate independent entities.
-                // Store branches record physical stock independently via Stock Intake / Physical Adjustments.
+                // If marked as received immediately, credit stock and record movement
+                if ($validated['status'] === 'received' && $variantId) {
+                    $variant = ProductVariant::find($variantId);
+                    if ($variant) {
+                        $variant->update(['cost_price' => $item['unit_cost']]);
+
+                        $branchStock = BranchStock::firstOrCreate(
+                            ['branch_id' => $branch?->id, 'product_variant_id' => $variant->id],
+                            ['branch_name' => $validated['branch_name'], 'stock_quantity' => 0]
+                        );
+                        $branchStock->increment('stock_quantity', $item['quantity']);
+                        $variant->update(['stock_quantity' => $variant->branchStocks()->sum('stock_quantity')]);
+
+                        StockMovement::create([
+                            'branch_id'          => $branch?->id,
+                            'branch_name'        => $validated['branch_name'],
+                            'product_variant_id' => $variant->id,
+                            'quantity'           => $item['quantity'],
+                            'balance_after'      => (float) $branchStock->fresh()->stock_quantity,
+                            'movement_type'      => 'purchase_receipt',
+                            'reference_id'       => $purchase->id,
+                            'reference_no'       => $purchase->purchase_number,
+                            'user_id'            => auth()->id(),
+                            'notes'              => "Goods received from supplier: {$purchase->supplier_name}",
+                        ]);
+                    }
+                }
             }
         });
 
         return redirect()->route('purchases.index')
-            ->with('success', "Purchase order {$purchaseNumber} recorded successfully. (Procurement record saved independently of retail store stock).");
+            ->with('success', "Purchase order {$purchaseNumber} recorded successfully.");
     }
 
     public function show(Purchase $purchase)
     {
         $purchase->load(['items.productVariant.product', 'user']);
         return view('purchases.show', compact('purchase'));
+    }
+
+    public function receiveGoods(Purchase $purchase)
+    {
+        if ($purchase->status === 'received') {
+            return back()->with('info', "Purchase order {$purchase->purchase_number} has already been received.");
+        }
+
+        $branch = Branch::where('name', $purchase->branch_name)->first();
+
+        DB::transaction(function () use ($purchase, $branch) {
+            foreach ($purchase->items as $item) {
+                if ($item->product_variant_id) {
+                    $variant = ProductVariant::find($item->product_variant_id);
+                    if ($variant) {
+                        $variant->update(['cost_price' => $item->unit_cost]);
+
+                        $branchStock = BranchStock::firstOrCreate(
+                            ['branch_id' => $branch?->id, 'product_variant_id' => $variant->id],
+                            ['branch_name' => $purchase->branch_name, 'stock_quantity' => 0]
+                        );
+                        $branchStock->increment('stock_quantity', $item->quantity);
+                        $variant->update(['stock_quantity' => $variant->branchStocks()->sum('stock_quantity')]);
+
+                        StockMovement::create([
+                            'branch_id'          => $branch?->id,
+                            'branch_name'        => $purchase->branch_name,
+                            'product_variant_id' => $variant->id,
+                            'quantity'           => $item->quantity,
+                            'balance_after'      => (float) $branchStock->fresh()->stock_quantity,
+                            'movement_type'      => 'purchase_receipt',
+                            'reference_id'       => $purchase->id,
+                            'reference_no'       => $purchase->purchase_number,
+                            'user_id'            => auth()->id(),
+                            'notes'              => "Goods received from supplier: {$purchase->supplier_name}",
+                        ]);
+                    }
+                }
+            }
+
+            $purchase->update(['status' => 'received']);
+        });
+
+        return back()->with('success', "Purchase order {$purchase->purchase_number} marked as Received. Inventory updated at {$purchase->branch_name}.");
     }
 
     public function destroy(Purchase $purchase)
@@ -126,6 +199,6 @@ class PurchaseController extends Controller
         });
 
         return redirect()->route('purchases.index')
-            ->with('success', "Purchase order {$purchaseNumber} deleted and inventory reconciled.");
+            ->with('success', "Purchase order {$purchaseNumber} deleted.");
     }
 }

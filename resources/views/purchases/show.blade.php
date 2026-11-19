@@ -8,6 +8,15 @@
                 <a href="{{ route('purchases.index') }}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-sm">
                     &larr; Back to Purchases
                 </a>
+                @if($purchase->status !== 'received')
+                    <form method="POST" action="{{ route('purchases.receive', $purchase) }}" onsubmit="return confirm('Confirm receipt of these goods? This will increment physical shelf stock at {{ $purchase->branch_name }} and record immutable stock movements.');" class="inline">
+                        @csrf
+                        <button type="submit" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-sm shadow-sm transition" style="background-color: #059669 !important; color: #ffffff !important;">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                            Receive Goods & Update Shelves
+                        </button>
+                    </form>
+                @endif
                 <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm">
                     Print Invoice
                 </button>
