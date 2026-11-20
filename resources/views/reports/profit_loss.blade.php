@@ -43,9 +43,9 @@
                 </div>
 
                 <div class="bg-white p-5 rounded-xl border shadow-sm">
-                    <p class="text-xs font-bold uppercase text-gray-500">Cost of Purchased Stock</p>
-                    <p class="text-2xl font-black text-amber-600 mt-2 font-mono">KES {{ number_format($totalPurchases, 2) }}</p>
-                    <p class="text-[11px] text-gray-500 font-semibold mt-1">Supplier procurements</p>
+                    <p class="text-xs font-bold uppercase text-gray-500">Cost of Goods Sold (COGS)</p>
+                    <p class="text-2xl font-black text-amber-600 mt-2 font-mono">KES {{ number_format($cogs > 0 ? $cogs : $totalPurchases, 2) }}</p>
+                    <p class="text-[11px] text-gray-500 font-semibold mt-1">Cost of sold inventory</p>
                 </div>
 
                 <div class="bg-white p-5 rounded-xl border shadow-sm">

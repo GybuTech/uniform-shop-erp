@@ -16,6 +16,11 @@ class Customer extends Model
         'last_name',
         'phone',
         'email',
+        'credit_limit',
+    ];
+
+    protected $casts = [
+        'credit_limit' => 'decimal:2',
     ];
 
     public function getNameAttribute(): string
@@ -26,5 +31,24 @@ class Customer extends Model
     public function sales(): HasMany
     {
         return $this->hasMany(Sale::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(CustomerPayment::class);
+    }
+
+    public function getOutstandingBalanceAttribute(): float
+    {
+        $creditSales = (float) $this->sales()
+            ->where(function ($q) {
+                $q->where('payment_method', 'Credit')
+                  ->orWhere('payment_status', 'credit');
+            })
+            ->sum('total_amount');
+
+        $repayments = (float) $this->payments()->sum('amount');
+
+        return max(0.00, round($creditSales - $repayments, 2));
     }
 }

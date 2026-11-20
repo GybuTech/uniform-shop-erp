@@ -131,24 +131,32 @@ class ReportController extends Controller
 
     public function profitLoss(Request $request)
     {
-        $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date')) : Carbon::now()->startOfMonth();
+        $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date'))->startOfDay() : Carbon::now()->startOfMonth();
         $endDate   = $request->input('end_date') ? Carbon::parse($request->input('end_date'))->endOfDay() : Carbon::now()->endOfDay();
 
-        // 1. Total Sales Revenue
+        // 1. Total Completed Sales Revenue
         $totalSales = (float) Sale::whereBetween('created_at', [$startDate, $endDate])->sum('total_amount');
 
-        // 2. Cost of Purchased Goods (Received Purchases)
+        // 2. True Cost of Goods Sold (COGS) from snapshotted sale items
+        $cogs = (float) DB::table('sale_items')
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->whereBetween('sales.created_at', [$startDate, $endDate])
+            ->sum(DB::raw('sale_items.quantity * CASE WHEN sale_items.cost_price > 0 THEN sale_items.cost_price ELSE COALESCE((SELECT cost_price FROM product_variants WHERE product_variants.id = sale_items.product_variant_id), 0) END'));
+
+        // 3. Supplier Procurements (for procurement cash-flow reference)
         $totalPurchases = (float) Purchase::where('status', 'received')
             ->whereBetween('purchase_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->sum('total_amount');
 
-        // 3. Operating Expenses
+        // 4. Operating Expenses
         $totalExpenses = (float) Expense::whereBetween('expense_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->sum('amount');
 
-        // 4. Gross and Net Profit Calculations
-        $grossProfit = $totalSales - $totalPurchases;
+        // 5. Accurate Margins (Using COGS with fallback)
+        $effectiveCost = $cogs > 0 ? $cogs : $totalPurchases;
+        $grossProfit = $totalSales - $effectiveCost;
         $netProfit   = $grossProfit - $totalExpenses;
+        $grossMargin = $totalSales > 0 ? round(($grossProfit / $totalSales) * 100, 2) : 0;
         $profitMargin = $totalSales > 0 ? round(($netProfit / $totalSales) * 100, 2) : 0;
 
         // Breakdown of expenses by category for this period
@@ -161,10 +169,12 @@ class ReportController extends Controller
             'startDate',
             'endDate',
             'totalSales',
+            'cogs',
             'totalPurchases',
             'totalExpenses',
             'grossProfit',
             'netProfit',
+            'grossMargin',
             'profitMargin',
             'expenseBreakdown'
         ));
