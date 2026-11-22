@@ -4,7 +4,7 @@
             <div>
                 <div class="flex items-center space-x-2">
                     <h2 class="font-bold text-xl text-gray-900 leading-tight">{{ \App\Models\BusinessSetting::get('business_name', 'POS Terminal') }}</h2>
-                    <span class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded">🏬 {{ $currentBranchName }}</span>
+                    <span class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded">{{ $currentBranchName }}</span>
                 </div>
                 <p class="text-xs text-gray-500 mt-0.5">{{ \App\Models\BusinessSetting::get('business_tagline', 'Quick Checkout • Barcode Scanner • Multi-Payment • Quotes') }}</p>
             </div>
@@ -142,7 +142,7 @@
                                 </svg>
                                 <div>
                                     <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">Selling Branch</span>
-                                    <span class="text-xs font-extrabold text-blue-950">🏬 {{ $currentBranchName }}</span>
+                                    <span class="text-xs font-extrabold text-blue-950">{{ $currentBranchName }}</span>
                                 </div>
                             </div>
                             <span class="text-[10px] bg-blue-200 text-blue-900 font-bold px-2 py-0.5 rounded-full">

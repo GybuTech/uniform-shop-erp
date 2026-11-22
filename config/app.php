@@ -30,6 +30,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Retail Store Architecture & Offline Branch Isolation
+    |--------------------------------------------------------------------------
+    |
+    | 'store_mode':
+    |   - 'standalone': Offline PC locked to its own physical store till.
+    |   - 'cloud': Centralized multi-branch installation with top-bar switcher.
+    |
+    | 'default_branch': Assigned store name for this till (e.g. 'Stall 35', 'Main Shop').
+    |
+    */
+    'store_mode' => env('APP_STORE_MODE', 'standalone'),
+    'default_branch' => env('STORE_DEFAULT_BRANCH', 'Main Shop'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Debug Mode
     |--------------------------------------------------------------------------
     |

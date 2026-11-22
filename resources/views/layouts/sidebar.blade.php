@@ -27,8 +27,10 @@
 
         {{-- 1. Home / Dashboard with Multi-Branch Submenu --}}
         @php
+            $isStandalone = \App\Services\BranchContext::isStandalone();
             $isOwnerOrAdmin = in_array(strtolower(auth()->user()?->roles?->first()?->name ?? ''), ['owner', 'system_administrator', 'admin', 'manager']);
-            $currentBranch = session('active_branch', 'all');
+            $activeBranch = \App\Services\BranchContext::getActiveBranch();
+            $isAll = \App\Services\BranchContext::isAllBranches();
             try {
                 $sidebarBranches = \App\Models\Branch::where('is_active', true)->orderBy('name')->get();
             } catch (\Throwable $e) {
@@ -44,20 +46,20 @@
                     </svg>
                     <span>Home</span>
                 </a>
-                @if($isOwnerOrAdmin)
+                @if(!$isStandalone && $isOwnerOrAdmin)
                 <button @click="open = !open" type="button" class="p-1 hover:text-white text-slate-400" title="Toggle Branches">
                     <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 </button>
                 @endif
             </div>
 
-            @if($isOwnerOrAdmin)
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
-                <a href="{{ route('dashboard', ['branch' => 'all']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === 'all' && request()->routeIs('dashboard') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">
+            @if(!$isStandalone && $isOwnerOrAdmin)
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+                <a href="{{ route('dashboard', ['branch' => 'all']) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $isAll && request()->routeIs('dashboard') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">
                     All Branches (Consolidated)
                 </a>
                 @foreach($sidebarBranches as $sb)
-                    <a href="{{ route('dashboard', ['branch' => $sb->name]) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $currentBranch === $sb->name ? 'text-blue-400 font-bold' : 'text-slate-400' }}">
+                    <a href="{{ route('dashboard', ['branch' => $sb->name]) }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ $activeBranch === $sb->name && request()->routeIs('dashboard') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">
                         {{ $sb->name }}
                     </a>
                 @endforeach
@@ -77,7 +79,7 @@
                 </div>
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('users.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('users.*') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Staff Accounts</a>
                 <a href="{{ route('roles.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('roles.*') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Roles & Permissions Matrix</a>
             </div>
@@ -96,7 +98,7 @@
                 </div>
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('customers.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('customers.index') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Customers List</a>
                 <a href="{{ route('customers.create') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('customers.create') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Add Customer</a>
             </div>
@@ -115,7 +117,7 @@
                 </div>
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 @can('view-products')
                 <a href="{{ route('products.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('products.index') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">List Products</a>
                 @endcan
@@ -141,7 +143,7 @@
                 </div>
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('purchases.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('purchases.index') && !request()->has('status') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">
                     List Purchases
                 </a>
@@ -170,7 +172,7 @@
                 </div>
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('pos.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 font-bold text-emerald-400">+ POS Terminal</a>
                 <a href="{{ route('sales.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('sales.*') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">All Sales Receipts</a>
                 <a href="{{ route('shifts.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('shifts.*') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Shift Handover & Z-Reports</a>
@@ -207,7 +209,7 @@
                     <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 </div>
             </button>
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('transfers.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('transfers.index') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">List Transfers</a>
                 @if($isOwnerOrAdmin)
                 <a href="{{ route('transfers.create') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('transfers.create') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Add Stock Transfer</a>
@@ -228,7 +230,7 @@
                 </div>
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('adjustments.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('adjustments.index') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">List Adjustments</a>
                 <a href="{{ route('adjustments.edit-stock') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('adjustments.edit-stock') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Edit Stock Quantities</a>
                 <a href="{{ route('adjustments.create') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('adjustments.create') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Add Adjustment</a>
@@ -248,7 +250,7 @@
                 </div>
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('expenses.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('expenses.index') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Expenses Log</a>
                 <a href="{{ route('expenses.create') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('expenses.create') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Add Expense</a>
             </div>
@@ -267,7 +269,7 @@
                 </div>
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('reports.profit-loss') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('reports.profit-loss') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Profit / Loss Report</a>
                 <a href="{{ route('reports.sales-trends') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('reports.sales-trends') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Sales Report & Trends</a>
                 <a href="{{ route('reports.expenses') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('reports.expenses') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Expense Report</a>
@@ -287,7 +289,7 @@
                 </div>
                 <svg class="w-3 h-3 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
-            <div x-show="open" x-collapse class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
+            <div x-show="open" x-cloak x-transition class="pl-8 pr-2 py-1 space-y-1 text-[11px]">
                 <a href="{{ route('settings.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('settings.*') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Business & Profile Settings</a>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf

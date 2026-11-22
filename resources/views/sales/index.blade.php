@@ -32,13 +32,13 @@
                     @if(!empty($lockedBranch))
                         <div class="flex items-center space-x-1.5 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-900">
                             <span class="text-blue-500 uppercase text-[10px]">Station:</span>
-                            <span>🏬 {{ $lockedBranch }}</span>
+                            <span>{{ $lockedBranch }}</span>
                         </div>
                     @else
                         <div class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
                             <span class="w-2 h-2 rounded-full {{ $branchFilter ? 'bg-emerald-500' : 'bg-blue-600' }} animate-pulse"></span>
                             <span class="text-slate-400 uppercase text-[10px]">Scope:</span>
-                            <span>{{ $branchFilter ? '🏬 ' . $branchFilter : '🌐 All Branches (Combined)' }}</span>
+                            <span>{{ $branchFilter ?: 'All Branches (Combined)' }}</span>
                         </div>
                     @endif
 

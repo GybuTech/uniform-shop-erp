@@ -105,7 +105,7 @@
                             <span class="font-bold text-gray-700">Stock For Branch:</span>
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-50 border border-indigo-200 text-indigo-900">
                                 <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-                                🏬 {{ $selectedBranch }}
+                                {{ $selectedBranch }}
                             </span>
                             <input type="hidden" name="branch_name" id="bulk_branch_name" value="{{ $selectedBranch }}">
                             <input type="hidden" name="reason" id="bulk_reason" value="Physical Stock Inventory Count">

@@ -77,11 +77,11 @@
                     </div>
                     <div class="px-4">
                         <div class="text-2xl font-black {{ $impSkipped > 0 ? 'text-amber-600' : 'text-gray-400' }}">{{ number_format($impSkipped) }}</div>
-                        <div class="text-gray-500 mt-0.5">⚠️ Rows Skipped</div>
+                        <div class="text-gray-500 mt-0.5">Rows Skipped</div>
                     </div>
                     <div class="pl-4">
                         <div class="text-2xl font-black text-gray-400">{{ $impBranch }}</div>
-                        <div class="text-gray-500 mt-0.5">📦 Target Branch</div>
+                        <div class="text-gray-500 mt-0.5">Target Branch</div>
                     </div>
                 </div>
 
@@ -253,7 +253,7 @@
             <div class="bg-gray-50 p-4 rounded-xl border text-xs text-gray-600 space-y-2">
                 <div class="font-bold text-gray-800">📋 Accepted Spreadsheet Format &amp; Rules</div>
                 <div class="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-[11px] text-indigo-800 space-y-1">
-                    <p class="font-bold">⚠️ Important Rules</p>
+                    <p class="font-bold">Important Rules</p>
                     <ul class="list-disc list-inside space-y-0.5">
                         <li>The importer <strong>auto-detects and skips</strong> title rows (e.g. "SWEATERS STOCK CARD FOR OCTOBER") — your file does not need to be cleaned first.</li>
                         <li>Use the <strong>Download Stock Template</strong> button above for a pre-filled CSV with all correct SKUs and product names.</li>
@@ -325,7 +325,7 @@
                 </div>
 
                 <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-900 space-y-1">
-                    <p class="font-bold">⚠️ Warning: Irreversible Inventory Reset</p>
+                    <p class="font-bold">Warning: Irreversible Inventory Reset</p>
                     <p>Use this option to purge test stock numbers so Tshaprint Solutions can record clean, accurate physical stock counts.</p>
                     <p class="text-[11px] text-rose-700">All product catalogs, uniform sizes, categories, and selling prices will remain 100% safe and intact.</p>
                 </div>

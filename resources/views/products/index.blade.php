@@ -247,9 +247,9 @@
                                 <th class="px-4 py-3">SKU Prefix</th>
                                 <th class="px-4 py-3 text-center">
                                     @if(!empty($activeBranch))
-                                        🏬 {{ $activeBranch }} Stock
+                                        {{ $activeBranch }} Shelf Stock
                                     @else
-                                        🌐 Total Stock (All Stores)
+                                        Total Stock (All Stores)
                                     @endif
                                 </th>
                                 <th class="px-5 py-3 text-right">Actions</th>
@@ -453,7 +453,7 @@
                 </div>
 
                 <div class="bg-rose-50 border border-rose-200 rounded-xl p-3.5 text-xs text-rose-900 space-y-1.5">
-                    <p class="font-bold">⚠️ Warning: Complete Test Catalog Deletion</p>
+                    <p class="font-bold">Warning: Complete Test Catalog Deletion</p>
                     <p>This action will permanently delete all test products, sizes, prices, and test transaction records so you can record your real products with clean fresh IDs.</p>
                     <p class="text-[11px] text-rose-700"><strong>Protected Data:</strong> User logins, Staff roles, Store branches, and Shop settings (Tshaprint Solutions) will remain 100% safe.</p>
                 </div>

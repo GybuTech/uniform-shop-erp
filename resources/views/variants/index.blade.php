@@ -155,9 +155,9 @@
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Selling Price</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                                 @if(!empty($activeBranch))
-                                    🏬 {{ $activeBranch }} Shelf Stock
+                                    {{ $activeBranch }} Shelf Stock
                                 @else
-                                    🌐 Total Stock (All Branches)
+                                    Total Stock (All Branches)
                                 @endif
                             </th>
                             <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>

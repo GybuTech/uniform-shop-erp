@@ -204,7 +204,7 @@
                 </div>
 
                 <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-900 space-y-1">
-                    <p class="font-bold">⚠️ Warning: Irreversible Inventory Reset</p>
+                    <p class="font-bold">Warning: Irreversible Inventory Reset</p>
                     <p>Use this option to purge test stock numbers so Tshaprint Solutions can record clean, accurate physical stock counts.</p>
                     <p class="text-[11px] text-rose-700">All product catalogs, uniform sizes, categories, and selling prices will remain 100% safe and intact.</p>
                 </div>

@@ -81,9 +81,10 @@ class PosController extends Controller
         $exact = $request->boolean('exact');
         $user = auth()->user();
         $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
+        $activeBranch = \App\Services\BranchContext::getActiveBranch();
         $branchName = $isGlobalUser
-            ? ($request->get('branch') ?: ($user->branch_name ?: 'Main Shop'))
-            : ($user->branch_name ?: 'Main Shop');
+            ? ($request->get('branch') ?: ($activeBranch ?: ($user->branch_name ?: 'Main Shop')))
+            : ($activeBranch ?: ($user->branch_name ?: 'Main Shop'));
 
         if ($query === '') {
             return response()->json([]);
@@ -191,10 +192,11 @@ class PosController extends Controller
         $user = auth()->user();
         $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
 
+        $activeBranch = \App\Services\BranchContext::getActiveBranch();
         if ($isOwnerOrAdmin) {
-            $branchName = $request->branch_name ?: ($user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop'));
+            $branchName = $request->branch_name ?: ($activeBranch ?: ($user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop')));
         } else {
-            $branchName = $user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop');
+            $branchName = $activeBranch ?: ($user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop'));
         }
 
         $paymentMethod = $request->payment_method;

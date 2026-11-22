@@ -30,6 +30,11 @@ class DashboardController extends Controller
         $isCashier = strtolower($primaryRole) === 'cashier';
         $isAdminOrOwner = in_array(strtolower($primaryRole), ['owner', 'system_administrator', 'admin', 'manager']);
 
+        // Handle direct branch navigation (e.g. sidebar branch options)
+        if ($request->has('branch')) {
+            BranchContext::setActiveBranch($request->input('branch'));
+        }
+
         // 1. Multi-Branch Resolution via Central BranchContext Service
         $branches = Branch::where('is_active', true)->orderBy('name')->get();
         $activeBranch = BranchContext::getActiveBranch();

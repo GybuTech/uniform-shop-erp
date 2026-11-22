@@ -2,11 +2,11 @@
     $navUser = Auth::user();
     $isSuperAdmin = $navUser && ($navUser->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager'])
         || in_array(strtolower($navUser->roles->first()?->name ?? ''), ['admin', 'owner', 'system_administrator', 'manager']));
+    $isStandalone = \App\Services\BranchContext::isStandalone();
     $allBranches = \App\Models\Branch::where('is_active', true)->orderBy('name')->get();
     $activeBranch = \App\Services\BranchContext::getActiveBranch();
     $isAll = \App\Services\BranchContext::isAllBranches();
-    $displayLabel = $isAll ? '🌐 All Branches (Combined)' : "🏬 {$activeBranch}";
-    $currentStationName = $navUser?->branch_name ?: ($allBranches->first()?->name ?? 'Main Shop');
+    $displayLabel = $isAll ? 'All Branches (Combined)' : $activeBranch;
 @endphp
 
 <div x-data="topUtilityBar()" 
@@ -14,13 +14,33 @@
      @keydown.window="handleGlobalKeys($event)" 
      class="flex items-center space-x-2 text-xs">
 
-    {{-- 1. Branch Identity Pill (Current Operating Station Location Only) --}}
-    @if($isSuperAdmin)
-        {{-- Interactive Branch Dropdown for Admin/Owner --}}
+    {{-- 1. Branch Identity Pill / Store Context Selector --}}
+    @if($isStandalone)
+        {{-- Locked Status Badge for Offline Machines --}}
+        <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-800 font-bold shadow-2xs select-none"
+             title="Hardware machine locked to physical store location">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+            <span class="text-xs">{{ $activeBranch }}</span>
+            <span class="text-[10px] text-slate-500 font-medium bg-slate-200/80 px-1.5 py-0.5 rounded">Offline Local Till</span>
+        </div>
+    @elseif($isSuperAdmin)
+        {{-- Interactive Cloud Multi-Branch Dropdown for Admin/Owner --}}
         <div class="relative" x-data="{ open: false }">
             <button @click="open = !open" type="button" 
                     class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 font-bold transition shadow-2xs">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                @if($isAll)
+                    <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                    </svg>
+                @else
+                    <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                @endif
                 <span class="text-xs">{{ $displayLabel }}</span>
                 <svg class="w-3.5 h-3.5 text-slate-500 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -45,8 +65,10 @@
                         @click="open = false"
                         class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ $isAll ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
                     <span class="flex items-center space-x-2">
-                        <span>🌐</span>
-                        <span>All Branches (Combined)</span>
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                        <span>All Branches (Combined Summary)</span>
                     </span>
                     @if($isAll)
                         <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -58,7 +80,9 @@
                             @click="open = false"
                             class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ $activeBranch === $br->name ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
                         <span class="flex items-center space-x-2">
-                            <span>🏬</span>
+                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
                             <span>{{ $br->name }}</span>
                         </span>
                         @if($activeBranch === $br->name)
@@ -69,10 +93,10 @@
             </div>
         </div>
     @else
-        {{-- Static Station Badge for Cashiers --}}
+        {{-- Static Station Badge for Cashiers in Cloud Mode --}}
         <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-800 font-bold shadow-2xs">
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="text-xs">🏬 {{ $currentStationName }} &bull; Station 1</span>
+            <span class="text-xs">{{ $activeBranch }} &bull; Station 1</span>
         </div>
     @endif
 
