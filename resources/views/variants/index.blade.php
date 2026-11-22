@@ -153,7 +153,13 @@
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Size / Unit</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Colour / Brand</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Selling Price</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Stock</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                                @if(!empty($activeBranch))
+                                    🏬 {{ $activeBranch }} Shelf Stock
+                                @else
+                                    🌐 Total Stock (All Branches)
+                                @endif
+                            </th>
                             <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
                         </tr>
                     </thead>
@@ -183,8 +189,13 @@
                                 KES {{ number_format($variant->selling_price, 2) }}
                             </td>
                             <td class="px-6 py-4 text-sm">
-                                <span class="{{ $variant->stock_quantity <= 5 ? 'text-red-600 font-extrabold' : 'text-emerald-700 font-extrabold' }}">
-                                    {{ $variant->stock_quantity }} units
+                                @php
+                                    $vStock = !empty($activeBranch)
+                                        ? $variant->getStockForBranch($activeBranch)
+                                        : ($variant->branchStocks->isNotEmpty() ? $variant->branchStocks->sum('stock_quantity') : (float)$variant->stock_quantity);
+                                @endphp
+                                <span class="{{ $vStock <= 5 ? 'text-red-600 font-extrabold' : 'text-emerald-700 font-extrabold' }}">
+                                    {{ (float) $vStock }} units
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-sm text-right space-x-2 whitespace-nowrap">

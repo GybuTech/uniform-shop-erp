@@ -245,6 +245,13 @@
                                 <th class="px-5 py-3">Product Name</th>
                                 <th class="px-4 py-3">Category</th>
                                 <th class="px-4 py-3">SKU Prefix</th>
+                                <th class="px-4 py-3 text-center">
+                                    @if(!empty($activeBranch))
+                                        🏬 {{ $activeBranch }} Stock
+                                    @else
+                                        🌐 Total Stock (All Stores)
+                                    @endif
+                                </th>
                                 <th class="px-5 py-3 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -271,6 +278,18 @@
                                     </td>
                                     <td class="px-4 py-3.5 font-mono text-gray-700 font-semibold">
                                         {{ $product->sku_prefix }}
+                                    </td>
+                                    <td class="px-4 py-3.5 text-center font-bold">
+                                        @php
+                                            $shelfStock = $product->variants->sum(function($v) use ($activeBranch) {
+                                                return !empty($activeBranch)
+                                                    ? $v->getStockForBranch($activeBranch)
+                                                    : ($v->branchStocks->isNotEmpty() ? $v->branchStocks->sum('stock_quantity') : (float)$v->stock_quantity);
+                                            });
+                                        @endphp
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold {{ $shelfStock <= 5 ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200' }}">
+                                            {{ (float) $shelfStock }} pcs
+                                        </span>
                                     </td>
                                     <td class="px-5 py-3.5 text-right space-x-2 whitespace-nowrap">
                                         <a href="{{ route('products.variants.index', $product) }}"
@@ -300,7 +319,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                                         <div class="space-y-1">
                                             <p class="font-bold text-gray-700 text-sm">No products found matching your search.</p>
                                             <p class="text-xs text-gray-400">Try searching with a different keyword, size, or SKU prefix.</p>

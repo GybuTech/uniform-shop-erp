@@ -36,9 +36,9 @@ class PosController extends Controller
 
         if ($isOwnerOrAdmin) {
             $isLockedBranch = false;
-            $currentBranchName = session('active_branch_name')
-                ?: $request->get('branch')
-                ?: ($user->branch_name ?: ($branches->first()?->name ?? 'Main Shop'));
+            $activeBranch = \App\Services\BranchContext::getActiveBranch();
+            $currentBranchName = $activeBranch
+                ?: ($request->get('branch') ?: ($user->branch_name ?: ($branches->first()?->name ?? 'Main Shop')));
         } else {
             $isLockedBranch = true;
             $currentBranchName = $user->branch_name ?: ($branches->first()?->name ?? 'Main Shop');
@@ -529,7 +529,11 @@ class PosController extends Controller
         $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
 
         $search = $request->get('search');
-        $branchFilter = $request->get('branch') ?: session('active_branch_name');
+        $activeBranch = \App\Services\BranchContext::getActiveBranch();
+        $branchFilter = $request->filled('branch') ? $request->get('branch') : $activeBranch;
+        if ($branchFilter === 'all') {
+            $branchFilter = null;
+        }
 
         $query = Sale::with(['customer', 'user'])->withCount('saleItems');
 

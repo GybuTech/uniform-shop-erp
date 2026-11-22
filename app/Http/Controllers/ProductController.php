@@ -31,7 +31,10 @@ class ProductController extends Controller
         $search = trim($request->input('search', ''));
         $categoryId = $request->input('category_id');
 
-        $query = Product::with(['category', 'variants'])->latest();
+        $activeBranch = \App\Services\BranchContext::getActiveBranch();
+        $isAllBranches = \App\Services\BranchContext::isAllBranches();
+
+        $query = Product::with(['category', 'variants.branchStocks'])->latest();
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
@@ -64,7 +67,16 @@ class ProductController extends Controller
             $branches = Branch::orderBy('name')->get();
         }
 
-        return view('products.index', compact('products', 'search', 'categories', 'categoryId', 'branches', 'perPageInput'));
+        return view('products.index', compact(
+            'products',
+            'search',
+            'categories',
+            'categoryId',
+            'branches',
+            'perPageInput',
+            'activeBranch',
+            'isAllBranches'
+        ));
     }
 
     public function create()

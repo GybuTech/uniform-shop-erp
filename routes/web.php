@@ -44,6 +44,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/settings/system-time', [SettingsController::class, 'updateSystemTime'])->name('settings.system-time.update');
     Route::post('/settings/system-time/reset', [SettingsController::class, 'resetSystemTime'])->name('settings.system-time.reset');
     Route::post('/settings/switch-account', [SettingsController::class, 'switchAccount'])->name('settings.switch-account');
+    Route::post('/branch/switch-context', [SettingsController::class, 'switchBranchContext'])->name('branch.switch-context');
     Route::post('/settings/branch-session', [SettingsController::class, 'switchBranchSession'])->name('settings.branch.session');
     Route::delete('/settings/users/{user}', [SettingsController::class, 'deleteUser'])->name('settings.users.destroy');
 

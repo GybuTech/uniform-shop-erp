@@ -12,6 +12,7 @@ use App\Models\Purchase;
 use App\Models\Sale;
 use App\Models\Shift;
 use App\Models\StockAdjustment;
+use App\Services\BranchContext;
 use App\Services\SystemTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,21 +30,16 @@ class DashboardController extends Controller
         $isCashier = strtolower($primaryRole) === 'cashier';
         $isAdminOrOwner = in_array(strtolower($primaryRole), ['owner', 'system_administrator', 'admin', 'manager']);
 
-        // 1. Multi-Branch Resolution (Cashier is strictly bound to their station branch)
-        $branches = Branch::where('is_active', true)->get();
-        if ($isCashier && !empty(auth()->user()->branch_name)) {
-            $selectedBranch = auth()->user()->branch_name;
-        } elseif ($request->has('branch')) {
-            $selectedBranch = $request->input('branch');
-            session(['active_branch' => $selectedBranch]);
-        } else {
-            $selectedBranch = session('active_branch', 'all');
-        }
+        // 1. Multi-Branch Resolution via Central BranchContext Service
+        $branches = Branch::where('is_active', true)->orderBy('name')->get();
+        $activeBranch = BranchContext::getActiveBranch();
+        $isAllBranches = BranchContext::isAllBranches();
+        $selectedBranch = $activeBranch ?? 'all';
 
         // Base query for sales scoped by selected branch if not 'all'
         $salesQuery = Sale::query();
-        if ($selectedBranch !== 'all' && !empty($selectedBranch)) {
-            $salesQuery->where('branch_name', $selectedBranch);
+        if (!$isAllBranches) {
+            $salesQuery->where('branch_name', $activeBranch);
         }
 
         // Row 1 Metrics:
@@ -56,8 +52,8 @@ class DashboardController extends Controller
 
         // 2. Operating Expenses & Net Profit
         $expensesQuery = Expense::query();
-        if ($selectedBranch !== 'all' && !empty($selectedBranch)) {
-            $expensesQuery->where('branch_name', $selectedBranch);
+        if (!$isAllBranches) {
+            $expensesQuery->where('branch_name', $activeBranch);
         }
         $totalExpenses = (float) $expensesQuery->sum('amount');
         $netProfit = max(0, $totalSalesAmount - $totalExpenses);
@@ -73,55 +69,57 @@ class DashboardController extends Controller
         $allCreditSales = (clone $creditSalesQuery)->latest()->get();
 
         // 4. Sales Returns / Stock Adjustments
-        $salesReturnsCount = StockAdjustment::when($selectedBranch !== 'all' && !empty($selectedBranch), fn($q) => $q->where('branch_name', $selectedBranch))
+        $salesReturnsCount = StockAdjustment::when(!$isAllBranches, fn($q) => $q->where('branch_name', $activeBranch))
             ->where('reason', 'like', '%return%')
             ->count();
         if ($salesReturnsCount === 0) {
-            $salesReturnsCount = StockAdjustment::when($selectedBranch !== 'all' && !empty($selectedBranch), fn($q) => $q->where('branch_name', $selectedBranch))->count();
+            $salesReturnsCount = StockAdjustment::when(!$isAllBranches, fn($q) => $q->where('branch_name', $activeBranch))->count();
         }
 
         // Row 2 Metrics:
         // 5. Stock Inventory Valuation
-        $inventoryValuation = (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
+        if (!$isAllBranches) {
+            $inventoryValuation = (float) \App\Models\BranchStock::where('branch_name', $activeBranch)
+                ->join('product_variants', 'branch_stocks.product_variant_id', '=', 'product_variants.id')
+                ->sum(DB::raw('branch_stocks.stock_quantity * product_variants.selling_price'));
+        } else {
+            $inventoryValuation = (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
+        }
 
         // 6. Supplier Debt Due (Pending Purchases)
         $supplierPayablesQuery = Purchase::whereIn('status', ['pending', 'ordered']);
-        if ($selectedBranch !== 'all' && !empty($selectedBranch)) {
-            $supplierPayablesQuery->where('branch_name', $selectedBranch);
+        if (!$isAllBranches) {
+            $supplierPayablesQuery->where('branch_name', $activeBranch);
         }
         $totalSupplierDebt = (float) (clone $supplierPayablesQuery)->sum('total_amount');
         $supplierPayables = $supplierPayablesQuery->latest('purchase_date')->take(8)->get();
 
         // 7. Active Open Shifts
         $activeShiftsCount = Shift::where('status', 'open')
-            ->when($selectedBranch !== 'all' && !empty($selectedBranch), fn($q) => $q->where('branch_name', $selectedBranch))
+            ->when(!$isAllBranches, fn($q) => $q->where('branch_name', $activeBranch))
             ->count();
 
         // Low stock alerts (stock <= 5 units)
-        $branchStockExists = ($selectedBranch !== 'all' && !empty($selectedBranch))
-            ? \App\Models\BranchStock::where('branch_name', $selectedBranch)->exists()
-            : false;
-
-        if ($branchStockExists) {
-            $lowStockProducts = Product::whereHas('variants', function($q) use ($selectedBranch) {
-                    $q->whereHas('branchStocks', function($bs) use ($selectedBranch) {
-                        $bs->where('branch_name', $selectedBranch)->where('stock_quantity', '<=', 5);
+        if (!$isAllBranches) {
+            $lowStockProducts = Product::whereHas('variants', function($q) use ($activeBranch) {
+                    $q->whereHas('branchStocks', function($bs) use ($activeBranch) {
+                        $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
                     });
                 })
-                ->with(['category', 'variants' => function($q) use ($selectedBranch) {
-                    $q->whereHas('branchStocks', function($bs) use ($selectedBranch) {
-                        $bs->where('branch_name', $selectedBranch)->where('stock_quantity', '<=', 5);
-                    })->with(['branchStocks' => fn($b) => $b->where('branch_name', $selectedBranch)]);
+                ->with(['category', 'variants' => function($q) use ($activeBranch) {
+                    $q->whereHas('branchStocks', function($bs) use ($activeBranch) {
+                        $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
+                    })->with(['branchStocks' => fn($b) => $b->where('branch_name', $activeBranch)]);
                 }])
                 ->orderBy('name')
                 ->get();
 
-            $lowStockCount = ProductVariant::whereHas('branchStocks', function($bs) use ($selectedBranch) {
-                $bs->where('branch_name', $selectedBranch)->where('stock_quantity', '<=', 5);
+            $lowStockCount = ProductVariant::whereHas('branchStocks', function($bs) use ($activeBranch) {
+                $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
             })->count();
 
-            $lowStockVariants = ProductVariant::whereHas('branchStocks', function($bs) use ($selectedBranch) {
-                $bs->where('branch_name', $selectedBranch)->where('stock_quantity', '<=', 5);
+            $lowStockVariants = ProductVariant::whereHas('branchStocks', function($bs) use ($activeBranch) {
+                $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
             })->with('product')->take(5)->get();
         } else {
             $lowStockCount = ProductVariant::where('stock_quantity', '<=', 5)->count();

@@ -31,14 +31,17 @@ class ProductVariantController extends Controller
             $query->where('size', $sizeFilter);
         }
 
-        $variants = $query->paginate(25)->withQueryString();
+        $activeBranch = \App\Services\BranchContext::getActiveBranch();
+        $isAllBranches = \App\Services\BranchContext::isAllBranches();
+
+        $variants = $query->with('branchStocks')->paginate(25)->withQueryString();
         $availableSizes = $product->variants()
             ->whereNotNull('size')
             ->where('size', '!=', '')
             ->distinct()
             ->pluck('size')
             ->toArray();
-        return view('variants.index', compact('product', 'variants', 'availableSizes', 'search', 'sizeFilter'));
+        return view('variants.index', compact('product', 'variants', 'availableSizes', 'search', 'sizeFilter', 'activeBranch', 'isAllBranches'));
     }
 
     public function create(Product $product)

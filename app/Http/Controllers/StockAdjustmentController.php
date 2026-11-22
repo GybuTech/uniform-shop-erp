@@ -167,7 +167,8 @@ class StockAdjustmentController extends Controller
         }
 
         $user = auth()->user();
-        $selectedBranch = $request->input('branch', $user->branch_name ?: ($branches[0] ?? 'Main Shop'));
+        $activeBranch = \App\Services\BranchContext::getActiveBranch();
+        $selectedBranch = $request->input('branch', $activeBranch ?: ($user->branch_name ?: ($branches[0] ?? 'Main Shop')));
 
         $perPage = $request->input('per_page', 15);
         $limit = ($perPage === 'all' || $perPage == -1) ? 500 : max(5, (int)$perPage);

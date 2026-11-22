@@ -1,8 +1,12 @@
 @php
     $navUser = Auth::user();
-    $isSuperAdmin = $navUser && $navUser->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager']);
+    $isSuperAdmin = $navUser && ($navUser->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager'])
+        || in_array(strtolower($navUser->roles->first()?->name ?? ''), ['admin', 'owner', 'system_administrator', 'manager']));
     $allBranches = \App\Models\Branch::where('is_active', true)->orderBy('name')->get();
-    $currentBranchName = session('active_branch_name') ?: ($navUser?->branch_name ?: ($allBranches->first()?->name ?? 'Main Shop'));
+    $activeBranch = \App\Services\BranchContext::getActiveBranch();
+    $isAll = \App\Services\BranchContext::isAllBranches();
+    $displayLabel = $isAll ? '🌐 All Branches (Combined)' : "🏬 {$activeBranch}";
+    $currentStationName = $navUser?->branch_name ?: ($allBranches->first()?->name ?? 'Main Shop');
 @endphp
 
 <div x-data="topUtilityBar()" 
@@ -17,7 +21,7 @@
             <button @click="open = !open" type="button" 
                     class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 font-bold transition shadow-2xs">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="text-xs">{{ $currentBranchName }}</span>
+                <span class="text-xs">{{ $displayLabel }}</span>
                 <svg class="w-3.5 h-3.5 text-slate-500 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
@@ -27,21 +31,24 @@
                  x-transition:enter="transition ease-out duration-100"
                  x-transition:enter-start="transform opacity-0 scale-95"
                  x-transition:enter-end="transform opacity-100 scale-100"
-                 class="absolute left-0 mt-2 w-56 rounded-xl bg-white shadow-xl border border-slate-200 py-1.5 z-50">
+                 class="absolute left-0 mt-2 w-64 rounded-xl bg-white shadow-xl border border-slate-200 py-1.5 z-50">
                 <div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     Switch Active Store View
                 </div>
                 {{-- Hidden form that POSTs the branch name and stays on current page --}}
-                <form method="POST" action="{{ route('settings.branch.session') }}" id="branchSwitchForm">
+                <form method="POST" action="{{ route('branch.switch-context') }}" id="branchSwitchForm">
                     @csrf
                     <input type="hidden" name="branch_name" id="branchSwitchValue" value="">
                 </form>
                 <button type="button"
                         onclick="document.getElementById('branchSwitchValue').value=''; document.getElementById('branchSwitchForm').submit();"
                         @click="open = false"
-                        class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ empty(session('active_branch_name')) ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
-                    <span>All Branches</span>
-                    @if(empty(session('active_branch_name')))
+                        class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ $isAll ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
+                    <span class="flex items-center space-x-2">
+                        <span>🌐</span>
+                        <span>All Branches (Combined)</span>
+                    </span>
+                    @if($isAll)
                         <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                     @endif
                 </button>
@@ -49,9 +56,12 @@
                     <button type="button"
                             onclick="document.getElementById('branchSwitchValue').value='{{ addslashes($br->name) }}'; document.getElementById('branchSwitchForm').submit();"
                             @click="open = false"
-                            class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ session('active_branch_name') === $br->name ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
-                        <span>{{ $br->name }}</span>
-                        @if(session('active_branch_name') === $br->name)
+                            class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ $activeBranch === $br->name ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
+                        <span class="flex items-center space-x-2">
+                            <span>🏬</span>
+                            <span>{{ $br->name }}</span>
+                        </span>
+                        @if($activeBranch === $br->name)
                             <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                         @endif
                     </button>
@@ -62,7 +72,7 @@
         {{-- Static Station Badge for Cashiers --}}
         <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-800 font-bold shadow-2xs">
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="text-xs">{{ $currentBranchName }} &bull; Station 1</span>
+            <span class="text-xs">🏬 {{ $currentStationName }} &bull; Station 1</span>
         </div>
     @endif
 

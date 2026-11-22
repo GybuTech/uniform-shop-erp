@@ -4,7 +4,7 @@
             <div>
                 <div class="flex items-center space-x-2">
                     <h2 class="font-bold text-xl text-gray-900 leading-tight">{{ \App\Models\BusinessSetting::get('business_name', 'POS Terminal') }}</h2>
-                    <span class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded">{{ $branchName ?? 'Main Branch' }}</span>
+                    <span class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded">🏬 {{ $currentBranchName }}</span>
                 </div>
                 <p class="text-xs text-gray-500 mt-0.5">{{ \App\Models\BusinessSetting::get('business_tagline', 'Quick Checkout • Barcode Scanner • Multi-Payment • Quotes') }}</p>
             </div>
@@ -135,35 +135,21 @@
                         </div>
 
                         {{-- Top Controls: Branch Indicator --}}
-                        @if($isLockedBranch)
-                            <div class="mb-3 p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg flex items-center justify-between">
-                                <div class="flex items-center space-x-2">
-                                    <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                    </svg>
-                                    <div>
-                                        <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">Active Branch</span>
-                                        <span class="text-xs font-extrabold text-blue-950">{{ $currentBranchName }}</span>
-                                    </div>
+                        <div class="mb-3 p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                <div>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">Selling Branch</span>
+                                    <span class="text-xs font-extrabold text-blue-950">🏬 {{ $currentBranchName }}</span>
                                 </div>
-                                <span class="text-[10px] bg-blue-200 text-blue-900 font-bold px-2 py-0.5 rounded-full">Station</span>
-                                <input type="hidden" id="branchSelect" value="{{ $currentBranchName }}">
                             </div>
-                        @else
-                            <div class="mb-3">
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider">Selling Branch *</label>
-                                    <span class="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded">Owner Override</span>
-                                </div>
-                                <select id="branchSelect" class="block w-full border-gray-300 rounded-lg shadow-sm text-xs font-bold text-indigo-950 bg-indigo-50/40 focus:ring-indigo-500 focus:border-indigo-500">
-                                    @foreach($branches as $branch)
-                                        <option value="{{ $branch->name }}" {{ ($currentBranchName == $branch->name) ? 'selected' : '' }}>
-                                            {{ $branch->name }} {{ $branch->code ? '('.$branch->code.')' : '' }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        @endif
+                            <span class="text-[10px] bg-blue-200 text-blue-900 font-bold px-2 py-0.5 rounded-full">
+                                {{ $isLockedBranch ? 'Station' : 'Active Scope' }}
+                            </span>
+                            <input type="hidden" id="branchSelect" value="{{ $currentBranchName }}">
+                        </div>
 
                         {{-- Top Controls: Customer Selection & Quick Add --}}
                         <div class="mb-3">

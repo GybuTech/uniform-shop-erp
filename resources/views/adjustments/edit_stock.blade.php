@@ -103,11 +103,11 @@
                     <div class="flex flex-wrap items-center gap-3">
                         <div class="flex items-center space-x-2">
                             <span class="font-bold text-gray-700">Stock For Branch:</span>
-                            <select name="branch_name" id="bulk_branch_name" onchange="switchBranchWithFilters(this.value)" class="text-xs font-bold text-indigo-900 bg-white rounded-lg border-gray-300 py-1 px-2.5">
-                                @foreach($branches as $branch)
-                                    <option value="{{ $branch }}" {{ ($selectedBranch ?? 'Main Shop') === $branch ? 'selected' : '' }}>{{ $branch }}</option>
-                                @endforeach
-                            </select>
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-50 border border-indigo-200 text-indigo-900">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+                                🏬 {{ $selectedBranch }}
+                            </span>
+                            <input type="hidden" name="branch_name" id="bulk_branch_name" value="{{ $selectedBranch }}">
                             <input type="hidden" name="reason" id="bulk_reason" value="Physical Stock Inventory Count">
                         </div>
 
