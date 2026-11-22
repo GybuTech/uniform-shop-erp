@@ -347,13 +347,13 @@
         function priceGroupsManager() {
             return {
                 groups: [
-                    { from_size: '22', to_size: '26', price: 0 },
-                    { from_size: '28', to_size: '30', price: 0 },
-                    { from_size: '32', to_size: '36', price: 0 },
-                    { from_size: '38', to_size: '42', price: 0 }
+                    { from_size: '22', to_size: '26', price: '' },
+                    { from_size: '28', to_size: '30', price: '' },
+                    { from_size: '32', to_size: '36', price: '' },
+                    { from_size: '38', to_size: '42', price: '' }
                 ],
                 addGroupRow() {
-                    this.groups.push({ from_size: '', to_size: '', price: 0 });
+                    this.groups.push({ from_size: '', to_size: '', price: '' });
                 },
                 removeGroupRow(idx) {
                     if (this.groups.length > 1) {
@@ -362,10 +362,9 @@
                 },
                 loadSchoolUniformPresets() {
                     this.groups = [
-                        { from_size: '22', to_size: '26', price: 0 },
-                        { from_size: '28', to_size: '30', price: 0 },
-                        { from_size: '32', to_size: '36', price: 0 },
-                        { from_size: '38', to_size: '42', price: 0 }
+                        { from_size: '', to_size: '', price: '' },
+                        { from_size: '', to_size: '', price: '' },
+                        
                     ];
                 }
             };

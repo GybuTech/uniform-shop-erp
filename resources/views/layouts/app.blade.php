@@ -12,9 +12,6 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-        <!-- AlpineJS -->
-        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
         <!-- Vite Compiled Assets with Offline Production Fallback -->
         @if(file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
             @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -25,14 +22,15 @@
         <style>
             [x-cloak] { display: none !important; }
             body {
-                font-family: 'Plus Jakarta Sans', sans-serif;
+                font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             }
 
             /* Global Input Caret and Cursor Visibility Fix */
             input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
             textarea,
+            select,
             [contenteditable="true"] {
-                caret-color: #2563eb !important;
+                caret-color: #0f172a !important;
                 cursor: text !important;
             }
 

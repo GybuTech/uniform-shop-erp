@@ -143,7 +143,7 @@
                                             <label class="block text-[10px] font-bold text-gray-500 uppercase">Selling Price (KES)</label>
                                             <div class="relative">
                                                 <span class="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-bold text-[10px]">KES</span>
-                                                <input type="number" step="0.01" min="0" :name="`price_groups[${idx}][price]`" x-model.number="group.price" placeholder="900"
+                                                <input type="number" step="0.01" min="0" :name="`price_groups[${idx}][price]`" x-model="group.price" placeholder="900"
                                                        class="pl-9 w-full text-xs font-bold text-emerald-700 rounded border-gray-300 py-1 px-2 focus:ring-indigo-500">
                                             </div>
                                         </div>
@@ -182,7 +182,7 @@
                                             <span class="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-bold text-[10px]">KES</span>
                                             <input type="number" step="0.01" min="0"
                                                    :name="`size_prices[${sz}]`"
-                                                   x-model.number="individualPrices[sz]"
+                                                   x-model="individualPrices[sz]"
                                                    placeholder="0.00"
                                                    class="pl-9 w-full text-xs font-bold text-gray-900 rounded border-gray-300 py-1 px-2 focus:ring-indigo-500">
                                         </div>
@@ -199,7 +199,7 @@
                             <div class="relative w-full sm:w-1/2">
                                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 font-bold text-xs">KES</span>
                                 <input type="number" step="0.01" min="0" name="selling_price" id="selling_price"
-                                       x-model.number="flatPrice"
+                                       x-model="flatPrice"
                                        placeholder="0.00"
                                        class="pl-12 w-full text-xs font-bold text-gray-900 rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
                             </div>
@@ -269,7 +269,7 @@
 
                 // Pricing Modes: 'groups', 'individual', 'flat'
                 pricingMode: 'groups',
-                flatPrice: 0,
+                flatPrice: '',
                 priceGroups: [
                     { from_size: '22', to_size: '26', sizes: '', price: 900 },
                     { from_size: '28', to_size: '30', sizes: '', price: 1000 },
@@ -279,7 +279,7 @@
                 individualPrices: {},
 
                 addGroupRow() {
-                    this.priceGroups.push({ from_size: '', to_size: '', sizes: '', price: 0 });
+                    this.priceGroups.push({ from_size: '', to_size: '', sizes: '', price: '' });
                 },
 
                 removeGroupRow(index) {

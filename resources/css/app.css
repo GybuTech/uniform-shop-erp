@@ -5,8 +5,9 @@
 /* Global Input Caret and Cursor Visibility Fix */
 input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
 textarea,
+select,
 [contenteditable="true"] {
-    caret-color: #4f46e5 !important;
+    caret-color: #0f172a !important;
     cursor: text !important;
 }
 

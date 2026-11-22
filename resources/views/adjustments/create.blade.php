@@ -29,7 +29,7 @@
                             <x-input-label for="branch_name" value="Target Branch *" />
                             <select name="branch_name" id="branch_name" required class="w-full mt-1 border-gray-300 rounded-md shadow-sm text-sm">
                                 @foreach($branches as $branch)
-                                    <option value="{{ $branch }}">{{ $branch }}</option>
+                                    <option value="{{ $branch }}" {{ (old('branch_name', auth()->user()->branch_name ?? '') === $branch) ? 'selected' : '' }}>{{ $branch }}</option>
                                 @endforeach
                             </select>
                         </div>
