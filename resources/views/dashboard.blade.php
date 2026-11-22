@@ -27,7 +27,13 @@
         }
     @endphp
 
-    <div class="space-y-6">
+    <div class="space-y-6" x-data="{
+        chartTab: 'weekly',
+        showLowStockModal: false,
+        showCustomerDebtModal: false,
+        lowStockSearch: '',
+        customerDebtSearch: ''
+    }">
 
         {{-- Pending Incoming Stock Transfer Notification Banner --}}
         @if(isset($pendingIncomingTransfers) && $pendingIncomingTransfers->isNotEmpty())
@@ -64,85 +70,180 @@
 
         @if($isCashier && !$isAdminOrOwner)
             {{-- ======================================================== --}}
-            {{-- CASHIER-ONLY VIEW: STRICTLY SALES-FOCUSED OPERATIONAL UI --}}
+            {{-- CASHIER-ONLY VIEW: HIGH-SPEED OPERATIONAL COUNTER SUITE  --}}
             {{-- ======================================================== --}}
             <div class="space-y-6">
-                {{-- Cashier KPI Cards --}}
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {{-- 1. Today's Revenue --}}
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+                {{-- 4-CARD CASHIER SUITE (UltimatePOS Corporate Blue & Green Aesthetic) --}}
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {{-- 1. Counter Sales Revenue (Corporate Blue Card) --}}
+                    <div class="bg-blue-600 rounded-2xl shadow-sm p-5 text-white flex flex-col justify-between">
                         <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Today's Revenue</span>
-                            <span class="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-blue-100">Counter Sales Revenue</span>
+                            <div class="bg-white/15 rounded-lg p-1.5">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                            </span>
+                            </div>
                         </div>
                         <div>
-                            <p class="text-2xl sm:text-3xl font-black font-mono text-slate-900">KES {{ number_format($todayRevenue, 0) }}</p>
-                            <p class="text-xs text-slate-500 mt-1">{{ $todaySalesCount }} completed sale(s) today</p>
+                            <p class="text-2xl sm:text-3xl font-black font-mono">KES {{ number_format($totalSalesAmount, 0) }}</p>
+                            <p class="text-[11px] text-blue-100 mt-1 flex items-center justify-between">
+                                <span>Today: KES {{ number_format($todayRevenue, 0) }}</span>
+                                <span>{{ $todaySalesCount }} sale(s)</span>
+                            </p>
                         </div>
                     </div>
 
-                    {{-- 2. Total Sales Count --}}
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+                    {{-- 2. Today's Counter Transactions (Light Green Boundary) --}}
+                    <div class="bg-white p-5 rounded-2xl border border-emerald-300 shadow-xs flex flex-col justify-between">
                         <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Transactions</span>
-                            <span class="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Today's Transactions</span>
+                            <span class="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
                             </span>
                         </div>
                         <div>
-                            <p class="text-2xl sm:text-3xl font-black font-mono text-slate-900">{{ number_format($totalSalesCount) }}</p>
-                            <p class="text-xs text-slate-500 mt-1">Total recorded receipts</p>
+                            <p class="text-2xl sm:text-3xl font-black font-mono text-slate-900">{{ number_format($todaySalesCount) }}</p>
+                            <p class="text-[11px] text-slate-500 mt-1">Completed sales on this terminal</p>
                         </div>
                     </div>
 
-                    {{-- 3. Customer Credit Sales (Debt) --}}
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+                    {{-- 3. Customer Debt Due (Clickable Functional Button with Blue Boundary) --}}
+                    <div @click="showCustomerDebtModal = true"
+                         class="bg-white p-5 rounded-2xl border-2 border-blue-400 hover:border-blue-600 shadow-xs hover:shadow-md cursor-pointer transition flex flex-col justify-between group">
                         <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Unsettled Credit Sales</span>
-                            <span class="p-1.5 rounded-lg bg-amber-50 text-amber-600">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-600 group-hover:text-blue-700 transition">Customer Debt Due</span>
+                            <span class="p-1.5 rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </span>
+                        </div>
+                        <div>
+                            <p class="text-2xl sm:text-3xl font-black font-mono text-amber-700">KES {{ number_format($totalCustomerDebt, 0) }}</p>
+                            <p class="text-[11px] text-blue-600 font-semibold mt-1 flex items-center justify-between">
+                                <span>{{ count($allCreditSales) }} credit sale(s)</span>
+                                <span class="underline">View Debts &rarr;</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    {{-- 4. Low Stock Alert (Clickable Functional Button with Blue Boundary) --}}
+                    <div @click="showLowStockModal = true"
+                         class="bg-white p-5 rounded-2xl border-2 border-blue-400 hover:border-blue-600 shadow-xs hover:shadow-md cursor-pointer transition flex flex-col justify-between group">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-600 group-hover:text-blue-700 transition">Low Stock Alert</span>
+                            <span class="p-1.5 rounded-lg bg-rose-50 text-rose-700 group-hover:bg-rose-600 group-hover:text-white transition">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
                             </span>
                         </div>
                         <div>
-                            <p class="text-2xl sm:text-3xl font-black font-mono text-amber-700">KES {{ number_format($totalCustomerDebt, 0) }}</p>
-                            <p class="text-xs text-slate-500 mt-1">Pending customer collections</p>
+                            <p class="text-2xl sm:text-3xl font-black font-mono text-rose-600">{{ $lowStockCount }} Item(s)</p>
+                            <p class="text-[11px] text-blue-600 font-semibold mt-1 flex items-center justify-between">
+                                <span>Stock &le; 5 units</span>
+                                <span class="underline">View Items &rarr;</span>
+                            </p>
                         </div>
                     </div>
                 </div>
 
-                {{-- Cashier Fast Action --}}
-                <div class="flex">
-                    @can('create-sales')
-                    <a href="{{ route('pos.index') }}"
-                       class="inline-flex items-center space-x-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm shadow-sm transition">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                        <span>Launch POS Terminal</span>
-                    </a>
-                    @endcan
+                {{-- CASHIER QUICK ACTIONS (Blue Boundary) --}}
+                <div class="pt-2 border-t border-slate-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Quick Actions</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        @can('create-sales')
+                        <a href="{{ route('pos.index') }}"
+                           class="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-2xs hover:shadow-sm transition group border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-50/20">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold bg-blue-50 text-blue-700 group-hover:scale-105 transition">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-bold text-sm text-slate-900 group-hover:text-blue-700">Launch POS Terminal</p>
+                                <p class="text-xs text-slate-500">Fast checkout & thermal receipts</p>
+                            </div>
+                        </a>
+                        @endcan
+
+                        <a href="{{ route('transfers.index') }}"
+                           class="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-2xs hover:shadow-sm transition group border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-50/20">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold bg-blue-50 text-blue-700 group-hover:scale-105 transition">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-bold text-sm text-slate-900 group-hover:text-blue-700">Stock Transfers</p>
+                                <p class="text-xs text-slate-500">Incoming & inter-branch goods</p>
+                            </div>
+                        </a>
+
+                        @can('view-sales')
+                        <a href="{{ route('sales.index') }}"
+                           class="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-2xs hover:shadow-sm transition group border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-50/20">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold bg-blue-50 text-blue-700 group-hover:scale-105 transition">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-bold text-sm text-slate-900 group-hover:text-blue-700">Counter Receipts</p>
+                                <p class="text-xs text-slate-500">View sales history & reprint receipts</p>
+                            </div>
+                        </a>
+                        @endcan
+                    </div>
                 </div>
 
-                {{-- Cashier Recent Sales Log --}}
+                {{-- CASHIER SALES REVENUE LINE GRAPH --}}
+                <div class="bg-white shadow-xs rounded-2xl p-6 border border-slate-200">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 mb-4 border-b border-slate-100 gap-3">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-base">Counter Sales Revenue Trend</h3>
+                            <p class="text-xs text-slate-500">Terminal performance across weekly, monthly, and annual cycles</p>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 bg-slate-100 p-1 rounded-xl">
+                            <button type="button" @click="chartTab = 'weekly'"
+                                    class="px-3 py-1 rounded-lg text-xs font-bold transition"
+                                    :class="chartTab === 'weekly' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'">
+                                7 Days
+                            </button>
+                            <button type="button" @click="chartTab = '30day'"
+                                    class="px-3 py-1 rounded-lg text-xs font-bold transition"
+                                    :class="chartTab === '30day' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'">
+                                30 Days
+                            </button>
+                            <button type="button" @click="chartTab = 'monthly'"
+                                    class="px-3 py-1 rounded-lg text-xs font-bold transition"
+                                    :class="chartTab === 'monthly' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'">
+                                Financial Year
+                            </button>
+                        </div>
+                    </div>
+                    <div class="h-64 sm:h-72 w-full relative">
+                        <canvas id="salesTrendChart"></canvas>
+                    </div>
+                </div>
+
+                {{-- CASHIER RECENT SALES RECEIPTS FEED --}}
                 <div class="bg-white shadow-xs rounded-2xl p-6 border border-slate-200">
                     <div class="flex justify-between items-center pb-3 mb-3 border-b border-slate-100">
                         <div>
                             <h3 class="font-bold text-slate-900 text-base">Your Counter Sales Receipts</h3>
-                            <p class="text-xs text-slate-500">Recent completed customer transactions</p>
+                            <p class="text-xs text-slate-500">Recent completed transactions on this terminal</p>
                         </div>
                         <a href="{{ route('sales.index') }}" class="text-xs font-bold text-blue-600 hover:underline">View Sales Log &rarr;</a>
                     </div>
                     <div class="divide-y divide-slate-100">
                         @forelse($recentSales as $sale)
-                        <div class="flex justify-between items-center py-3">
+                        <div class="flex justify-between items-center py-3 hover:bg-slate-50 rounded-xl px-2 transition">
                             <div>
                                 <p class="text-sm font-bold text-slate-900 font-mono">{{ $sale->receipt_number }}</p>
                                 <p class="text-xs text-slate-500">
@@ -166,13 +267,7 @@
             {{-- ======================================================== --}}
             {{-- ADMIN / OWNER VIEW: FULL EXECUTIVE FINANCIAL SUITE       --}}
             {{-- ======================================================== --}}
-            <div class="space-y-6" x-data="{
-                chartTab: 'weekly',
-                showLowStockModal: false,
-                showCustomerDebtModal: false,
-                lowStockSearch: '',
-                customerDebtSearch: ''
-            }">
+            <div class="space-y-6">
 
                 {{-- 2-ROW EXECUTIVE METRIC CARDS (UltimatePOS Corporate Blue Aesthetic) --}}
                 <div class="space-y-4">
@@ -521,9 +616,12 @@
 
                 </div>
 
-                {{-- ========================================================================= --}}
-                {{-- MODAL 1: LOW STOCK PRODUCTS (Grouped by Product Name to Avoid Long Lists) --}}
-                {{-- ========================================================================= --}}
+            </div>
+        @endif
+
+        {{-- ========================================================================= --}}
+        {{-- MODAL 1: LOW STOCK PRODUCTS (Grouped by Product Name to Avoid Long Lists) --}}
+        {{-- ========================================================================= --}}
                 <div x-show="showLowStockModal" x-cloak
                      class="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
                      @keydown.escape.window="showLowStockModal = false">
@@ -560,9 +658,11 @@
                                 <span class="text-xs font-bold px-3 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-full font-mono">
                                     {{ $lowStockCount }} Critical Size(s)
                                 </span>
+                                @if($isAdminOrOwner || auth()->user()->can('manage-inventory'))
                                 <a href="{{ route('adjustments.edit-stock') }}" class="text-xs font-bold text-blue-600 hover:underline px-2 py-1">
                                     Edit Quantities &rarr;
                                 </a>
+                                @endif
                             </div>
                         </div>
 
@@ -598,11 +698,13 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                                 </svg>
                                             </button>
+                                            @if($isAdminOrOwner || auth()->user()->can('edit-products'))
                                             <a href="{{ route('products.variants.index', $lsp) }}"
                                                class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
                                                title="Manage Product Variants">
                                                 Manage
                                             </a>
+                                            @endif
                                         </div>
                                     </div>
 
@@ -620,6 +722,11 @@
                                             </thead>
                                             <tbody class="divide-y divide-slate-50 font-medium">
                                                 @foreach($lsp->variants as $variant)
+                                                @php
+                                                    $dispStock = ($selectedBranch !== 'all' && !empty($selectedBranch))
+                                                        ? $variant->getStockForBranch($selectedBranch)
+                                                        : $variant->stock_quantity;
+                                                @endphp
                                                 <tr class="hover:bg-slate-50 transition">
                                                     <td class="py-2 font-bold text-slate-800">
                                                         Size {{ $variant->size }}
@@ -630,11 +737,11 @@
                                                     <td class="py-2 text-right font-mono text-slate-700">
                                                         KES {{ number_format($variant->selling_price, 2) }}
                                                     </td>
-                                                    <td class="py-2 text-right font-black font-mono {{ $variant->stock_quantity == 0 ? 'text-red-600' : 'text-amber-700' }}">
-                                                        {{ $variant->stock_quantity }}
+                                                    <td class="py-2 text-right font-black font-mono {{ $dispStock == 0 ? 'text-red-600' : 'text-amber-700' }}">
+                                                        {{ $dispStock }}
                                                     </td>
                                                     <td class="py-2 text-right">
-                                                        @if($variant->stock_quantity == 0)
+                                                        @if($dispStock == 0)
                                                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800">Out of Stock</span>
                                                         @else
                                                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Critical (&le; 5)</span>
@@ -866,7 +973,6 @@
                     });
                 });
             </script>
-        @endif
 
     </div>
 </x-app-layout>

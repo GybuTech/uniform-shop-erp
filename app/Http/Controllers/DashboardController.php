@@ -23,9 +23,17 @@ class DashboardController extends Controller
     {
         $today = SystemTime::today();
 
-        // 1. Multi-Branch Resolution
+        // Dynamic Role Name & Presentation
+        $primaryRole = auth()->user()->roles->first()?->name ?? 'staff';
+        $displayRole = ucwords(str_replace('_', ' ', $primaryRole));
+        $isCashier = strtolower($primaryRole) === 'cashier';
+        $isAdminOrOwner = in_array(strtolower($primaryRole), ['owner', 'system_administrator', 'admin', 'manager']);
+
+        // 1. Multi-Branch Resolution (Cashier is strictly bound to their station branch)
         $branches = Branch::where('is_active', true)->get();
-        if ($request->has('branch')) {
+        if ($isCashier && !empty(auth()->user()->branch_name)) {
+            $selectedBranch = auth()->user()->branch_name;
+        } elseif ($request->has('branch')) {
             $selectedBranch = $request->input('branch');
             session(['active_branch' => $selectedBranch]);
         } else {
@@ -89,23 +97,49 @@ class DashboardController extends Controller
             ->when($selectedBranch !== 'all' && !empty($selectedBranch), fn($q) => $q->where('branch_name', $selectedBranch))
             ->count();
 
-        // Low stock alerts (stock <= 5)
-        $lowStockVariants = ProductVariant::with('product')
-            ->where('stock_quantity', '<=', 5)
-            ->orderBy('stock_quantity', 'asc')
-            ->take(5)
-            ->get();
-        $lowStockCount = ProductVariant::where('stock_quantity', '<=', 5)->count();
+        // Low stock alerts (stock <= 5 units)
+        $branchStockExists = ($selectedBranch !== 'all' && !empty($selectedBranch))
+            ? \App\Models\BranchStock::where('branch_name', $selectedBranch)->exists()
+            : false;
 
-        // Grouped products with their low stock variants
-        $lowStockProducts = Product::whereHas('variants', function($q) {
-                $q->where('stock_quantity', '<=', 5);
-            })
-            ->with(['category', 'variants' => function($q) {
-                $q->where('stock_quantity', '<=', 5)->orderBy('stock_quantity', 'asc');
-            }])
-            ->orderBy('name')
-            ->get();
+        if ($branchStockExists) {
+            $lowStockProducts = Product::whereHas('variants', function($q) use ($selectedBranch) {
+                    $q->whereHas('branchStocks', function($bs) use ($selectedBranch) {
+                        $bs->where('branch_name', $selectedBranch)->where('stock_quantity', '<=', 5);
+                    });
+                })
+                ->with(['category', 'variants' => function($q) use ($selectedBranch) {
+                    $q->whereHas('branchStocks', function($bs) use ($selectedBranch) {
+                        $bs->where('branch_name', $selectedBranch)->where('stock_quantity', '<=', 5);
+                    })->with(['branchStocks' => fn($b) => $b->where('branch_name', $selectedBranch)]);
+                }])
+                ->orderBy('name')
+                ->get();
+
+            $lowStockCount = ProductVariant::whereHas('branchStocks', function($bs) use ($selectedBranch) {
+                $bs->where('branch_name', $selectedBranch)->where('stock_quantity', '<=', 5);
+            })->count();
+
+            $lowStockVariants = ProductVariant::whereHas('branchStocks', function($bs) use ($selectedBranch) {
+                $bs->where('branch_name', $selectedBranch)->where('stock_quantity', '<=', 5);
+            })->with('product')->take(5)->get();
+        } else {
+            $lowStockCount = ProductVariant::where('stock_quantity', '<=', 5)->count();
+            $lowStockVariants = ProductVariant::with('product')
+                ->where('stock_quantity', '<=', 5)
+                ->orderBy('stock_quantity', 'asc')
+                ->take(5)
+                ->get();
+
+            $lowStockProducts = Product::whereHas('variants', function($q) {
+                    $q->where('stock_quantity', '<=', 5);
+                })
+                ->with(['category', 'variants' => function($q) {
+                    $q->where('stock_quantity', '<=', 5)->orderBy('stock_quantity', 'asc');
+                }])
+                ->orderBy('name')
+                ->get();
+        }
 
         // Recent transactions
         $recentSales = (clone $salesQuery)->with(['customer', 'user', 'saleItems'])
@@ -147,12 +181,6 @@ class DashboardController extends Controller
                 ->whereMonth('created_at', $month->month)
                 ->sum('total_amount');
         }
-
-        // Dynamic Role Name & Presentation
-        $primaryRole = auth()->user()->roles->first()?->name ?? 'staff';
-        $displayRole = ucwords(str_replace('_', ' ', $primaryRole));
-        $isCashier = strtolower($primaryRole) === 'cashier';
-        $isAdminOrOwner = in_array(strtolower($primaryRole), ['owner', 'system_administrator', 'admin', 'manager']);
 
         // Pending Stock Transfers dispatched to the user/active branch
         $userBranch = auth()->user()->branch_name ?: ($selectedBranch !== 'all' ? $selectedBranch : 'Main Shop');
