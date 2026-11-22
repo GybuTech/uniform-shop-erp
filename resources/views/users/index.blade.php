@@ -60,21 +60,30 @@
                         @endif
                     </td>
                     <td class="px-6 py-4 text-sm text-right space-x-2 whitespace-nowrap">
-                        <a href="{{ route('users.edit', $user) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">Edit</a>
+                        <a href="{{ route('users.edit', $user) }}" title="Edit"
+                           class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </a>
                         <form method="POST" action="{{ route('users.toggle-status', $user) }}" class="inline" onsubmit="return confirm('Change account status for {{ $user->name }}?')">
                             @csrf
                             @method('PATCH')
-                            <button type="submit" class="{{ $user->is_active ? 'text-amber-600 hover:text-amber-900' : 'text-emerald-600 hover:text-emerald-900' }} font-medium">
-                                {{ $user->is_active ? 'Deactivate' : 'Activate' }}
+                            <button type="submit" title="{{ $user->is_active ? 'Deactivate' : 'Activate' }}"
+                                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg {{ $user->is_active ? 'bg-amber-50 hover:bg-amber-100 text-amber-600' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600' }} transition">
+                                @if($user->is_active)
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                                @else
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728M12 8v4l3 3"/></svg>
+                                @endif
                             </button>
                         </form>
                         @can('delete-users')
                             @if(auth()->id() !== $user->id && !in_array('owner', $user->roles->pluck('name')->toArray()))
-                            <form method="POST" action="{{ route('users.destroy', $user) }}" class="inline" onsubmit="return confirm('WARNING: Are you sure you want to permanently delete staff account {{ $user->name }}?');">
+                            <form method="POST" action="{{ route('users.destroy', $user) }}" class="inline" onsubmit="return confirm('WARNING: Permanently delete {{ $user->name }}?');">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="font-medium hover:underline ml-1" style="color: #dc2626 !important;">
-                                    Delete
+                                <button type="submit" title="Delete"
+                                        class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                 </button>
                             </form>
                             @endif

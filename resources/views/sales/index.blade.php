@@ -1,4 +1,4 @@
-<x-app-layout>
+﻿<x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
@@ -156,15 +156,29 @@
                                 </td>
                                 <td class="px-4 py-3.5 text-slate-600">{{ $sale->user->name ?? 'Staff' }}</td>
                                 <td class="px-5 py-3.5 text-slate-500 font-mono">{{ $sale->created_at->format('M d, Y H:i') }}</td>
-                                <td class="px-5 py-3.5 text-right">
-                                    <a href="{{ route('sales.show', $sale) }}" target="_blank"
-                                       class="inline-flex items-center space-x-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition">
-                                        <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                        </svg>
-                                        <span>Receipt</span>
-                                    </a>
-                                </td>
+                                <td                                  <td class="px-5 py-3.5 text-right">
+                                    <div class="flex items-center justify-end space-x-1.5">
+                                        <a href="{{ route('sales.show', $sale) }}" target="_blank"
+                                           class="inline-flex items-center space-x-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition">
+                                            <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                            </svg>
+                                            <span>Receipt</span>
+                                        </a>
+                                        @hasanyrole('admin|owner|system_administrator')
+                                        <form method="POST" action="{{ route('sales.destroy', $sale) }}"
+                                              class="inline"
+                                              onsubmit="return confirm('VOID & delete receipt #{{ $sale->receipt_number }}? Stock will be restored.')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" title="Void Receipt"
+                                                    class="inline-flex items-center justify-center w-7 h-7 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                            </button>
+                                        </form>
+                                        @endhasanyrole
+                                    </div>
+                                 </td>
                             </tr>
                             @empty
                             <tr>
@@ -277,3 +291,4 @@
         }
     </script>
 </x-app-layout>
+

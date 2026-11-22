@@ -285,4 +285,22 @@ class SettingsController extends Controller
         return redirect()->route('login')
             ->with('status', 'Account session closed. Enter username and password to log in.');
     }
+
+    public function switchBranchSession(Request $request)
+    {
+        $branchName = trim($request->input('branch_name', ''));
+
+        if (empty($branchName)) {
+            session()->forget(['active_branch_id', 'active_branch_name']);
+        } else {
+            $branch = \App\Models\Branch::where('name', $branchName)->first();
+            session([
+                'active_branch_id'   => $branch?->id,
+                'active_branch_name' => $branchName,
+            ]);
+        }
+
+        // Stay on the exact page the user was on — no dashboard redirect
+        return redirect()->back();
+    }
 }

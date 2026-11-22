@@ -2,7 +2,7 @@
     $navUser = Auth::user();
     $isSuperAdmin = $navUser && $navUser->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager']);
     $allBranches = \App\Models\Branch::where('is_active', true)->orderBy('name')->get();
-    $currentBranchName = $navUser?->branch_name ?: ($allBranches->first()?->name ?? 'Main Shop');
+    $currentBranchName = session('active_branch_name') ?: ($navUser?->branch_name ?: ($allBranches->first()?->name ?? 'Main Shop'));
 @endphp
 
 <div x-data="topUtilityBar()" 
@@ -31,23 +31,30 @@
                 <div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     Switch Active Store View
                 </div>
-                <a href="{{ request()->fullUrlWithQuery(['branch' => 'all']) }}" 
-                   @click="open = false"
-                   class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition {{ $currentBranchName === 'all' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
-                    <span>All Branches (All Stores)</span>
-                    @if($currentBranchName === 'all')
+                {{-- Hidden form that POSTs the branch name and stays on current page --}}
+                <form method="POST" action="{{ route('settings.branch.session') }}" id="branchSwitchForm">
+                    @csrf
+                    <input type="hidden" name="branch_name" id="branchSwitchValue" value="">
+                </form>
+                <button type="button"
+                        onclick="document.getElementById('branchSwitchValue').value=''; document.getElementById('branchSwitchForm').submit();"
+                        @click="open = false"
+                        class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ empty(session('active_branch_name')) ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
+                    <span>All Branches</span>
+                    @if(empty(session('active_branch_name')))
                         <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                     @endif
-                </a>
+                </button>
                 @foreach($allBranches as $br)
-                    <a href="{{ request()->fullUrlWithQuery(['branch' => $br->name]) }}" 
-                       @click="open = false"
-                       class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition {{ $currentBranchName === $br->name ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
+                    <button type="button"
+                            onclick="document.getElementById('branchSwitchValue').value='{{ addslashes($br->name) }}'; document.getElementById('branchSwitchForm').submit();"
+                            @click="open = false"
+                            class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ session('active_branch_name') === $br->name ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
                         <span>{{ $br->name }}</span>
-                        @if($currentBranchName === $br->name)
+                        @if(session('active_branch_name') === $br->name)
                             <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                         @endif
-                    </a>
+                    </button>
                 @endforeach
             </div>
         </div>

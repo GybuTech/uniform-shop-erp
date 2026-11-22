@@ -36,7 +36,9 @@ class PosController extends Controller
 
         if ($isOwnerOrAdmin) {
             $isLockedBranch = false;
-            $currentBranchName = $request->get('branch') ?: ($user->branch_name ?: ($branches->first()?->name ?? 'Main Shop'));
+            $currentBranchName = session('active_branch_name')
+                ?: $request->get('branch')
+                ?: ($user->branch_name ?: ($branches->first()?->name ?? 'Main Shop'));
         } else {
             $isLockedBranch = true;
             $currentBranchName = $user->branch_name ?: ($branches->first()?->name ?? 'Main Shop');
@@ -527,7 +529,7 @@ class PosController extends Controller
         $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
 
         $search = $request->get('search');
-        $branchFilter = $request->get('branch');
+        $branchFilter = $request->get('branch') ?: session('active_branch_name');
 
         $query = Sale::with(['customer', 'user'])->withCount('saleItems');
 
@@ -642,5 +644,58 @@ class PosController extends Controller
             'success' => true,
             'message' => "Parked sale discarded.",
         ]);
+    }
+
+    public function destroySale(Sale $sale)
+    {
+        $user = auth()->user();
+        if (!$user || !$user->hasAnyRole(['admin', 'owner', 'system_administrator'])) {
+            abort(403, 'Only administrators and owners can void completed sales.');
+        }
+
+        $receiptNumber = $sale->receipt_number;
+
+        DB::transaction(function () use ($sale) {
+            // Restore stock for every line item back to the branch shelf
+            foreach ($sale->items as $item) {
+                $branchStock = BranchStock::where('branch_name', $sale->branch_name)
+                    ->where('product_variant_id', $item->product_variant_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($branchStock) {
+                    $branchStock->increment('stock_quantity', $item->quantity);
+                } else {
+                    BranchStock::create([
+                        'branch_name'        => $sale->branch_name,
+                        'product_variant_id' => $item->product_variant_id,
+                        'stock_quantity'     => $item->quantity,
+                    ]);
+                }
+
+                // Sync variant cached total
+                if ($item->productVariant) {
+                    $item->productVariant->update([
+                        'stock_quantity' => $item->productVariant->branchStocks()->sum('stock_quantity'),
+                    ]);
+                }
+            }
+
+            // Reverse shift totals if the sale was linked to a shift
+            if ($sale->shift_id) {
+                $shift = Shift::find($sale->shift_id);
+                if ($shift) {
+                    $shift->decrement('total_sales', $sale->total_amount);
+                    $shift->decrement('total_transactions', 1);
+                }
+            }
+
+            // Delete line items then the sale header
+            $sale->items()->delete();
+            $sale->delete();
+        });
+
+        return redirect()->route('sales.index')
+            ->with('success', "Receipt #{$receiptNumber} voided and items restored to shelf stock.");
     }
 }
