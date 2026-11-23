@@ -657,4 +657,15 @@ class PosController extends Controller
         return redirect()->route('sales.index')
             ->with('success', "Receipt #{$invoiceNo} was successfully voided and inventory returned to shelves.");
     }
+
+    public function thermalReceipt(Sale $sale, Request $request)
+    {
+        $sale->load(['customer', 'user', 'items.productVariant.product']);
+
+        return view('receipts.thermal', [
+            'sale'      => $sale,
+            'isCopy'    => $request->boolean('copy'),
+            'autoPrint' => !$request->boolean('preview'),
+        ]);
+    }
 }

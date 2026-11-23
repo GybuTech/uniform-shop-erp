@@ -722,6 +722,7 @@ class ProductVariantController extends Controller
                 'formatted_title' => $variant->formatted_title,
                 'category_name'   => $variant->product?->category?->name ?? 'General',
                 'sku'             => $variant->sku,
+                'barcode'         => $variant->barcode,
                 'size'            => $variant->size,
                 'colour'          => $variant->colour,
                 'selling_price'   => number_format($variant->selling_price, 2),

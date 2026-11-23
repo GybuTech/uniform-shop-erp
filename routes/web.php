@@ -4,6 +4,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\LabelController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductVariantController;
@@ -211,6 +212,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/pos/receipt', [PosController::class, 'receipt'])
         ->name('pos.receipt')
         ->middleware('permission:create-sales');
+    Route::get('/pos/receipt/{sale}/thermal', [PosController::class, 'thermalReceipt'])
+        ->name('pos.receipt.thermal')
+        ->middleware('permission:create-sales');
+    Route::get('/sales/{sale}/thermal', [PosController::class, 'thermalReceipt'])
+        ->name('sales.thermal')
+        ->middleware('permission:view-sales');
+    Route::get('/labels', [LabelController::class, 'index'])->name('labels.index');
+    Route::post('/labels/print', [LabelController::class, 'print'])->name('labels.print');
     Route::post('/pos/park', [PosController::class, 'parkSale'])
         ->name('pos.park')
         ->middleware('permission:create-sales');

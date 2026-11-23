@@ -127,6 +127,7 @@
                 @can('edit-product-variants')
                 <a href="{{ route('products.prices') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('products.prices*') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Update Price Groups</a>
                 @endcan
+                <a href="{{ route('labels.index') }}" class="block py-1 px-2 rounded hover:bg-slate-800 {{ request()->routeIs('labels.*') ? 'text-blue-400 font-bold' : 'text-slate-400' }}">Print Barcode Labels</a>
             </div>
         </div>
         @endif
