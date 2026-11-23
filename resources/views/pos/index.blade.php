@@ -960,8 +960,8 @@
             if (cart.length === 0) {
                 cartList.innerHTML = '<p class="text-gray-400 text-xs text-center py-6 border border-dashed rounded-lg">Cart is currently empty</p>';
                 grandTotalEl.innerText = 'KES 0.00';
-                checkoutBtn.disabled = true;
-                checkoutBtnText.innerText = 'Complete Sale (KES 0.00)';
+                if (checkoutBtn) checkoutBtn.disabled = true;
+                if (checkoutBtnText) checkoutBtnText.innerText = 'Complete Sale (KES 0.00)';
                 updateSplitDisplays(0);
                 return;
             }
@@ -1005,8 +1005,8 @@
             }).join('');
 
             grandTotalEl.innerText = `KES ${total.toFixed(2)}`;
-            checkoutBtn.disabled = false;
-            checkoutBtnText.innerText = `Complete Sale (KES ${total.toFixed(2)})`;
+            if (checkoutBtn) checkoutBtn.disabled = false;
+            if (checkoutBtnText) checkoutBtnText.innerText = `Complete Sale (KES ${total.toFixed(2)})`;
 
             updateSplitDisplays(total);
         }
@@ -1017,20 +1017,20 @@
             const creditPanel = document.getElementById('creditNoticePanel');
             const mpesaPanel = document.getElementById('mpesaRefPanel');
 
-            splitPanel.classList.add('hidden');
-            creditPanel.classList.add('hidden');
+            if (splitPanel) splitPanel.classList.add('hidden');
+            if (creditPanel) creditPanel.classList.add('hidden');
             if (mpesaPanel) mpesaPanel.classList.add('hidden');
 
             if (method === 'M-Pesa') {
                 if (mpesaPanel) mpesaPanel.classList.remove('hidden');
             } else if (method === 'Split') {
-                splitPanel.classList.remove('hidden');
+                if (splitPanel) splitPanel.classList.remove('hidden');
                 if (mpesaPanel) mpesaPanel.classList.remove('hidden');
                 openSplitPaymentModal();
             } else if (method === 'Credit') {
-                creditPanel.classList.remove('hidden');
+                if (creditPanel) creditPanel.classList.remove('hidden');
                 const custSelect = document.getElementById('customerSelect');
-                if (!custSelect.value) {
+                if (custSelect && !custSelect.value) {
                     alert('Notice: Credit Sale requires a registered customer account. Please select or register a customer.');
                 }
             }
@@ -1038,39 +1038,52 @@
 
         function onCustomerChange() {
             const custSelect = document.getElementById('customerSelect');
+            if (!custSelect) return;
             const selOption = custSelect.options[custSelect.selectedIndex];
-            const custName = selOption.getAttribute('data-name') || 'Walk-in Customer';
-            document.getElementById('creditCustomerNotice').innerText =
-                custSelect.value
+            const custName = selOption ? selOption.getAttribute('data-name') : 'Walk-in Customer';
+            const noticeEl = document.getElementById('creditCustomerNotice');
+            if (noticeEl) {
+                noticeEl.innerText = custSelect.value
                     ? `Stock will be deducted immediately and KES ${calculateCartTotal().toFixed(2)} will be charged to ${custName}'s credit debt ledger.`
                     : 'A registered customer must be selected to record this sale on credit.';
+            }
         }
 
         function openSplitPaymentModal() {
             const total = calculateCartTotal();
-            document.getElementById('splitModalTotal').innerText = `KES ${total.toFixed(2)}`;
+            if (total <= 0) {
+                alert('Please add items to the cart before opening split payment.');
+                return;
+            }
+            const modalTotalEl = document.getElementById('splitModalTotal');
+            if (modalTotalEl) modalTotalEl.innerText = `KES ${total.toFixed(2)}`;
 
-            if (splitCash === 0 && splitMpesa === 0 && total > 0) {
-                // Default split: 50% Cash, 50% M-Pesa
+            // Auto-balance if split doesn't match total
+            if (Math.abs((splitCash + splitMpesa) - total) >= 0.05) {
                 splitCash = Math.round((total / 2) * 100) / 100;
                 splitMpesa = Math.round((total - splitCash) * 100) / 100;
             }
 
-            document.getElementById('splitCashInput').value = splitCash;
-            document.getElementById('splitMpesaInput').value = splitMpesa;
+            const cashInput = document.getElementById('splitCashInput');
+            const mpesaInput = document.getElementById('splitMpesaInput');
+            if (cashInput) cashInput.value = splitCash;
+            if (mpesaInput) mpesaInput.value = splitMpesa;
+
             onSplitInputChange();
-            document.getElementById('splitPaymentModal').classList.remove('hidden');
+            const modal = document.getElementById('splitPaymentModal');
+            if (modal) modal.classList.remove('hidden');
         }
 
         function closeSplitPaymentModal() {
-            document.getElementById('splitPaymentModal').classList.add('hidden');
+            const modal = document.getElementById('splitPaymentModal');
+            if (modal) modal.classList.add('hidden');
         }
 
         function onSplitInputChange() {
             const total = calculateCartTotal();
-            const cash = parseFloat(document.getElementById('splitCashInput').value) || 0;
-            const mpesa = parseFloat(document.getElementById('splitMpesaInput').value) || 0;
-            const allocated = cash + mpesa;
+            const cash = parseFloat(document.getElementById('splitCashInput')?.value) || 0;
+            const mpesa = parseFloat(document.getElementById('splitMpesaInput')?.value) || 0;
+            const allocated = Math.round((cash + mpesa) * 100) / 100;
             const remaining = Math.round((total - allocated) * 100) / 100;
             const isBalanced = Math.abs(allocated - total) < 0.05;
 
@@ -1079,15 +1092,15 @@
             const applyBtn = document.getElementById('splitApplyBtn');
             const errorMsg = document.getElementById('splitModalErrorMsg');
 
-            remEl.innerText = `KES ${remaining.toFixed(2)}`;
+            if (remEl) remEl.innerText = `KES ${remaining.toFixed(2)}`;
 
             if (isBalanced) {
-                box.className = 'p-2.5 rounded-lg text-xs font-bold flex justify-between items-center bg-emerald-50 text-emerald-800 border border-emerald-200';
-                applyBtn.disabled = false;
+                if (box) box.className = 'p-2.5 rounded-lg text-xs font-bold flex justify-between items-center bg-emerald-50 text-emerald-800 border border-emerald-200';
+                if (applyBtn) applyBtn.disabled = false;
                 if (errorMsg) errorMsg.classList.add('hidden');
             } else {
-                box.className = 'p-2.5 rounded-lg text-xs font-bold flex justify-between items-center ' + (remaining > 0 ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-rose-50 text-rose-800 border border-rose-200');
-                applyBtn.disabled = true;
+                if (box) box.className = 'p-2.5 rounded-lg text-xs font-bold flex justify-between items-center ' + (remaining > 0 ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-rose-50 text-rose-800 border border-rose-200');
+                if (applyBtn) applyBtn.disabled = true;
                 if (errorMsg) errorMsg.classList.remove('hidden');
             }
         }
@@ -1096,58 +1109,95 @@
             const total = calculateCartTotal();
             splitCash = Math.round((total / 2) * 100) / 100;
             splitMpesa = Math.round((total - splitCash) * 100) / 100;
-            document.getElementById('splitCashInput').value = splitCash;
-            document.getElementById('splitMpesaInput').value = splitMpesa;
+            const cashInput = document.getElementById('splitCashInput');
+            const mpesaInput = document.getElementById('splitMpesaInput');
+            if (cashInput) cashInput.value = splitCash;
+            if (mpesaInput) mpesaInput.value = splitMpesa;
             onSplitInputChange();
         }
 
         function fillRemainderToMpesa() {
             const total = calculateCartTotal();
-            const cash = parseFloat(document.getElementById('splitCashInput').value) || 0;
-            document.getElementById('splitMpesaInput').value = Math.max(0, Math.round((total - cash) * 100) / 100);
+            const cash = parseFloat(document.getElementById('splitCashInput')?.value) || 0;
+            const mpesaInput = document.getElementById('splitMpesaInput');
+            if (mpesaInput) mpesaInput.value = Math.max(0, Math.round((total - cash) * 100) / 100);
             onSplitInputChange();
         }
 
         function fillRemainderToCash() {
             const total = calculateCartTotal();
-            const mpesa = parseFloat(document.getElementById('splitMpesaInput').value) || 0;
-            document.getElementById('splitCashInput').value = Math.max(0, Math.round((total - mpesa) * 100) / 100);
+            const mpesa = parseFloat(document.getElementById('splitMpesaInput')?.value) || 0;
+            const cashInput = document.getElementById('splitCashInput');
+            if (cashInput) cashInput.value = Math.max(0, Math.round((total - mpesa) * 100) / 100);
             onSplitInputChange();
         }
 
         function applySplitPayment() {
-            splitCash = parseFloat(document.getElementById('splitCashInput').value) || 0;
-            splitMpesa = parseFloat(document.getElementById('splitMpesaInput').value) || 0;
             const total = calculateCartTotal();
-            const totalSplit = splitCash + splitMpesa;
+            if (total <= 0) {
+                alert('Shopping cart is empty. Please add items to the cart before completing sale.');
+                return;
+            }
+
+            splitCash = parseFloat(document.getElementById('splitCashInput')?.value) || 0;
+            splitMpesa = parseFloat(document.getElementById('splitMpesaInput')?.value) || 0;
+            const totalSplit = Math.round((splitCash + splitMpesa) * 100) / 100;
+
             if (Math.abs(total - totalSplit) >= 0.05) {
                 const errorMsg = document.getElementById('splitModalErrorMsg');
                 if (errorMsg) errorMsg.classList.remove('hidden');
+                alert('Allocated total does not equal cart total.');
                 return;
             }
 
             const splitRef = document.getElementById('splitMpesaRefInput')?.value.trim();
-            // Allow cashiers to type full codes (10 chars), short codes (last 3–4 digits), or leave blank
-            document.getElementById('formPaymentReference').value = splitRef ? splitRef.toUpperCase() : 'MPESA-REF';
+            const refVal = splitRef ? splitRef.toUpperCase() : 'MPESA-REF';
 
-            document.getElementById('paymentMethod').value = 'Split';
+            const methodEl = document.getElementById('paymentMethod');
+            if (methodEl) methodEl.value = 'Split';
+
+            const formMethod = document.getElementById('formPaymentMethod');
+            if (formMethod) formMethod.value = 'Split';
+
+            const formRef = document.getElementById('formPaymentReference');
+            if (formRef) formRef.value = refVal;
+
+            const formCash = document.getElementById('formCashAmount');
+            if (formCash) formCash.value = splitCash;
+
+            const formMpesa = document.getElementById('formMpesaAmount');
+            if (formMpesa) formMpesa.value = splitMpesa;
+
             updateSplitDisplays(total);
             closeSplitPaymentModal();
             executeCheckout();
         }
 
         function updateSplitDisplays(total) {
-            document.getElementById('splitCashDisplay').innerText = `KES ${splitCash.toFixed(2)}`;
-            document.getElementById('splitMpesaDisplay').innerText = `KES ${splitMpesa.toFixed(2)}`;
-            document.getElementById('formCashAmount').value = splitCash;
-            document.getElementById('formMpesaAmount').value = splitMpesa;
+            const cashEl = document.getElementById('splitCashDisplay');
+            if (cashEl) cashEl.innerText = `KES ${splitCash.toFixed(2)}`;
+
+            const mpesaEl = document.getElementById('splitMpesaDisplay');
+            if (mpesaEl) mpesaEl.innerText = `KES ${splitMpesa.toFixed(2)}`;
+
+            const formCash = document.getElementById('formCashAmount');
+            if (formCash) formCash.value = splitCash;
+
+            const formMpesa = document.getElementById('formMpesaAmount');
+            if (formMpesa) formMpesa.value = splitMpesa;
 
             const remaining = Math.round((total - (splitCash + splitMpesa)) * 100) / 100;
             const statusEl = document.getElementById('splitBalanceStatus');
-            if (Math.abs(remaining) < 0.01) {
-                statusEl.innerText = 'Split is fully balanced (100% accounted for)';
-                statusEl.className = 'text-[11px] font-bold text-emerald-600';
-            } else {
+            if (statusEl) {
+                if (Math.abs(remaining) < 0.05) {
+                    statusEl.innerText = 'Split is fully balanced (100% accounted for)';
+                    statusEl.className = 'text-[11px] font-bold text-emerald-600';
+                } else {
+                    statusEl.innerText = `Balance discrepancy: KES ${remaining.toFixed(2)}`;
+                    statusEl.className = 'text-[11px] font-bold text-rose-600';
+                }
+            }
+        }
                 statusEl.innerText = `Balance discrepancy: KES ${remaining.toFixed(2)}`;
                 statusEl.className = 'text-[11px] font-bold text-rose-600';
             }
@@ -1484,8 +1534,8 @@
                 }
             }
 
-            const paymentMethod = document.getElementById('paymentMethod').value;
-            const customerId = document.getElementById('customerSelect').value;
+            const paymentMethod = document.getElementById('paymentMethod')?.value || 'Cash';
+            const customerId = document.getElementById('customerSelect')?.value || '';
 
             // Credit rule: registered customer required
             if (paymentMethod === 'Credit' && !customerId) {
@@ -1496,7 +1546,7 @@
             // Split rule: must balance within 0.05 precision tolerance
             if (paymentMethod === 'Split') {
                 const total = calculateCartTotal();
-                const totalSplit = splitCash + splitMpesa;
+                const totalSplit = Math.round((splitCash + splitMpesa) * 100) / 100;
                 if (Math.abs(total - totalSplit) >= 0.05) {
                     alert('Allocated total does not equal cart total.');
                     openSplitPaymentModal();
@@ -1515,11 +1565,21 @@
             document.getElementById('formPricingTier').value = pricingTier;
             document.getElementById('formCashAmount').value = splitCash;
             document.getElementById('formMpesaAmount').value = splitMpesa;
+
+            const formRefEl = document.getElementById('formPaymentReference');
             const checkoutRefInput = document.getElementById('paymentReferenceInput');
             if (checkoutRefInput && checkoutRefInput.value.trim()) {
-                document.getElementById('formPaymentReference').value = checkoutRefInput.value.trim();
+                formRefEl.value = checkoutRefInput.value.trim();
+            } else if (!formRefEl.value) {
+                if (paymentMethod === 'M-Pesa' || paymentMethod === 'Split') {
+                    formRefEl.value = 'MPESA-REF';
+                }
             }
-            document.getElementById('formBranchName').value = document.getElementById('branchSelect').value;
+
+            const branchEl = document.getElementById('branchSelect');
+            if (branchEl) {
+                document.getElementById('formBranchName').value = branchEl.value;
+            }
 
             return true;
         }
@@ -1528,8 +1588,12 @@
             if (!validateCheckout()) {
                 return false;
             }
-            document.getElementById('checkoutForm').submit();
-            return true;
+            const form = document.getElementById('checkoutForm');
+            if (form) {
+                form.submit();
+                return true;
+            }
+            return false;
         }
 
         // 9. SHIFT MANAGEMENT & RECONCILIATION
