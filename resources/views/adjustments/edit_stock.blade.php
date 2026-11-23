@@ -102,12 +102,12 @@
                 <div class="bg-gray-50 border p-3.5 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
                     <div class="flex flex-wrap items-center gap-3">
                         <div class="flex items-center space-x-2">
-                            <span class="font-bold text-gray-700">Stock For Branch:</span>
+                            <span class="font-bold text-gray-700">Inventory:</span>
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-50 border border-indigo-200 text-indigo-900">
                                 <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-                                {{ $selectedBranch }}
+                                Shelf Stock
                             </span>
-                            <input type="hidden" name="branch_name" id="bulk_branch_name" value="{{ $selectedBranch }}">
+                            <input type="hidden" name="branch_name" id="bulk_branch_name" value="Main Store">
                             <input type="hidden" name="reason" id="bulk_reason" value="Physical Stock Inventory Count">
                         </div>
 
@@ -161,7 +161,7 @@
                             <tbody class="divide-y divide-gray-100">
                                 @forelse($products as $product)
                                     @php
-                                        $totalBranchStock = $product->variants->sum(fn($v) => $v->branchStocks->firstWhere('branch_name', $selectedBranch ?? 'Main Shop')->stock_quantity ?? 0);
+                                        $totalStock = (float) $product->variants->sum('stock_quantity');
                                     @endphp
 
                                     {{-- Product Summary Row --}}
@@ -196,13 +196,13 @@
                                         </td>
 
                                         <td class="px-4 py-3.5 text-center font-bold">
-                                            @if($totalBranchStock <= 0)
+                                            @if($totalStock <= 0)
                                                 <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                                                     0 pcs
                                                 </span>
                                             @else
                                                 <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800">
-                                                    {{ $totalBranchStock }} pcs
+                                                    {{ $totalStock }} pcs
                                                 </span>
                                             @endif
                                         </td>
@@ -233,9 +233,6 @@
                                                     <div>
                                                         <h4 class="font-extrabold text-indigo-950 text-sm flex items-center gap-2">
                                                             <span>Editing Sizes for: {{ $product->name }}</span>
-                                                            <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-indigo-600 text-white">
-                                                                Branch: {{ $selectedBranch ?? 'Main Shop' }}
-                                                            </span>
                                                         </h4>
                                                         <p class="text-xs text-slate-500 mt-0.5">
                                                             Update the shelf counts below. Save individual sizes or save all sizes at once.
@@ -264,15 +261,15 @@
                                                 @else
                                                     <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                                                         @foreach($product->variants as $variant)
-                                                            @php $branchStock = $variant->branchStocks->firstWhere('branch_name', $selectedBranch ?? 'Main Shop')->stock_quantity ?? 0; @endphp
+                                                            @php $variantStock = (float) ($variant->stock_quantity ?? 0); @endphp
                                                             <div class="bg-white p-3 rounded-xl border border-slate-200 hover:border-indigo-300 shadow-sm text-center transition flex flex-col justify-between">
                                                                 <div>
                                                                     <div class="flex items-center justify-between text-xs font-black text-slate-800 mb-1">
                                                                         <span>Sz {{ $variant->size }}</span>
-                                                                        @if($branchStock <= 0)
+                                                                        @if($variantStock <= 0)
                                                                             <span class="text-[10px] px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 font-bold" title="Out of stock">0</span>
                                                                         @else
-                                                                            <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold" title="In stock">{{ $branchStock }}</span>
+                                                                            <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold" title="In stock">{{ $variantStock }}</span>
                                                                         @endif
                                                                     </div>
                                                                     @if($variant->colour && strtolower($variant->colour) !== 'standard')
@@ -290,7 +287,7 @@
                                                                         <input type="number"
                                                                                name="stocks[{{ $variant->id }}]"
                                                                                id="stock_input_{{ $variant->id }}"
-                                                                               value="{{ $branchStock }}"
+                                                                               value="{{ $variantStock }}"
                                                                                min="0"
                                                                                class="w-full text-center font-black text-slate-900 rounded-lg border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 text-xs py-1.5 bg-slate-50 focus:bg-white"
                                                                         >

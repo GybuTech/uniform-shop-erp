@@ -30,21 +30,8 @@ class PosController extends Controller
         $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
         $branches = Branch::where('is_active', true)->orderBy('name')->get();
 
-        if (!$isOwnerOrAdmin && empty($user->branch_name)) {
-            return redirect()->route('dashboard')->with('error', 'Your account is not assigned to an active branch. Please contact a supervisor.');
-        }
-
-        if ($isOwnerOrAdmin) {
-            $isLockedBranch = false;
-            $activeBranch = \App\Services\BranchContext::getActiveBranch();
-            $currentBranchName = $activeBranch
-                ?: ($request->get('branch') ?: ($user->branch_name ?: ($branches->first()?->name ?? 'Main Shop')));
-        } else {
-            $isLockedBranch = true;
-            // Cashier: force their own branch, never fallback to Main Shop unless none assigned
-                $currentBranchName = $user->branch_name
-                    ?: ($branches->first()?->name ?? 'Main Shop');
-        }
+        $currentBranchName = $user->branch_name ?: ($branches->first()?->name ?? 'Main Store');
+        $isLockedBranch = !$isOwnerOrAdmin;
 
         $customers = Customer::orderBy('first_name')->get();
 
@@ -81,12 +68,6 @@ class PosController extends Controller
     {
         $query = trim($request->get('q', ''));
         $exact = $request->boolean('exact');
-        $user = auth()->user();
-        $isGlobalUser = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
-        $activeBranch = \App\Services\BranchContext::getActiveBranch();
-        $branchName = $isGlobalUser
-            ? ($request->get('branch') ?: ($activeBranch ?: ($user->branch_name ?: 'Main Shop')))
-            : ($activeBranch ?: ($user->branch_name ?: 'Main Shop'));
 
         if ($query === '') {
             return response()->json([]);
@@ -94,21 +75,12 @@ class PosController extends Controller
 
         // If scanning an exact barcode or SKU
         if ($exact || strlen($query) >= 8 || str_starts_with($query, 'BC-')) {
-            $exactVariant = ProductVariant::with(['product.category', 'branchStocks'])
+            $exactVariant = ProductVariant::with(['product.category'])
                 ->where('barcode', $query)
                 ->orWhere('sku', $query)
                 ->first();
 
             if ($exactVariant) {
-                $exactBranchStock = $exactVariant->branchStocks->firstWhere('branch_name', $branchName)->stock_quantity ?? 0;
-                $otherExactInfo = '';
-                if ($exactBranchStock <= 0 && $exactVariant->branchStocks->isNotEmpty()) {
-                    $other = $exactVariant->branchStocks->filter(fn($bs) => $bs->quantity > 0 && $bs->branch_name !== $branchName);
-                    if ($other->isNotEmpty()) {
-                        $otherExactInfo = $other->map(fn($o) => "{$o->branch_name} ({$o->quantity})")->join(', ');
-                    }
-                }
-
                 return response()->json([
                     [
                         'id'                  => $exactVariant->id,
@@ -121,15 +93,15 @@ class PosController extends Controller
                         'size'                => $exactVariant->size,
                         'colour'              => $exactVariant->colour,
                         'selling_price'       => $exactVariant->selling_price,
-                        'stock_quantity'      => $exactBranchStock,
-                        'other_branches_info' => $otherExactInfo,
+                        'stock_quantity'      => (float) ($exactVariant->stock_quantity ?? 0.00),
+                        'other_branches_info' => '',
                         'exact_match'         => true,
                     ]
                 ]);
             }
         }
 
-        $variants = ProductVariant::with(['product.category', 'branchStocks'])
+        $variants = ProductVariant::with(['product.category'])
             ->where(function($q) use ($query) {
                 $q->whereHas('product', function($p) use ($query) {
                     $p->where('name', 'like', "%{$query}%")
@@ -145,19 +117,11 @@ class PosController extends Controller
                 ->orWhere('sku', 'like', "%{$query}%")
                 ->orWhere('barcode', 'like', "%{$query}%");
             })
-            ->limit(25)
+            ->orderByDesc('stock_quantity')
+            ->limit(50)
             ->get();
 
-        return response()->json($variants->map(function($variant) use ($branchName) {
-            $branchStock = $variant->getStockForBranch($branchName);
-            $otherInfo = '';
-            if ($branchStock <= 0 && $variant->branchStocks->isNotEmpty()) {
-                $other = $variant->branchStocks->filter(fn($bs) => $bs->quantity > 0 && $bs->branch_name !== $branchName);
-                if ($other->isNotEmpty()) {
-                    $otherInfo = $other->map(fn($o) => "{$o->branch_name} ({$o->quantity})")->join(', ');
-                }
-            }
-
+        return response()->json($variants->map(function($variant) {
             return [
                 'id'                  => $variant->id,
                 'sku'                 => $variant->sku,
@@ -169,8 +133,8 @@ class PosController extends Controller
                 'size'                => $variant->size,
                 'colour'              => $variant->colour,
                 'selling_price'       => $variant->selling_price,
-                'stock_quantity'      => $branchStock,
-                'other_branches_info' => $otherInfo,
+                'stock_quantity'      => (float) ($variant->stock_quantity ?? 0.00),
+                'other_branches_info' => '',
                 'exact_match'         => false,
             ];
         }));
@@ -240,16 +204,8 @@ class PosController extends Controller
 
                     $requestedQty = (float) $item['quantity'];
 
-                    // REFACTORED STRICT CHECK: No fallback to global stock
-                    $branchStockRecord = BranchStock::where('branch_name', $branchName)
-                        ->where('product_variant_id', $item['variant_id'])
-                        ->lockForUpdate()
-                        ->first();
-
-                    $availableQty = $branchStockRecord ? (float) $branchStockRecord->stock_quantity : 0.00;
-
-                    if ($availableQty < $requestedQty) {
-                        throw new \Exception("Stock error: '{$variant->sku}' has only {$availableQty} units available at {$branchName}. (Requested: {$requestedQty})");
+                    if ((float)$variant->stock_quantity < $requestedQty) {
+                        throw new \Exception("Insufficient stock for {$variant->sku}. Available on shelf: {$variant->stock_quantity}");
                     }
 
                     $unitPrice = round($variant->selling_price * $tierMultiplier, 2);
@@ -258,7 +214,6 @@ class PosController extends Controller
 
                     $saleItems[] = [
                         'variant'             => $variant,
-                        'branch_stock_record' => $branchStockRecord,
                         'quantity'            => $requestedQty,
                         'unit_price'          => $unitPrice,
                         'cost_price'          => (float) ($variant->cost_price ?? 0.00),
@@ -312,7 +267,6 @@ class PosController extends Controller
                 foreach ($saleItems as $sItem) {
                     $variant = $sItem['variant'];
                     $qty = $sItem['quantity'];
-                    $branchStockRecord = $sItem['branch_stock_record'];
 
                     SaleItem::create([
                         'sale_id'            => $sale->id,
@@ -325,9 +279,8 @@ class PosController extends Controller
                         'updated_at'         => $now,
                     ]);
 
-                    // Decrement inventory strictly on BranchStock
-                    $branchStockRecord->decrement('stock_quantity', $qty);
-                    $variant->update(['stock_quantity' => $variant->branchStocks()->sum('stock_quantity')]);
+                    // Decrement inventory directly on ProductVariant
+                    $variant->decrement('stock_quantity', $qty);
 
                     // Immutable stock movement ledger entry
                     StockMovement::create([
@@ -335,7 +288,7 @@ class PosController extends Controller
                         'branch_name'        => $branchName,
                         'product_variant_id' => $variant->id,
                         'quantity'           => -1 * $qty,
-                        'balance_after'      => (float) $branchStockRecord->fresh()->stock_quantity,
+                        'balance_after'      => (float) $variant->fresh()->stock_quantity,
                         'movement_type'      => 'sale',
                         'reference_id'       => $sale->id,
                         'reference_no'       => $sale->receipt_number,
@@ -669,28 +622,10 @@ class PosController extends Controller
         $invoiceNo = $sale->invoice_no ?: $sale->receipt_number;
 
         DB::transaction(function () use ($sale) {
-            // Restore stock for every line item back to the branch shelf
+            // Restore stock for every line item back to product variant
             foreach ($sale->items as $item) {
-                $branchStock = BranchStock::where('branch_name', $sale->branch_name)
-                    ->where('product_variant_id', $item->product_variant_id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if ($branchStock) {
-                    $branchStock->increment('stock_quantity', $item->quantity);
-                } else {
-                    BranchStock::create([
-                        'branch_name'        => $sale->branch_name,
-                        'product_variant_id' => $item->product_variant_id,
-                        'stock_quantity'     => $item->quantity,
-                    ]);
-                }
-
-                // Sync variant cached total
                 if ($item->productVariant) {
-                    $item->productVariant->update([
-                        'stock_quantity' => $item->productVariant->branchStocks()->sum('stock_quantity'),
-                    ]);
+                    $item->productVariant->increment('stock_quantity', $item->quantity);
                 }
             }
 

@@ -63,7 +63,7 @@ class StockAdjustmentController extends Controller
     {
         $this->checkOwnerOrAdmin();
         $validated = $request->validate([
-            'branch_name' => ['required', 'string'],
+            'branch_name' => ['nullable', 'string'],
             'reason'      => ['required', 'string'],
             'notes'       => ['nullable', 'string'],
             'items'       => ['required', 'array', 'min:1'],
@@ -78,7 +78,7 @@ class StockAdjustmentController extends Controller
         DB::transaction(function () use ($validated, $adjustmentNumber) {
             $adjustment = StockAdjustment::create([
                 'adjustment_number' => $adjustmentNumber,
-                'branch_name'       => $validated['branch_name'],
+                'branch_name'       => $validated['branch_name'] ?? 'Main Store',
                 'reason'            => $validated['reason'],
                 'notes'             => $validated['notes'] ?? null,
                 'user_id'           => auth()->id(),
@@ -91,7 +91,7 @@ class StockAdjustmentController extends Controller
                     'quantity'           => $item['quantity'],
                 ]);
 
-                // Adjust stock on ProductVariant
+                // Adjust stock directly on ProductVariant
                 $variant = ProductVariant::findOrFail($item['product_variant_id']);
                 if ($item['type'] === 'add') {
                     $variant->increment('stock_quantity', $item['quantity']);
@@ -123,13 +123,10 @@ class StockAdjustmentController extends Controller
 
         $categories = Category::withCount('products')->orderBy('name')->get();
         $productsList = Product::orderBy('name')->get(['id', 'name', 'category_id']);
-        $branches = Branch::where('is_active', true)->pluck('name')->toArray();
-        if (empty($branches)) {
-            $branches = ['Main Branch', 'Branch 2 Sweaters', 'Branch 3 Sweaters'];
-        }
+        $branches = ['Main Store'];
 
         $query = Product::with(['category', 'variants' => function ($vq) {
-            $vq->with('branchStocks')->orderByRaw('CAST(size AS UNSIGNED), size');
+            $vq->orderByRaw('CAST(size AS UNSIGNED), size');
         }]);
 
         if ($search) {
@@ -166,10 +163,7 @@ class StockAdjustmentController extends Controller
             });
         }
 
-        $user = auth()->user();
-        $activeBranch = \App\Services\BranchContext::getActiveBranch();
-        $selectedBranch = $request->input('branch', $activeBranch ?: ($user->branch_name ?: ($branches[0] ?? 'Main Shop')));
-
+        $selectedBranch = 'Main Store';
         $perPage = $request->input('per_page', 15);
         $limit = ($perPage === 'all' || $perPage == -1) ? 500 : max(5, (int)$perPage);
 
@@ -199,21 +193,20 @@ class StockAdjustmentController extends Controller
             'reason'         => ['nullable', 'string'],
         ]);
 
-        $branchName = $validated['branch_name'] ?? 'Main Shop';
-        $oldStock = (float) $variant->getStockForBranch($branchName);
+        $oldStock = (float) ($variant->stock_quantity ?? 0.00);
         $newStock = (float) $validated['stock_quantity'];
         $diff = $newStock - $oldStock;
 
         if ($diff != 0) {
-            DB::transaction(function () use ($variant, $oldStock, $newStock, $diff, $branchName, $validated) {
+            DB::transaction(function () use ($variant, $oldStock, $newStock, $diff, $validated) {
                 $count = StockAdjustment::count() + 1;
                 $adjNum = 'ADJ-DIR-' . \App\Services\SystemTime::now()->format('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
                 $adjustment = StockAdjustment::create([
                     'adjustment_number' => $adjNum,
-                    'branch_name'       => $branchName,
+                    'branch_name'       => 'Main Store',
                     'reason'            => $validated['reason'] ?: 'Physical Stock Inventory Count / Testing Reset',
-                    'notes'             => "Manual stock edit on {$variant->product->name} ({$variant->size}) for {$branchName}: adjusted from {$oldStock} to {$newStock}",
+                    'notes'             => "Manual stock edit on {$variant->product->name} ({$variant->size}): adjusted from {$oldStock} to {$newStock}",
                     'user_id'           => auth()->id(),
                 ]);
 
@@ -223,13 +216,13 @@ class StockAdjustmentController extends Controller
                     'quantity'           => abs($diff),
                 ]);
 
-                $variant->setStockForBranch($branchName, $newStock);
+                $variant->update(['stock_quantity' => $newStock]);
             });
 
-            return back()->with('success', "Stock for {$variant->product->name} (Size {$variant->size}) at {$branchName} updated from {$oldStock} to {$newStock}.");
+            return back()->with('success', "Stock for {$variant->product->name} (Size {$variant->size}) updated from {$oldStock} to {$newStock}.");
         }
 
-        return back()->with('info', "Stock for {$variant->product->name} at {$branchName} is already {$newStock}. No change made.");
+        return back()->with('info', "Stock for {$variant->product->name} is already {$newStock}. No change made.");
     }
 
     public function updateStockDirect(Request $request)
@@ -244,22 +237,21 @@ class StockAdjustmentController extends Controller
         ]);
 
         $updatedCount = 0;
-        $branchName = $validated['branch_name'] ?? 'Main Shop';
         $reason = $validated['reason'] ?: 'Physical Stock Inventory Count / Testing Reset';
 
-        DB::transaction(function () use ($validated, $branchName, $reason, &$updatedCount) {
+        DB::transaction(function () use ($validated, $reason, &$updatedCount) {
             $itemsToLog = [];
 
             foreach ($validated['stocks'] as $variantId => $newQty) {
-                $variant = ProductVariant::with(['product', 'branchStocks'])->find($variantId);
+                $variant = ProductVariant::find($variantId);
                 if (!$variant) continue;
 
-                $oldQty = (float) $variant->getStockForBranch($branchName);
+                $oldQty = (float) ($variant->stock_quantity ?? 0.00);
                 $newQty = (float) $newQty;
                 $diff = $newQty - $oldQty;
 
                 if ($diff != 0) {
-                    $variant->setStockForBranch($branchName, $newQty);
+                    $variant->update(['stock_quantity' => $newQty]);
                     $itemsToLog[] = [
                         'product_variant_id' => $variant->id,
                         'type'               => $diff > 0 ? 'add' : 'subtract',
@@ -275,9 +267,9 @@ class StockAdjustmentController extends Controller
 
                 $adjustment = StockAdjustment::create([
                     'adjustment_number' => $adjNum,
-                    'branch_name'       => $branchName,
+                    'branch_name'       => 'Main Store',
                     'reason'            => $reason,
-                    'notes'             => "Bulk direct stock inventory count update for {$updatedCount} items at {$branchName}.",
+                    'notes'             => "Bulk direct stock inventory count update for {$updatedCount} items.",
                     'user_id'           => auth()->id(),
                 ]);
 
@@ -288,10 +280,10 @@ class StockAdjustmentController extends Controller
         });
 
         if ($updatedCount > 0) {
-            return back()->with('success', "Successfully updated physical stock for {$updatedCount} product variant(s) at {$branchName}.");
+            return back()->with('success', "Successfully updated physical stock for {$updatedCount} product variant(s).");
         }
 
-        return back()->with('info', "No stock changes detected for {$branchName}. All quantities were already identical.");
+        return back()->with('info', "No stock changes detected. All quantities were already identical.");
     }
 }
 
