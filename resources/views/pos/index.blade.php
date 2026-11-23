@@ -654,12 +654,25 @@
     </div>
 
     <script>
+        // Dynamic resilient URLs that adapt to any local XAMPP subfolder, port or host
+        const POS_BASE_URL = window.location.href.split('?')[0].replace(/\/+$/, '');
+        const APP_ROOT_URL = POS_BASE_URL.replace(/\/pos\/?$/, '');
+        const POS_SEARCH_URL = POS_BASE_URL.endsWith('/pos') ? (POS_BASE_URL + '/search') : '{{ route("pos.search") }}';
+        const POS_PARK_URL = POS_BASE_URL.endsWith('/pos') ? (POS_BASE_URL + '/park') : '{{ route("pos.park") }}';
+        const POS_QUICK_CUSTOMER_URL = POS_BASE_URL.endsWith('/pos') ? (POS_BASE_URL + '/quick-customer') : '{{ route("pos.quick-customer") }}';
+        const POS_QUOTATION_URL = POS_BASE_URL.endsWith('/pos') ? (POS_BASE_URL + '/quotation') : '{{ route("pos.quotation") }}';
+        const POS_RECENT_SALES_URL = POS_BASE_URL.endsWith('/pos') ? (POS_BASE_URL + '/recent-sales') : '{{ route("pos.recent-sales") }}';
+        const SHIFTS_CURRENT_URL = APP_ROOT_URL + '/shifts/current';
+        const SHIFTS_CLOSE_URL = APP_ROOT_URL + '/shifts/close';
+        const LOGIN_URL = APP_ROOT_URL + '/login';
+
         // Main POS State
         let cart = [];
         let searchTimeout = null;
         let pricingTier = 'retail';
         let splitCash = 0;
         let splitMpesa = 0;
+        let posCatalogVariants = {};
 
         const TIER_MULTIPLIERS = {
             retail: 1.00,
@@ -690,23 +703,43 @@
             clearTimeout(searchTimeout);
             const trimmed = (query !== undefined && query !== null) ? query.trim() : '';
 
-            document.getElementById('searchSpinner').classList.remove('hidden');
+            const spinner = document.getElementById('searchSpinner');
+            if (spinner) spinner.classList.remove('hidden');
 
             searchTimeout = setTimeout(() => {
-                fetch(`{{ route('pos.search', [], false) }}?q=${encodeURIComponent(trimmed)}`, {
+                const targetUrl = POS_SEARCH_URL + '?q=' + encodeURIComponent(trimmed);
+                fetch(targetUrl, {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     }
                 })
-                    .then(res => res.json())
+                    .then(res => {
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        return res.json();
+                    })
                     .then(data => {
-                        document.getElementById('searchSpinner').classList.add('hidden');
+                        if (spinner) spinner.classList.add('hidden');
                         renderSearchResults(data);
                     })
                     .catch(err => {
-                        console.error('POS search error:', err);
-                        document.getElementById('searchSpinner').classList.add('hidden');
+                        console.warn('POS search via primary URL failed, trying fallback:', err);
+                        // Fallback to absolute Laravel route
+                        fetch('{{ route("pos.search") }}?q=' + encodeURIComponent(trimmed), {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        })
+                            .then(r => r.json())
+                            .then(fallbackData => {
+                                if (spinner) spinner.classList.add('hidden');
+                                renderSearchResults(fallbackData);
+                            })
+                            .catch(fallbackErr => {
+                                console.error('POS search completely failed:', fallbackErr);
+                                if (spinner) spinner.classList.add('hidden');
+                            });
                     });
             }, 180);
         }
@@ -717,9 +750,11 @@
                 const query = event.target.value.trim();
                 if (!query) return;
 
+                const spinner = document.getElementById('searchSpinner');
+                if (spinner) spinner.classList.remove('hidden');
+
                 // Immediate exact match lookup for Barcode Scanners
-                document.getElementById('searchSpinner').classList.remove('hidden');
-                fetch(`{{ route('pos.search', [], false) }}?q=${encodeURIComponent(query)}&exact=1`, {
+                fetch(POS_SEARCH_URL + '?q=' + encodeURIComponent(query) + '&exact=1', {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
@@ -727,7 +762,7 @@
                 })
                     .then(res => res.json())
                     .then(data => {
-                        document.getElementById('searchSpinner').classList.add('hidden');
+                        if (spinner) spinner.classList.add('hidden');
                         if (data && data.length > 0) {
                             const topMatch = data[0];
                             const displayName = topMatch.formatted_title || topMatch.product_name;
@@ -742,7 +777,6 @@
                                 topMatch.unit_of_measure,
                                 topMatch.brand_name
                             );
-                            // Clear input immediately so cashier can scan next item seamlessly
                             event.target.value = '';
                             document.getElementById('searchResults').innerHTML = `
                                 <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-bold flex items-center justify-between">
@@ -750,15 +784,32 @@
                                     <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-mono">${topMatch.sku}</span>
                                 </div>`;
                         } else {
-                            // If exact match didn't find a barcode, search catalog
+                            // If exact match didn't find a barcode, search catalog and list below for selection
                             handleSearchInput(query);
                         }
                     })
                     .catch(() => {
-                        document.getElementById('searchSpinner').classList.add('hidden');
+                        if (spinner) spinner.classList.add('hidden');
                         handleSearchInput(query);
                     });
             }
+        }
+
+        function addCatalogItemToCart(variantId) {
+            const v = posCatalogVariants[variantId];
+            if (!v) return;
+            const displayName = v.formatted_title || v.product_name || 'Product';
+            addToCart(
+                v.id,
+                displayName,
+                v.size,
+                v.colour,
+                v.selling_price,
+                v.stock_quantity,
+                v.sku,
+                v.unit_of_measure,
+                v.brand_name
+            );
         }
 
         function renderSearchResults(variants) {
@@ -769,20 +820,17 @@
                 return;
             }
 
+            posCatalogVariants = {};
             const multiplier = TIER_MULTIPLIERS[pricingTier] || 1.00;
 
             container.innerHTML = variants.map(v => {
-                const displayName = v.formatted_title || v.product_name;
-                const safeName = displayName.replace(/'/g, "\\'");
-                const safeSize = (v.size || '').replace(/'/g, "\\'");
-                const safeColour = (v.colour || '').replace(/'/g, "\\'");
-                const safeUnit = (v.unit_of_measure || 'Piece').replace(/'/g, "\\'");
-                const safeBrand = (v.brand_name || '').replace(/'/g, "\\'");
-                const effectivePrice = Math.round((v.selling_price * multiplier) * 100) / 100;
+                posCatalogVariants[v.id] = v;
+                const displayName = v.formatted_title || v.product_name || 'Product';
+                const effectivePrice = Math.round((parseFloat(v.selling_price || 0) * multiplier) * 100) / 100;
+                const stockQty = parseFloat(v.stock_quantity || 0);
 
-                // Attribute badge: size/colour for uniforms, unit/brand for hardware/agrovet
                 let attrPill = '';
-                if (v.size && v.size.trim() !== '') {
+                if (v.size && String(v.size).trim() !== '') {
                     const normColour = (v.colour || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                     const normName = (v.product_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                     const showColour = v.colour && normColour !== normName && !normName.includes(normColour) && v.colour.toLowerCase() !== 'standard';
@@ -794,35 +842,30 @@
 
                 const brandPill = v.brand_name ? `<span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold mr-1.5">${v.brand_name}</span>` : '';
 
-                let otherStockNotice = '';
-                if (v.stock_quantity <= 0 && v.other_branches_info) {
-                    otherStockNotice = `<span class="text-[10px] text-indigo-700 block mt-0.5 font-bold">In stock at: ${v.other_branches_info}</span>`;
-                }
+                const stockBadge = stockQty <= 0
+                    ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">Out of Stock</span>`
+                    : (stockQty <= 5
+                        ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">Low Stock (${stockQty} left)</span>`
+                        : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${stockQty} ${v.unit_of_measure || 'units'})</span>`);
 
-                const stockBadge = v.stock_quantity <= 0
-                    ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">Out of Stock at this station</span>${otherStockNotice}`
-                    : (v.stock_quantity <= 5
-                        ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">Low Stock (${v.stock_quantity} left)</span>`
-                        : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${v.stock_quantity} ${v.unit_of_measure || 'units'})</span>`);
-
-                const actionButton = v.stock_quantity <= 0
+                const actionButton = stockQty <= 0
                     ? `<span class="inline-block text-xs bg-gray-100 text-gray-400 px-3 py-1 rounded font-bold border cursor-not-allowed">0 Stock</span>`
-                    : `<span class="inline-block text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</span>`;
+                    : `<button type="button" onclick="event.stopPropagation(); addCatalogItemToCart(${v.id})" class="inline-block text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</button>`;
 
                 return `
                 <div class="flex items-center justify-between p-3 border rounded-xl hover:bg-indigo-50/60 transition cursor-pointer bg-white"
-                     onclick="addToCart(${v.id}, '${safeName}', '${safeSize}', '${safeColour}', ${v.selling_price}, ${v.stock_quantity}, '${v.sku}', '${safeUnit}', '${safeBrand}')">
+                     onclick="addCatalogItemToCart(${v.id})">
                     <div>
                         <p class="font-bold text-gray-900 text-sm">${brandPill}${displayName}</p>
                         <p class="text-xs text-gray-500 font-mono mb-1">
-                            <span class="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-bold">${v.sku}</span>
+                            <span class="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-bold">${v.sku || ''}</span>
                             ${attrPill}
                         </p>
                         ${stockBadge}
                     </div>
                     <div class="text-right">
                         <p class="font-black text-indigo-700 text-base font-mono">KES ${effectivePrice.toFixed(2)}</p>
-                        ${multiplier < 1.0 ? `<p class="text-[10px] text-gray-400 line-through">Base: KES ${parseFloat(v.selling_price).toFixed(2)}</p>` : ''}
+                        ${multiplier < 1.0 ? `<p class="text-[10px] text-gray-400 line-through">Base: KES ${parseFloat(v.selling_price || 0).toFixed(2)}</p>` : ''}
                         ${actionButton}
                     </div>
                 </div>
@@ -1235,7 +1278,7 @@
             };
 
             // Post to backend database
-            fetch('{{ route("pos.park", [], false) }}', {
+            fetch(POS_PARK_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1383,7 +1426,7 @@
                 _token: '{{ csrf_token() }}'
             };
 
-            fetch('{{ route("pos.quick-customer", [], false) }}', {
+            fetch(POS_QUICK_CUSTOMER_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1448,7 +1491,7 @@
                 _token: '{{ csrf_token() }}'
             };
 
-            fetch('{{ route("pos.quotation", [], false) }}', {
+            fetch(POS_QUOTATION_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1479,7 +1522,7 @@
             const listEl = document.getElementById('recentSalesList');
             listEl.innerHTML = '<div class="text-center py-12 text-xs text-gray-400">Loading recent receipts...</div>';
 
-            fetch('{{ route("pos.recent-sales", [], false) }}')
+            fetch(POS_RECENT_SALES_URL)
                 .then(res => res.json())
                 .then(sales => {
                     if (!sales || sales.length === 0) {
@@ -1605,7 +1648,7 @@
             btn.disabled = true;
             btn.innerText = 'Loading shift details...';
 
-            fetch(`{{ route('shifts.current', [], false) }}?branch=${encodeURIComponent(branchName)}`)
+            fetch(SHIFTS_CURRENT_URL + `?branch=${encodeURIComponent(branchName)}`)
                 .then(res => res.json())
                 .then(data => {
                     btn.disabled = false;
@@ -1713,7 +1756,7 @@
                 _token: '{{ csrf_token() }}'
             };
 
-            fetch('{{ route("shifts.close", [], false) }}', {
+            fetch(SHIFTS_CLOSE_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1726,7 +1769,7 @@
                 if (data.success) {
                     alert('Shift concluded successfully! Opening official Z-Report handover slip...');
                     window.open(data.z_report_url, '_blank');
-                    window.location.href = '{{ route("login") }}';
+                    window.location.href = LOGIN_URL;
                 } else {
                     btn.disabled = false;
                     btn.innerText = 'Seal Shift & Print Z-Report';
@@ -1900,7 +1943,7 @@
             const branchName = document.getElementById('branchSelect').value;
 
             // Use fetch with Accept: application/json for immediate redirect
-            fetch('{{ route("pos.quotation", [], false) }}', {
+            fetch(POS_QUOTATION_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
