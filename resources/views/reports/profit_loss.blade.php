@@ -34,33 +34,36 @@
                 </div>
             </div>
 
-            {{-- Financial KPI Cards --}}
+            {{-- Financial KPI Cards: Gross Profit, Operating Expenses, Net Profit --}}
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div class="bg-white p-5 rounded-xl border shadow-sm">
                     <p class="text-xs font-bold uppercase text-gray-500">Total Sales Turnover</p>
                     <p class="text-2xl font-black text-gray-900 mt-2 font-mono">KES {{ number_format($totalSales, 2) }}</p>
-                    <p class="text-[11px] text-emerald-600 font-semibold mt-1">Revenue from customers</p>
+                    <p class="text-[11px] text-gray-500 font-semibold mt-1">COGS: KES {{ number_format($cogs > 0 ? $cogs : $totalPurchases, 2) }}</p>
                 </div>
 
-                <div class="bg-white p-5 rounded-xl border shadow-sm">
-                    <p class="text-xs font-bold uppercase text-gray-500">Cost of Goods Sold (COGS)</p>
-                    <p class="text-2xl font-black text-amber-600 mt-2 font-mono">KES {{ number_format($cogs > 0 ? $cogs : $totalPurchases, 2) }}</p>
-                    <p class="text-[11px] text-gray-500 font-semibold mt-1">Cost of sold inventory</p>
+                {{-- Card 1: Gross Profit (Goods markup) --}}
+                <div class="bg-white p-5 rounded-xl border border-indigo-100 shadow-sm">
+                    <p class="text-xs font-bold uppercase text-indigo-700">Gross Profit (Goods Markup)</p>
+                    <p class="text-2xl font-black text-indigo-900 mt-2 font-mono">KES {{ number_format($grossProfit, 2) }}</p>
+                    <p class="text-[11px] text-indigo-600 font-semibold mt-1">Gross Margin: {{ $grossMargin }}% (Sales &minus; COGS)</p>
                 </div>
 
-                <div class="bg-white p-5 rounded-xl border shadow-sm">
-                    <p class="text-xs font-bold uppercase text-gray-500">Total Operating Expenses</p>
+                {{-- Card 2: Operating Expenses --}}
+                <div class="bg-white p-5 rounded-xl border border-rose-100 shadow-sm">
+                    <p class="text-xs font-bold uppercase text-rose-700">Operating Expenses</p>
                     <p class="text-2xl font-black text-rose-600 mt-2 font-mono">KES {{ number_format($totalExpenses, 2) }}</p>
-                    <p class="text-[11px] text-gray-500 font-semibold mt-1">Rent, wages, utilities, logistics</p>
+                    <p class="text-[11px] text-gray-500 font-semibold mt-1">Rent, electricity, packaging, utilities</p>
                 </div>
 
+                {{-- Card 3: Net Profit (True bottom line) --}}
                 <div class="p-5 rounded-xl border shadow-sm {{ $netProfit >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200' }}">
-                    <p class="text-xs font-bold uppercase {{ $netProfit >= 0 ? 'text-emerald-800' : 'text-red-800' }}">Net Operating Profit</p>
+                    <p class="text-xs font-bold uppercase {{ $netProfit >= 0 ? 'text-emerald-800' : 'text-red-800' }}">Net Profit (Bottom Line)</p>
                     <p class="text-2xl font-black {{ $netProfit >= 0 ? 'text-emerald-700' : 'text-red-700' }} mt-2 font-mono">
                         KES {{ number_format($netProfit, 2) }}
                     </p>
                     <p class="text-[11px] font-bold mt-1 {{ $netProfit >= 0 ? 'text-emerald-600' : 'text-red-600' }}">
-                        Net Margin: {{ $profitMargin }}%
+                        Net Margin: {{ $netMargin }}% (After all expenses)
                     </p>
                 </div>
             </div>

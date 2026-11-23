@@ -22,7 +22,8 @@
             } elseif (!str_starts_with($cleaned, '254') && strlen($cleaned) === 9) {
                 $cleaned = '254' . $cleaned;
             }
-            $text = "Hello " . ($name ?: 'Customer') . ", this is a friendly reminder regarding your outstanding credit balance of KES " . number_format($amount, 2) . " on Receipt #" . $receipt . " at GybuTech Uniforms. Kindly arrange payment. Thank you!";
+            $bizName = \App\Models\BusinessSetting::get('business_name', 'Tshaprint Solutions');
+            $text = "Hello " . ($name ?: 'Customer') . ", this is a friendly reminder regarding your outstanding credit balance of KES " . number_format($amount, 2) . " on Receipt #" . $receipt . " at " . $bizName . ". Kindly arrange payment. Thank you!";
             return "https://wa.me/" . $cleaned . "?text=" . rawurlencode($text);
         }
     @endphp

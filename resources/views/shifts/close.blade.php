@@ -180,7 +180,7 @@
             </div>
 
             <div class="text-center text-xs text-gray-400">
-                Shift Handover Audit &bull; GybuTech Offline XAMPP Multi-Branch Engine
+                Shift Handover Audit &bull; {{ \App\Models\BusinessSetting::get('business_name', 'Tshaprint Solutions') }} Multi-Branch Engine
             </div>
         </div>
     </div>

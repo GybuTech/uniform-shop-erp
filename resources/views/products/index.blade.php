@@ -226,7 +226,7 @@
                                     class="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded text-xs transition shadow-2xs">
                                 Excel
                             </button>
-                            <button type="button" onclick="printDataTable('productsDataTable', 'GybuTech Products Catalog')"
+                            <button type="button" onclick="printDataTable('productsDataTable', '{{ \App\Models\BusinessSetting::get('business_name', 'Tshaprint Solutions') }} Products Catalog')"
                                     class="px-2.5 py-1 bg-white hover:bg-slate-50 text-blue-700 font-bold rounded text-xs transition shadow-2xs">
                                 Print
                             </button>
@@ -281,12 +281,19 @@
                                     </td>
                                     <td class="px-4 py-3.5 text-center font-bold">
                                         @php
-                                            $shelfStock = $product->variants->sum(function($v) use ($activeBranch) {
-                                                return !empty($activeBranch)
-                                                    ? $v->getStockForBranch($activeBranch)
-                                                    : ($v->branchStocks->isNotEmpty() ? $v->branchStocks->sum('stock_quantity') : (float)$v->stock_quantity);
-                                            });
-                                        @endphp
+    // Compute shelf stock using eager‑loaded relations only.
+    // `variants.branchStocks` is already loaded by the controller.
+    $shelfStock = $product->variants->sum(function ($variant) use ($activeBranch) {
+        // If a branch is selected, look for that branch in the loaded collection.
+        if (!empty($activeBranch) && $variant->relationLoaded('branchStocks')) {
+            $bs = $variant->branchStocks->firstWhere('branch_name', $activeBranch);
+            return $bs ? (float) $bs->stock_quantity : 0.0;
+        }
+        // All branches – sum all branch stocks (or fall back to the variant's own column).
+        $total = $variant->branchStocks->sum('stock_quantity');
+        return $total > 0 ? $total : (float) $variant->stock_quantity;
+    });
+@endphp
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold {{ $shelfStock <= 5 ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200' }}">
                                             {{ (float) $shelfStock }} pcs
                                         </span>
@@ -650,8 +657,8 @@
                     </style>
                 </head>
                 <body>
-                    <h2>${title || 'GybuTech POS Report'}</h2>
-                    <p>Printed on: ${new Date().toLocaleString()} &bull; Store: GybuTech Uniforms ERP</p>
+                    <h2>${title || '{{ \App\Models\BusinessSetting::get('business_name', 'Tshaprint Solutions') }} Report'}</h2>
+                    <p>Printed on: ${new Date().toLocaleString()} &bull; Store: {{ \App\Models\BusinessSetting::get('business_name', 'Tshaprint Solutions') }}</p>
                     ${table.outerHTML}
                     <script>
                         window.onload = function() { window.print(); window.close(); };

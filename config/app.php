@@ -41,6 +41,8 @@ return [
     |
     */
     'store_mode' => env('APP_STORE_MODE', 'standalone'),
+    // Flag to allow branch switching in offline/standalone mode. When true, admin can select a branch locally.
+    'allow_local_branch_switch' => env('APP_ALLOW_LOCAL_BRANCH_SWITCH', true),
     'default_branch' => env('STORE_DEFAULT_BRANCH', 'Main Shop'),
 
     /*

@@ -473,6 +473,9 @@
                     <span>Remaining Balance:</span>
                     <span id="splitModalRemaining" class="font-mono font-black">KES 0.00</span>
                 </div>
+                <div id="splitModalErrorMsg" class="hidden text-xs text-rose-600 font-bold p-2 bg-rose-50 rounded-lg border border-rose-200">
+                    Allocated total does not equal cart total.
+                </div>
             </div>
 
             <div class="flex justify-end space-x-2 pt-2 border-t">
@@ -1067,23 +1070,25 @@
             const total = calculateCartTotal();
             const cash = parseFloat(document.getElementById('splitCashInput').value) || 0;
             const mpesa = parseFloat(document.getElementById('splitMpesaInput').value) || 0;
-            const remaining = Math.round((total - (cash + mpesa)) * 100) / 100;
+            const allocated = cash + mpesa;
+            const remaining = Math.round((total - allocated) * 100) / 100;
+            const isBalanced = Math.abs(allocated - total) < 0.05;
 
             const box = document.getElementById('splitModalBalanceBox');
             const remEl = document.getElementById('splitModalRemaining');
             const applyBtn = document.getElementById('splitApplyBtn');
+            const errorMsg = document.getElementById('splitModalErrorMsg');
 
             remEl.innerText = `KES ${remaining.toFixed(2)}`;
 
-            if (Math.abs(remaining) < 0.01) {
+            if (isBalanced) {
                 box.className = 'p-2.5 rounded-lg text-xs font-bold flex justify-between items-center bg-emerald-50 text-emerald-800 border border-emerald-200';
                 applyBtn.disabled = false;
-            } else if (remaining > 0) {
-                box.className = 'p-2.5 rounded-lg text-xs font-bold flex justify-between items-center bg-amber-50 text-amber-800 border border-amber-200';
-                applyBtn.disabled = true;
+                if (errorMsg) errorMsg.classList.add('hidden');
             } else {
-                box.className = 'p-2.5 rounded-lg text-xs font-bold flex justify-between items-center bg-rose-50 text-rose-800 border border-rose-200';
+                box.className = 'p-2.5 rounded-lg text-xs font-bold flex justify-between items-center ' + (remaining > 0 ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-rose-50 text-rose-800 border border-rose-200');
                 applyBtn.disabled = true;
+                if (errorMsg) errorMsg.classList.remove('hidden');
             }
         }
 
@@ -1116,16 +1121,14 @@
             const total = calculateCartTotal();
             const totalSplit = splitCash + splitMpesa;
             if (Math.abs(total - totalSplit) >= 0.05) {
-                alert(`Split payment error: The sum of Cash (KES ${splitCash.toFixed(2)}) + M-Pesa (KES ${splitMpesa.toFixed(2)}) must equal Total KES ${total.toFixed(2)}.`);
+                const errorMsg = document.getElementById('splitModalErrorMsg');
+                if (errorMsg) errorMsg.classList.remove('hidden');
                 return;
             }
 
             const splitRef = document.getElementById('splitMpesaRefInput')?.value.trim();
-            if (splitRef) {
-                document.getElementById('formPaymentReference').value = splitRef.toUpperCase();
-            } else {
-                document.getElementById('formPaymentReference').value = 'SPLIT-PAY';
-            }
+            // Allow cashiers to type full codes (10 chars), short codes (last 3–4 digits), or leave blank
+            document.getElementById('formPaymentReference').value = splitRef ? splitRef.toUpperCase() : 'MPESA-REF';
 
             document.getElementById('paymentMethod').value = 'Split';
             updateSplitDisplays(total);
@@ -1490,12 +1493,12 @@
                 return false;
             }
 
-            // Split rule: must balance
+            // Split rule: must balance within 0.05 precision tolerance
             if (paymentMethod === 'Split') {
                 const total = calculateCartTotal();
                 const totalSplit = splitCash + splitMpesa;
                 if (Math.abs(total - totalSplit) >= 0.05) {
-                    alert(`Split payment error: The sum of Cash (KES ${splitCash.toFixed(2)}) + M-Pesa (KES ${splitMpesa.toFixed(2)}) must equal Total KES ${total.toFixed(2)}.`);
+                    alert('Allocated total does not equal cart total.');
                     openSplitPaymentModal();
                     return false;
                 }
@@ -1787,17 +1790,11 @@
             const codeInput = document.getElementById('fastMpesaCodeInput');
             const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
 
-            if (!code) {
-                if (!confirm('No M-PESA transaction code entered. Do you want to complete this sale with code PENDING?')) {
-                    codeInput.focus();
-                    return;
-                }
-            }
-
             document.getElementById('paymentMethod').value = 'M-Pesa';
             splitMpesa = total;
             splitCash = 0;
-            document.getElementById('formPaymentReference').value = code || 'MPESA-PENDING';
+            // Allow full code, short code (last 3-4 digits), or blank (auto-assign MPESA-REF)
+            document.getElementById('formPaymentReference').value = code || 'MPESA-REF';
             closeFastMpesaModal();
             executeCheckout();
         }

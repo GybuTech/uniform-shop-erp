@@ -23,6 +23,11 @@ class Sale extends Model
         'branch_name',
     ];
 
+    public function getInvoiceNoAttribute(): string
+    {
+        return $this->attributes['invoice_no'] ?? $this->attributes['receipt_number'] ?? '';
+    }
+
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);

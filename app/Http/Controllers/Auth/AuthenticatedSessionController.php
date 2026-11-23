@@ -28,6 +28,14 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $user = Auth::user();
+        if ($user) {
+            $branchName = $user->branch_name ?: ($user->branch?->name ?? null);
+            if ($branchName) {
+                session(['active_branch_name' => $branchName]);
+            }
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

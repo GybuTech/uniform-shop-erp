@@ -29,6 +29,13 @@ class BranchContext
     {
         // 1. Standalone Offline Mode: Strictly locked to this physical till's branch
         if (static::isStandalone()) {
+            // Allow admin to switch branches locally when the flag is enabled.
+            if (config('app.allow_local_branch_switch')) {
+                $sessionBranch = session('active_branch_name');
+                if (!empty($sessionBranch) && strtolower($sessionBranch) !== 'all') {
+                    return $sessionBranch;
+                }
+            }
             return config('app.default_branch', 'Main Shop');
         }
 

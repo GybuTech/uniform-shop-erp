@@ -161,7 +161,7 @@
                             <tbody class="divide-y divide-gray-100">
                                 @forelse($products as $product)
                                     @php
-                                        $totalBranchStock = $product->variants->sum(fn($v) => $v->getStockForBranch($selectedBranch ?? 'Main Shop'));
+                                        $totalBranchStock = $product->variants->sum(fn($v) => $v->branchStocks->firstWhere('branch_name', $selectedBranch ?? 'Main Shop')->stock_quantity ?? 0);
                                     @endphp
 
                                     {{-- Product Summary Row --}}
@@ -264,7 +264,7 @@
                                                 @else
                                                     <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                                                         @foreach($product->variants as $variant)
-                                                            @php $branchStock = $variant->getStockForBranch($selectedBranch ?? 'Main Shop'); @endphp
+                                                            @php $branchStock = $variant->branchStocks->firstWhere('branch_name', $selectedBranch ?? 'Main Shop')->stock_quantity ?? 0; @endphp
                                                             <div class="bg-white p-3 rounded-xl border border-slate-200 hover:border-indigo-300 shadow-sm text-center transition flex flex-col justify-between">
                                                                 <div>
                                                                     <div class="flex items-center justify-between text-xs font-black text-slate-800 mb-1">

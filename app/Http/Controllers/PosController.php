@@ -41,7 +41,9 @@ class PosController extends Controller
                 ?: ($request->get('branch') ?: ($user->branch_name ?: ($branches->first()?->name ?? 'Main Shop')));
         } else {
             $isLockedBranch = true;
-            $currentBranchName = $user->branch_name ?: ($branches->first()?->name ?? 'Main Shop');
+            // Cashier: force their own branch, never fallback to Main Shop unless none assigned
+                $currentBranchName = $user->branch_name
+                    ?: ($branches->first()?->name ?? 'Main Shop');
         }
 
         $customers = Customer::orderBy('first_name')->get();
@@ -98,7 +100,7 @@ class PosController extends Controller
                 ->first();
 
             if ($exactVariant) {
-                $exactBranchStock = $exactVariant->getStockForBranch($branchName);
+                $exactBranchStock = $exactVariant->branchStocks->firstWhere('branch_name', $branchName)->stock_quantity ?? 0;
                 $otherExactInfo = '';
                 if ($exactBranchStock <= 0 && $exactVariant->branchStocks->isNotEmpty()) {
                     $other = $exactVariant->branchStocks->filter(fn($bs) => $bs->quantity > 0 && $bs->branch_name !== $branchName);
@@ -286,6 +288,11 @@ class PosController extends Controller
                 $now = SystemTime::now();
                 $shift = Shift::getActiveShift(auth()->id(), $branchName);
 
+                $paymentRef = trim($request->input('payment_reference', ''));
+                if (($paymentMethod === 'M-Pesa' || $paymentMethod === 'Split') && empty($paymentRef)) {
+                    $paymentRef = 'MPESA-REF';
+                }
+
                 $sale = Sale::create([
                     'customer_id'       => $request->customer_id ?: null,
                     'user_id'           => auth()->id(),
@@ -294,7 +301,7 @@ class PosController extends Controller
                     'total_amount'      => $total,
                     'payment_method'    => $storedPaymentMethod,
                     'payment_status'    => $paymentStatus,
-                    'payment_reference' => trim($request->input('payment_reference', '')) ?: null,
+                    'payment_reference' => $paymentRef ?: null,
                     'branch_name'       => $branchName,
                     'created_at'        => $now,
                     'updated_at'        => $now,
@@ -659,7 +666,7 @@ class PosController extends Controller
             abort(403, 'Only administrators and owners can void completed sales.');
         }
 
-        $receiptNumber = $sale->receipt_number;
+        $invoiceNo = $sale->invoice_no ?: $sale->receipt_number;
 
         DB::transaction(function () use ($sale) {
             // Restore stock for every line item back to the branch shelf
@@ -687,21 +694,22 @@ class PosController extends Controller
                 }
             }
 
-            // Reverse shift totals if the sale was linked to a shift
-            if ($sale->shift_id) {
-                $shift = Shift::find($sale->shift_id);
-                if ($shift) {
-                    $shift->decrement('total_sales', $sale->total_amount);
-                    $shift->decrement('total_transactions', 1);
-                }
-            }
+            // Recalculate shift totals if the sale was linked to an active/open shift
+            $shiftId = $sale->shift_id;
 
             // Delete line items then the sale header
             $sale->items()->delete();
             $sale->delete();
+
+            if ($shiftId) {
+                $shift = Shift::find($shiftId);
+                if ($shift && method_exists($shift, 'recalculateTotals')) {
+                    $shift->recalculateTotals();
+                }
+            }
         });
 
         return redirect()->route('sales.index')
-            ->with('success', "Receipt #{$receiptNumber} voided and items restored to shelf stock.");
+            ->with('success', "Receipt #{$invoiceNo} was successfully voided and inventory returned to shelves.");
     }
 }

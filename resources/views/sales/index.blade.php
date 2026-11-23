@@ -93,7 +93,7 @@
                                     class="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded text-xs transition shadow-2xs">
                                 Excel
                             </button>
-                            <button type="button" onclick="printDataTable('salesDataTable', 'GybuTech Sales Transaction Log')"
+                            <button type="button" onclick="printDataTable('salesDataTable', '{{ \App\Models\BusinessSetting::get('business_name', 'Tshaprint Solutions') }} Sales Transaction Log')"
                                     class="px-2.5 py-1 bg-white hover:bg-slate-50 text-blue-700 font-bold rounded text-xs transition shadow-2xs">
                                 Print
                             </button>
@@ -277,8 +277,8 @@
                     </style>
                 </head>
                 <body>
-                    <h2>${title || 'GybuTech POS Report'}</h2>
-                    <p>Printed on: ${new Date().toLocaleString()} &bull; Store: GybuTech Uniforms ERP</p>
+                    <h2>${title || '{{ \App\Models\BusinessSetting::get('business_name', 'Tshaprint Solutions') }} Report'}</h2>
+                    <p>Printed on: ${new Date().toLocaleString()} &bull; Store: {{ \App\Models\BusinessSetting::get('business_name', 'Tshaprint Solutions') }}</p>
                     ${table.outerHTML}
                     <script>
                         window.onload = function() { window.print(); window.close(); };

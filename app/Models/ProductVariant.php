@@ -81,6 +81,18 @@ class ProductVariant extends Model
      */
     public function getStockForBranch(?string $branchName = null): float
     {
+        // Use eager‑loaded relationship when available to avoid extra DB queries.
+        if ($this->relationLoaded('branchStocks')) {
+            $bs = $this->branchStocks->firstWhere('branch_name', trim($branchName));
+            if (!empty($branchName)) {
+                return $bs ? (float) $bs->stock_quantity : 0.0;
+            }
+            // No branch specified – return total across all loaded stocks.
+            $total = $this->branchStocks->sum('stock_quantity');
+            return $total > 0 ? $total : (float) $this->stock_quantity;
+        }
+
+        // Fallback to DB queries if the relationship was not eager‑loaded.
         if (empty($branchName)) {
             $total = (float) $this->branchStocks()->sum('stock_quantity');
             return $total > 0 ? $total : (float) $this->stock_quantity;
@@ -90,11 +102,7 @@ class ProductVariant extends Model
             ->where('branch_name', trim($branchName))
             ->first();
 
-        if ($bs) {
-            return (float) $bs->stock_quantity;
-        }
-
-        return 0.00;
+        return $bs ? (float) $bs->stock_quantity : 0.0;
     }
 
     /**

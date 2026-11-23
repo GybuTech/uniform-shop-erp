@@ -152,12 +152,13 @@ class ReportController extends Controller
         $totalExpenses = (float) Expense::whereBetween('expense_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->sum('amount');
 
-        // 5. Accurate Margins (Using COGS with fallback)
+        // 5. Accurate Margins (Decoupled Gross Profit & Operating Expenses)
         $effectiveCost = $cogs > 0 ? $cogs : $totalPurchases;
         $grossProfit = $totalSales - $effectiveCost;
         $netProfit   = $grossProfit - $totalExpenses;
         $grossMargin = $totalSales > 0 ? round(($grossProfit / $totalSales) * 100, 2) : 0;
-        $profitMargin = $totalSales > 0 ? round(($netProfit / $totalSales) * 100, 2) : 0;
+        $netMargin   = $totalSales > 0 ? round(($netProfit / $totalSales) * 100, 2) : 0;
+        $profitMargin = $netMargin;
 
         // Breakdown of expenses by category for this period
         $expenseBreakdown = Expense::select('category', DB::raw('SUM(amount) as category_total'))
@@ -175,6 +176,7 @@ class ReportController extends Controller
             'grossProfit',
             'netProfit',
             'grossMargin',
+            'netMargin',
             'profitMargin',
             'expenseBreakdown'
         ));
