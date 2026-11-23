@@ -676,45 +676,39 @@
             const branchEl = document.getElementById('branchSelect');
             if (branchEl && branchEl.tagName === 'SELECT') {
                 branchEl.addEventListener('change', () => {
-                    const searchInput = document.getElementById('posSearchInput');
-                    if (searchInput && searchInput.value.trim().length >= 2) {
-                        handleSearchInput(searchInput.value);
-                    }
+                    const searchInput = document.getElementById('searchInput');
+                    handleSearchInput(searchInput ? searchInput.value : '');
                 });
             }
+
+            // Immediately preload available in-stock products into the catalog pane
+            handleSearchInput('');
         });
 
         // 1. SMART UNIFIED SEARCH & BARCODE SCANNER
         function handleSearchInput(query) {
             clearTimeout(searchTimeout);
-            const trimmed = query.trim();
-
-            if (trimmed.length < 2) {
-                document.getElementById('searchResults').innerHTML = `
-                    <div class="text-center py-16">
-                        <svg class="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <p class="text-gray-400 text-xs">Scan a barcode with your handheld scanner, or type 2+ characters to search products.</p>
-                    </div>`;
-                return;
-            }
+            const trimmed = (query !== undefined && query !== null) ? query.trim() : '';
 
             document.getElementById('searchSpinner').classList.remove('hidden');
 
-            const currentBranch = document.getElementById('branchSelect') ? document.getElementById('branchSelect').value : '';
-
             searchTimeout = setTimeout(() => {
-                fetch(`{{ route('pos.search') }}?q=${encodeURIComponent(trimmed)}&branch=${encodeURIComponent(currentBranch)}`)
+                fetch(`{{ route('pos.search', [], false) }}?q=${encodeURIComponent(trimmed)}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
                     .then(res => res.json())
                     .then(data => {
                         document.getElementById('searchSpinner').classList.add('hidden');
                         renderSearchResults(data);
                     })
-                    .catch(() => {
+                    .catch(err => {
+                        console.error('POS search error:', err);
                         document.getElementById('searchSpinner').classList.add('hidden');
                     });
-            }, 250);
+            }, 180);
         }
 
         function handleSearchKeydown(event) {
@@ -724,9 +718,13 @@
                 if (!query) return;
 
                 // Immediate exact match lookup for Barcode Scanners
-                const currentBranch = document.getElementById('branchSelect') ? document.getElementById('branchSelect').value : '';
                 document.getElementById('searchSpinner').classList.remove('hidden');
-                fetch(`{{ route('pos.search') }}?q=${encodeURIComponent(query)}&branch=${encodeURIComponent(currentBranch)}&exact=1`)
+                fetch(`{{ route('pos.search', [], false) }}?q=${encodeURIComponent(query)}&exact=1`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
                     .then(res => res.json())
                     .then(data => {
                         document.getElementById('searchSpinner').classList.add('hidden');
@@ -752,11 +750,13 @@
                                     <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-mono">${topMatch.sku}</span>
                                 </div>`;
                         } else {
-                            alert(`Barcode or SKU "${query}" was not found in catalog.`);
+                            // If exact match didn't find a barcode, search catalog
+                            handleSearchInput(query);
                         }
                     })
                     .catch(() => {
                         document.getElementById('searchSpinner').classList.add('hidden');
+                        handleSearchInput(query);
                     });
             }
         }
@@ -1235,7 +1235,7 @@
             };
 
             // Post to backend database
-            fetch('{{ route("pos.park") }}', {
+            fetch('{{ route("pos.park", [], false) }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1383,7 +1383,7 @@
                 _token: '{{ csrf_token() }}'
             };
 
-            fetch('{{ route("pos.quick-customer") }}', {
+            fetch('{{ route("pos.quick-customer", [], false) }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1448,7 +1448,7 @@
                 _token: '{{ csrf_token() }}'
             };
 
-            fetch('{{ route("pos.quotation") }}', {
+            fetch('{{ route("pos.quotation", [], false) }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1479,7 +1479,7 @@
             const listEl = document.getElementById('recentSalesList');
             listEl.innerHTML = '<div class="text-center py-12 text-xs text-gray-400">Loading recent receipts...</div>';
 
-            fetch('{{ route("pos.recent-sales") }}')
+            fetch('{{ route("pos.recent-sales", [], false) }}')
                 .then(res => res.json())
                 .then(sales => {
                     if (!sales || sales.length === 0) {
@@ -1605,7 +1605,7 @@
             btn.disabled = true;
             btn.innerText = 'Loading shift details...';
 
-            fetch(`{{ route('shifts.current') }}?branch=${encodeURIComponent(branchName)}`)
+            fetch(`{{ route('shifts.current', [], false) }}?branch=${encodeURIComponent(branchName)}`)
                 .then(res => res.json())
                 .then(data => {
                     btn.disabled = false;
@@ -1713,7 +1713,7 @@
                 _token: '{{ csrf_token() }}'
             };
 
-            fetch('{{ route("shifts.close") }}', {
+            fetch('{{ route("shifts.close", [], false) }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1900,7 +1900,7 @@
             const branchName = document.getElementById('branchSelect').value;
 
             // Use fetch with Accept: application/json for immediate redirect
-            fetch('{{ route("pos.quotation") }}', {
+            fetch('{{ route("pos.quotation", [], false) }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

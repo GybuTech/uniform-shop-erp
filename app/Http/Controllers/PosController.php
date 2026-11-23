@@ -66,18 +66,14 @@ class PosController extends Controller
 
     public function search(Request $request)
     {
-        $query = trim($request->get('q', ''));
+        $rawQuery = trim($request->get('q', ''));
         $exact = $request->boolean('exact');
 
-        if ($query === '') {
-            return response()->json([]);
-        }
-
         // If scanning an exact barcode or SKU
-        if ($exact || strlen($query) >= 8 || str_starts_with($query, 'BC-')) {
+        if ($rawQuery !== '' && ($exact || str_starts_with($rawQuery, 'BC-'))) {
             $exactVariant = ProductVariant::with(['product.category'])
-                ->where('barcode', $query)
-                ->orWhere('sku', $query)
+                ->where('barcode', $rawQuery)
+                ->orWhere('sku', $rawQuery)
                 ->first();
 
             if ($exactVariant) {
@@ -101,25 +97,39 @@ class PosController extends Controller
             }
         }
 
-        $variants = ProductVariant::with(['product.category'])
-            ->where(function($q) use ($query) {
-                $q->whereHas('product', function($p) use ($query) {
-                    $p->where('name', 'like', "%{$query}%")
-                      ->orWhere('sku_prefix', 'like', "%{$query}%")
-                      ->orWhereHas('category', function($c) use ($query) {
-                          $c->where('name', 'like', "%{$query}%");
-                      });
-                })
-                ->orWhere('size', 'like', "%{$query}%")
-                ->orWhere('colour', 'like', "%{$query}%")
-                ->orWhere('brand_name', 'like', "%{$query}%")
-                ->orWhere('unit_of_measure', 'like', "%{$query}%")
-                ->orWhere('sku', 'like', "%{$query}%")
-                ->orWhere('barcode', 'like', "%{$query}%");
-            })
-            ->orderByDesc('stock_quantity')
-            ->limit(50)
-            ->get();
+        $tokens = array_filter(explode(' ', $rawQuery), fn($t) => $t !== '');
+
+        $variantsQuery = ProductVariant::with(['product.category']);
+
+        if (empty($tokens)) {
+            // Initial load or cleared search: show top available shelf inventory
+            $variants = $variantsQuery->where('stock_quantity', '>', 0)
+                ->orderByDesc('stock_quantity')
+                ->limit(50)
+                ->get();
+        } else {
+            foreach ($tokens as $token) {
+                $variantsQuery->where(function($q) use ($token) {
+                    $q->whereHas('product', function($p) use ($token) {
+                        $p->where('name', 'like', "%{$token}%")
+                          ->orWhere('sku_prefix', 'like', "%{$token}%")
+                          ->orWhereHas('category', function($c) use ($token) {
+                              $c->where('name', 'like', "%{$token}%");
+                          });
+                    })
+                    ->orWhere('size', 'like', "%{$token}%")
+                    ->orWhere('colour', 'like', "%{$token}%")
+                    ->orWhere('brand_name', 'like', "%{$token}%")
+                    ->orWhere('unit_of_measure', 'like', "%{$token}%")
+                    ->orWhere('sku', 'like', "%{$token}%")
+                    ->orWhere('barcode', 'like', "%{$token}%");
+                });
+            }
+
+            $variants = $variantsQuery->orderByDesc('stock_quantity')
+                ->limit(50)
+                ->get();
+        }
 
         return response()->json($variants->map(function($variant) {
             return [
