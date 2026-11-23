@@ -3,12 +3,18 @@
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Official Sales Receipt</h2>
             <div class="space-x-2 no-print">
-                <button onclick="window.print()" class="bg-indigo-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm transition text-sm">
-                    Print Thermal Receipt (80mm)
-                </button>
+                <a href="{{ route('sales.print', ['sale' => $sale, 'copy' => $isReprint ? 1 : 0]) }}" target="_blank"
+                   class="bg-indigo-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm transition text-sm">
+                    {{ $isReprint ? 'Reprint Receipt (Copy)' : 'Print Receipt' }}
+                </a>
                 <a href="{{ route('pos.index') }}" class="bg-green-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm transition text-sm">
                     + New Sale
                 </a>
+                @can('refund-sales')
+                <a href="{{ route('returns.create', ['receipt_number' => $sale->receipt_number]) }}" class="bg-rose-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-rose-700 shadow-sm transition text-sm">
+                    Return Items
+                </a>
+                @endcan
             </div>
         </div>
     </x-slot>
@@ -119,6 +125,12 @@
             </div>
         </div>
     </div>
+
+    @if($autoPrintReceipt)
+        {{-- Send the receipt straight to the receipt printer right after the sale --}}
+        <iframe src="{{ route('sales.print', $sale) }}" title="Receipt print job"
+                style="position:absolute;width:0;height:0;border:0;visibility:hidden;"></iframe>
+    @endif
 
     <!-- 80mm Thermal Printer Stylesheet -->
     <style media="print">

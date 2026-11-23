@@ -29,6 +29,16 @@
                 </div>
             @endif
 
+            @if(session('label_entry'))
+                <div class="bg-blue-50 border border-blue-300 text-blue-900 p-3.5 rounded-lg text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span>Tag the new pieces now: one barcode label per piece received ({{ session('label_entry')['units'] }}).</span>
+                    <a href="{{ route('labels.index', ['entry' => session('label_entry')['id']]) }}"
+                       class="inline-flex items-center px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shrink-0">
+                        Print Barcode Labels
+                    </a>
+                </div>
+            @endif
+
             @if($errors->any())
                 <div class="bg-rose-50 border border-rose-300 text-rose-800 p-3.5 rounded-lg text-xs">
                     <span class="font-bold">Please check the following errors:</span>

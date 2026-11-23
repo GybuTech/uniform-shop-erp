@@ -9,7 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Customer extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, \App\Models\Concerns\Syncable;
+
+    /** Record type used when uploading to HQ (see App\Sync). */
+    public const SYNC_TYPE = 'customer';
 
     protected $fillable = [
         'first_name',
@@ -49,6 +52,16 @@ class Customer extends Model
 
         $repayments = (float) $this->payments()->sum('amount');
 
-        return max(0.00, round($creditSales - $repayments, 2));
+        // Goods returned from a credit sale reduce what the customer owes
+        $creditReturns = (float) SaleReturn::whereHas('sale', function ($q) {
+                $q->where('customer_id', $this->id)
+                  ->where(function ($q) {
+                      $q->where('payment_method', 'Credit')
+                        ->orWhere('payment_status', 'credit');
+                  });
+            })
+            ->sum('refund_total');
+
+        return max(0.00, round($creditSales - $repayments - $creditReturns, 2));
     }
 }

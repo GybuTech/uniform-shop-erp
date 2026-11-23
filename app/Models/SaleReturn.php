@@ -9,7 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SaleReturn extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Models\Concerns\Syncable;
+
+    /** Record type used when uploading to HQ (see App\Sync). */
+    public const SYNC_TYPE = 'sale_return';
 
     protected $fillable = [
         'sale_id',

@@ -9,11 +9,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Shift extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Models\Concerns\Syncable;
+
+    /** Record type used when uploading to HQ (see App\Sync). */
+    public const SYNC_TYPE = 'shift';
 
     protected $fillable = [
         'user_id',
         'branch_id',
+        'register_id',
         'branch_name',
         'started_at',
         'ended_at',
@@ -67,6 +71,38 @@ class Shift extends Model
     public function sales(): HasMany
     {
         return $this->hasMany(Sale::class);
+    }
+
+    public function register(): BelongsTo
+    {
+        return $this->belongsTo(Register::class);
+    }
+
+    /**
+     * Opening float for a till: what its last closed shift left in the drawer.
+     * Returns [float $float, ?Shift $lastShift, string $statusLabel].
+     */
+    public static function resolveOpeningFloatForRegister(Register $register): array
+    {
+        $lastShift = static::where('register_id', $register->id)
+            ->where('status', 'closed')
+            ->where(function ($q) {
+                $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
+            })
+            ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$lastShift) {
+            return [0.00, null, 'Initial Shift (Brand New Till Baseline)'];
+        }
+
+        if ($lastShift->cash_collected_by_owner) {
+            return [(float) ($lastShift->float_left_in_drawer ?? 0.00), $lastShift, 'Collected by Owner (Float Remaining in Drawer)'];
+        }
+
+        // Uncollected: the full counted cash stayed in this till's drawer overnight
+        return [(float) ($lastShift->actual_cash ?? $lastShift->expected_cash), $lastShift, 'Uncollected Overnight Rollover'];
     }
 
     public function isOpen(): bool
@@ -155,6 +191,24 @@ class Shift extends Model
     }
 
     /**
+     * The open cash drawer that money handled by $userId at $branchName passes through:
+     * the user's own open shift; otherwise the branch's open drawer, but only when exactly
+     * one till is open there (with several, the cash must go through the handler's own till).
+     * Never creates a shift.
+     */
+    public static function drawerFor(int $userId, string $branchName): ?self
+    {
+        $own = static::where('user_id', $userId)->where('status', 'open')->latest('started_at')->first();
+        if ($own) {
+            return $own;
+        }
+
+        $open = static::where('branch_name', $branchName)->where('status', 'open')->limit(2)->get();
+
+        return $open->count() === 1 ? $open->first() : null;
+    }
+
+    /**
      * Get or create the active open shift for a given user and branch.
      */
     public static function getActiveShift(int $userId, ?string $branchName = null, float $openingFloat = 0.00): self
@@ -216,12 +270,13 @@ class Shift extends Model
             if ($sale->payment_status === 'credit' || $sale->payment_method === 'Credit') {
                 $credit += (float) $sale->total_amount;
             } elseif (str_contains($sale->payment_method, 'Split')) {
-                // Parse split cash & mpesa if recorded
-                if (preg_match('/Cash:\s*([\d,\.]+)/i', $sale->payment_method, $cm)) {
-                    $cVal = (float) str_replace(',', '', $cm[1]);
+                // Parse split cash & mpesa. Two stored formats exist:
+                // "Split (Cash: 1,000.00, M-Pesa: 500.00)" and the short "Split (C:1000 + M:500)"
+                if (preg_match('/\b(?:Cash|C):\s*([\d,\.]+)/i', $sale->payment_method, $cm)) {
+                    $cVal = (float) str_replace(',', '', rtrim($cm[1], ',.'));
                     $cash += $cVal;
                 }
-                if (preg_match('/M-Pesa:\s*([\d,\.]+)/i', $sale->payment_method, $mm)) {
+                if (preg_match('/\b(?:M-Pesa|M):\s*([\d,\.]+)/i', $sale->payment_method, $mm)) {
                     $mVal = (float) str_replace(',', '', $mm[1]);
                     $mpesa += $mVal;
                 }
@@ -233,6 +288,15 @@ class Shift extends Model
                 $card += (float) $sale->total_amount;
             }
         }
+
+        // Cash leaving the drawer for refunds, and cash entering it for customer debt repayments
+        $cashRefunds = (float) SaleReturn::where('shift_id', $this->id)
+            ->where('refund_method', 'cash')
+            ->sum('refund_total');
+        $cashRepayments = (float) CustomerPayment::where('shift_id', $this->id)
+            ->where('payment_method', 'cash')
+            ->sum('amount');
+        $cash += $cashRepayments - $cashRefunds;
 
         $this->expected_cash      = round($cash, 2);
         $this->mpesa_total        = round($mpesa, 2);

@@ -7,6 +7,7 @@ use App\Models\ProductVariant;
 use App\Models\Purchase;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\SaleReturn;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -134,14 +135,21 @@ class ReportController extends Controller
         $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date'))->startOfDay() : Carbon::now()->startOfMonth();
         $endDate   = $request->input('end_date') ? Carbon::parse($request->input('end_date'))->endOfDay() : Carbon::now()->endOfDay();
 
-        // 1. Total Completed Sales Revenue
-        $totalSales = (float) Sale::whereBetween('created_at', [$startDate, $endDate])->sum('total_amount');
+        // 1. Total Completed Sales Revenue, net of refunds issued in the period
+        $grossSales = (float) Sale::whereBetween('created_at', [$startDate, $endDate])->sum('total_amount');
+        $totalReturns = (float) SaleReturn::whereBetween('created_at', [$startDate, $endDate])->sum('refund_total');
+        $totalSales = $grossSales - $totalReturns;
 
-        // 2. True Cost of Goods Sold (COGS) from snapshotted sale items
+        // 2. True Cost of Goods Sold (COGS) from snapshotted sale items, less goods returned to the shelf
         $cogs = (float) DB::table('sale_items')
             ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
             ->whereBetween('sales.created_at', [$startDate, $endDate])
             ->sum(DB::raw('sale_items.quantity * CASE WHEN sale_items.cost_price > 0 THEN sale_items.cost_price ELSE COALESCE((SELECT cost_price FROM product_variants WHERE product_variants.id = sale_items.product_variant_id), 0) END'));
+        $cogs -= (float) DB::table('sale_return_items')
+            ->join('sale_returns', 'sale_returns.id', '=', 'sale_return_items.sale_return_id')
+            ->join('product_variants', 'product_variants.id', '=', 'sale_return_items.product_variant_id')
+            ->whereBetween('sale_returns.created_at', [$startDate, $endDate])
+            ->sum(DB::raw('sale_return_items.quantity * COALESCE(product_variants.cost_price, 0)'));
 
         // 3. Supplier Procurements (for procurement cash-flow reference)
         $totalPurchases = (float) Purchase::where('status', 'received')
@@ -169,6 +177,8 @@ class ReportController extends Controller
             'startDate',
             'endDate',
             'totalSales',
+            'grossSales',
+            'totalReturns',
             'cogs',
             'totalPurchases',
             'totalExpenses',
@@ -264,14 +274,17 @@ class ReportController extends Controller
 
         // Standard Kenya VAT: 16% VAT inclusive in retail prices
         // Taxable Base = Total / 1.16; VAT Amount = Total - Taxable Base
-        $annualSales = (float) Sale::whereYear('created_at', $year)->sum('total_amount');
+        // Refunds reduce output VAT, so returns are netted off gross sales
+        $annualSales = (float) Sale::whereYear('created_at', $year)->sum('total_amount')
+            - (float) SaleReturn::whereYear('created_at', $year)->sum('refund_total');
         $taxableAmount = round($annualSales / 1.16, 2);
         $vatOutput     = round($annualSales - $taxableAmount, 2);
 
         // Monthly Breakdown
         $monthlyTax = [];
         for ($m = 1; $m <= 12; $m++) {
-            $monthGross = (float) Sale::whereYear('created_at', $year)->whereMonth('created_at', $m)->sum('total_amount');
+            $monthGross = (float) Sale::whereYear('created_at', $year)->whereMonth('created_at', $m)->sum('total_amount')
+                - (float) SaleReturn::whereYear('created_at', $year)->whereMonth('created_at', $m)->sum('refund_total');
             $monthTaxable = round($monthGross / 1.16, 2);
             $monthVat     = round($monthGross - $monthTaxable, 2);
 

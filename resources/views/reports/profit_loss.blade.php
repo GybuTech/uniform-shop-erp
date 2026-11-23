@@ -39,7 +39,7 @@
                 <div class="bg-white p-5 rounded-xl border shadow-sm">
                     <p class="text-xs font-bold uppercase text-gray-500">Total Sales Turnover</p>
                     <p class="text-2xl font-black text-gray-900 mt-2 font-mono">KES {{ number_format($totalSales, 2) }}</p>
-                    <p class="text-[11px] text-emerald-600 font-semibold mt-1">Revenue from customers</p>
+                    <p class="text-[11px] text-emerald-600 font-semibold mt-1">Net of KES {{ number_format($totalReturns, 2) }} refunded on returns</p>
                 </div>
 
                 <div class="bg-white p-5 rounded-xl border shadow-sm">
@@ -74,6 +74,14 @@
                     <tbody class="divide-y divide-gray-200">
                         <tr class="bg-white">
                             <td class="px-6 py-4 font-bold text-gray-900">1. Gross Sales Revenue (POS & Counter Orders)</td>
+                            <td class="px-6 py-4 text-right font-mono font-extrabold text-gray-900">KES {{ number_format($grossSales, 2) }}</td>
+                        </tr>
+                        <tr class="bg-white">
+                            <td class="px-6 py-4 pl-10 text-gray-700">Less: Refunds on Sale Returns</td>
+                            <td class="px-6 py-4 text-right font-mono text-rose-600">- KES {{ number_format($totalReturns, 2) }}</td>
+                        </tr>
+                        <tr class="bg-white">
+                            <td class="px-6 py-4 font-bold text-gray-900">Net Sales Revenue</td>
                             <td class="px-6 py-4 text-right font-mono font-extrabold text-gray-900">KES {{ number_format($totalSales, 2) }}</td>
                         </tr>
                         <tr class="bg-gray-50/50">

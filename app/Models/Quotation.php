@@ -19,6 +19,9 @@ class Quotation extends Model
         'status',
         'notes',
         'user_id',
+        // Set explicitly from SystemTime (the business clock) when created from the POS
+        'created_at',
+        'updated_at',
     ];
 
     public function items()

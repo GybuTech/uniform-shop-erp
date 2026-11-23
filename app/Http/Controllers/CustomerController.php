@@ -96,8 +96,13 @@ class CustomerController extends Controller
         ]);
 
         $user = auth()->user();
-        $branchName = $user->branch_name ?: 'Main Shop';
-        $activeShift = Shift::getActiveShift($user->id, $branchName);
+        $branchName = \App\Services\BranchContext::getActiveBranch() ?: ($user->branch_name ?: 'Main Shop');
+
+        // Cash goes into the branch's open drawer; M-Pesa and bank transfers need no drawer
+        $activeShift = Shift::drawerFor($user->id, $branchName);
+        if ($validated['payment_method'] === 'cash' && !$activeShift) {
+            return back()->with('error', "Cash repayments must go into an open till drawer. Open your own till shift at {$branchName} (or have the cashier on duty record it), or record it as M-Pesa / bank transfer.");
+        }
 
         DB::transaction(function () use ($validated, $customer, $user, $branchName, $activeShift) {
             CustomerPayment::create([
@@ -111,10 +116,8 @@ class CustomerController extends Controller
                 'notes'          => $validated['notes'] ?? null,
             ]);
 
-            // When payment is received in cash, increment the active cashier's shift expected cash
-            if ($validated['payment_method'] === 'cash' && $activeShift) {
-                $activeShift->increment('expected_cash', $validated['amount']);
-            }
+            // Cash repayments are added to the drawer inside Shift::recalculateTotals()
+            $activeShift?->recalculateTotals();
         });
 
         return back()->with('success', "Payment of KES " . number_format($validated['amount'], 2) . " recorded for {$customer->name}. Balance updated.");

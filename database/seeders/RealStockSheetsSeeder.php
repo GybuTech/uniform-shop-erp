@@ -1137,6 +1137,9 @@ class RealStockSheetsSeeder extends Seeder
             ['category' => 'School Sweaters', 'product' => 'Edelvale Jss Sweater', 'prefix' => 'SW', 'colour' => 'EDELVALE JSS', 'size' => '36', 'price' => 1200.0, 'stock' => 0],
         ];
 
+        // Branch that holds the stock-sheet counts (the till's own branch on a standalone install)
+        $openingBranch = config('app.default_branch', 'Main Shop');
+
         foreach ($items as $data) {
             $category = $categories[$data['category']] ?? $categories['School Sweaters'];
 
@@ -1161,9 +1164,17 @@ class RealStockSheetsSeeder extends Seeder
                 $skuPrefix = strlen($abbr) >= 3 ? $abbr : strtoupper(substr($words[0], 0, 3) . '-' . substr($words[1], 0, 2));
             }
 
-            $product = Product::where('name', $prodName)->orWhere('sku_prefix', $skuPrefix)->first();
+            // Match on the product NAME only. Matching on the generated prefix as well used to file
+            // different schools under one product (e.g. Horizon Junior Tracksuit -> Halisi, both "HJT").
+            $product = Product::where('name', $prodName)->first();
 
             if (!$product) {
+                $basePrefix = $skuPrefix;
+                $counter = 2;
+                while (Product::where('sku_prefix', $skuPrefix)->exists()) {
+                    $skuPrefix = $basePrefix . $counter++;
+                }
+
                 $product = Product::create([
                     'category_id' => $category->id,
                     'name'        => $prodName,
@@ -1203,8 +1214,21 @@ class RealStockSheetsSeeder extends Seeder
                 $variant->size           = $data['size'];
                 $variant->colour         = $data['colour'];
                 $variant->selling_price  = $data['price'];
-                $variant->stock_quantity = $data['stock'];
+                $variant->stock_quantity = 0;
                 $variant->save();
+
+                // The POS sells only from per-branch stock, so the sheet counts must be booked
+                // to a branch (as opening stock) or every item would show "Out of Stock".
+                if ((float) $data['stock'] > 0) {
+                    $variant->setStockForBranch(
+                        $openingBranch,
+                        (float) $data['stock'],
+                        'opening_stock',
+                        null,
+                        'SEED-STOCK-SHEETS',
+                        'Opening stock from stock sheets'
+                    );
+                }
             }
         }
     }

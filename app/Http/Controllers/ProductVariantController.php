@@ -288,12 +288,15 @@ class ProductVariantController extends Controller
         $size   = trim($validated['size'] ?? '') ?: null;
         $colour = trim($validated['colour'] ?? '') ?: null;
 
-        // If size or colour changed, generate a clean updated SKU; otherwise retain the current SKU
+        // SKU and barcode are permanent once the item has been used: printed labels on garments carry
+        // the barcode, and the shops and HQ match items by SKU. Only a brand-new, never-used variant
+        // (e.g. a typo fixed straight after creating it) gets a fresh SKU and barcode.
         $sku = $variant->sku;
-        if ($size !== $variant->size || $colour !== $variant->colour) {
+        $barcode = $variant->barcode;
+        if (($size !== $variant->size || $colour !== $variant->colour) && !$variant->hasBeenUsed()) {
             $sku = $this->generateVariantSku($product, $size, $colour);
+            $barcode = 'BC-' . $sku;
         }
-        $barcode = 'BC-' . $sku;
 
         $variant->update([
             'sku'           => $sku,
@@ -722,6 +725,7 @@ class ProductVariantController extends Controller
                 'formatted_title' => $variant->formatted_title,
                 'category_name'   => $variant->product?->category?->name ?? 'General',
                 'sku'             => $variant->sku,
+                'barcode'         => $variant->barcode,
                 'size'            => $variant->size,
                 'colour'          => $variant->colour,
                 'selling_price'   => number_format($variant->selling_price, 2),

@@ -92,18 +92,21 @@ class PosController extends Controller
 
         // If scanning an exact barcode or SKU
         if ($exact || strlen($query) >= 8 || str_starts_with($query, 'BC-')) {
+            // Scanners sometimes send lower case (Caps Lock); our barcodes and SKUs are upper case
+            $codes = array_values(array_unique([$query, strtoupper($query)]));
             $exactVariant = ProductVariant::with(['product.category', 'branchStocks'])
-                ->where('barcode', $query)
-                ->orWhere('sku', $query)
+                ->where(function ($q) use ($codes) {
+                    $q->whereIn('barcode', $codes)->orWhereIn('sku', $codes);
+                })
                 ->first();
 
             if ($exactVariant) {
                 $exactBranchStock = $exactVariant->getStockForBranch($branchName);
                 $otherExactInfo = '';
                 if ($exactBranchStock <= 0 && $exactVariant->branchStocks->isNotEmpty()) {
-                    $other = $exactVariant->branchStocks->filter(fn($bs) => $bs->quantity > 0 && $bs->branch_name !== $branchName);
+                    $other = $exactVariant->branchStocks->filter(fn($bs) => (float) $bs->stock_quantity > 0 && $bs->branch_name !== $branchName);
                     if ($other->isNotEmpty()) {
-                        $otherExactInfo = $other->map(fn($o) => "{$o->branch_name} ({$o->quantity})")->join(', ');
+                        $otherExactInfo = $other->map(fn($o) => "{$o->branch_name} (" . (float) $o->stock_quantity . ")")->join(', ');
                     }
                 }
 
@@ -150,9 +153,9 @@ class PosController extends Controller
             $branchStock = $variant->getStockForBranch($branchName);
             $otherInfo = '';
             if ($branchStock <= 0 && $variant->branchStocks->isNotEmpty()) {
-                $other = $variant->branchStocks->filter(fn($bs) => $bs->quantity > 0 && $bs->branch_name !== $branchName);
+                $other = $variant->branchStocks->filter(fn($bs) => (float) $bs->stock_quantity > 0 && $bs->branch_name !== $branchName);
                 if ($other->isNotEmpty()) {
-                    $otherInfo = $other->map(fn($o) => "{$o->branch_name} ({$o->quantity})")->join(', ');
+                    $otherInfo = $other->map(fn($o) => "{$o->branch_name} (" . (float) $o->stock_quantity . ")")->join(', ');
                 }
             }
 
@@ -192,12 +195,7 @@ class PosController extends Controller
         $user = auth()->user();
         $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
 
-        $activeBranch = \App\Services\BranchContext::getActiveBranch();
-        if ($isOwnerOrAdmin) {
-            $branchName = $request->branch_name ?: ($activeBranch ?: ($user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop')));
-        } else {
-            $branchName = $activeBranch ?: ($user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop'));
-        }
+        $branchName = $this->sellingBranch($request, $isOwnerOrAdmin);
 
         $paymentMethod = $request->payment_method;
         $paymentStatus = 'paid';
@@ -275,11 +273,17 @@ class PosController extends Controller
 
                 $storedPaymentMethod = $paymentMethod;
                 if ($paymentMethod === 'Split') {
-                    $cashAmt = (float) $request->input('cash_amount', 0);
-                    $mpesaAmt = (float) $request->input('mpesa_amount', 0);
-                    $storedPaymentMethod = "Split (Cash: " . number_format($cashAmt, 0) . ", M-Pesa: " . number_format($mpesaAmt, 0) . ")";
+                    $cashAmt = round((float) $request->input('cash_amount', 0), 2);
+                    $mpesaAmt = round((float) $request->input('mpesa_amount', 0), 2);
+
+                    // Server-side check: the browser check alone can be bypassed
+                    if (abs(($cashAmt + $mpesaAmt) - $total) >= 0.05) {
+                        throw new \Exception("Split payment error: Cash (KES " . number_format($cashAmt, 2) . ") + M-Pesa (KES " . number_format($mpesaAmt, 2) . ") must equal the sale total of KES " . number_format($total, 2) . ".");
+                    }
+
+                    $storedPaymentMethod = "Split (Cash: " . number_format($cashAmt, 2) . ", M-Pesa: " . number_format($mpesaAmt, 2) . ")";
                     if (strlen($storedPaymentMethod) > 50) {
-                        $storedPaymentMethod = "Split (C:" . intval($cashAmt) . " + M:" . intval($mpesaAmt) . ")";
+                        $storedPaymentMethod = "Split (C:" . $cashAmt . " + M:" . $mpesaAmt . ")";
                     }
                 }
 
@@ -290,7 +294,7 @@ class PosController extends Controller
                     'customer_id'       => $request->customer_id ?: null,
                     'user_id'           => auth()->id(),
                     'shift_id'          => $shift->id,
-                    'receipt_number'    => 'RCP-' . strtoupper(uniqid()),
+                    'receipt_number'    => \App\Services\DocumentNumber::make('RCP', $branchName),
                     'total_amount'      => $total,
                     'payment_method'    => $storedPaymentMethod,
                     'payment_status'    => $paymentStatus,
@@ -384,7 +388,7 @@ class PosController extends Controller
         ]);
 
         $user = auth()->user();
-        $branchName = $request->branch_name ?: ($user->branch_name ?: 'Main Shop');
+        $branchName = $this->sellingBranch($request, $user->hasAnyRole(['admin', 'owner', 'system_administrator']));
 
         $customer = null;
         $customerName = trim($request->customer_name ?? '');
@@ -407,8 +411,7 @@ class PosController extends Controller
             default     => 1.00,
         };
 
-        $count = Quotation::count() + 1;
-        $quotationNumber = 'QTN-' . date('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $quotationNumber = \App\Services\DocumentNumber::make('QTN', $branchName);
 
         try {
             $quotation = DB::transaction(function () use ($request, $customer, $customerName, $branchName, $tierMultiplier, $quotationNumber) {
@@ -505,6 +508,7 @@ class PosController extends Controller
                 'time'           => $sale->created_at->format('d M H:i'),
                 'time_ago'       => $sale->created_at->diffForHumans(),
                 'receipt_url'    => route('sales.show', $sale),
+                'print_url'      => route('sales.print', ['sale' => $sale, 'copy' => 1]),
             ];
         }));
     }
@@ -522,7 +526,32 @@ class PosController extends Controller
             'user'
         ])->findOrFail($saleId);
 
-        return view('pos.receipt', compact('sale'));
+        $isReprint = false;
+        // Auto-print only straight after the sale (the flash message), not on a page reload
+        $autoPrintReceipt = BusinessSetting::get('receipt_auto_print', '1') === '1' && session()->has('success');
+
+        return view('pos.receipt', compact('sale', 'isReprint', 'autoPrintReceipt'));
+    }
+
+    /**
+     * Thermal receipt for the receipt printer (58 mm or 80 mm roll, see Settings).
+     * ?copy=1 marks it as a reprint; ?preview=1 shows it without opening the print dialog.
+     */
+    public function printReceipt(Request $request, Sale $sale)
+    {
+        $user = auth()->user();
+        $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
+        if (!$isOwnerOrAdmin && !empty($user->branch_name) && $sale->branch_name !== (\App\Services\BranchContext::getActiveBranch() ?? $user->branch_name)) {
+            abort(403, 'You can only print receipts issued at your shop.');
+        }
+
+        $sale->load(['customer', 'user', 'saleItems.productVariant.product']);
+
+        return view('receipts.thermal', [
+            'sale'      => $sale,
+            'isCopy'    => $request->boolean('copy'),
+            'autoPrint' => !$request->boolean('preview'),
+        ]);
     }
 
     public function salesIndex(Request $request)
@@ -580,7 +609,25 @@ class PosController extends Controller
     public function salesShow(Sale $sale)
     {
         $sale->load(['customer', 'user', 'saleItems.productVariant.product']);
-        return view('pos.receipt', compact('sale'));
+        $isReprint = true;
+        $autoPrintReceipt = false;
+
+        return view('pos.receipt', compact('sale', 'isReprint', 'autoPrintReceipt'));
+    }
+
+    /**
+     * The shop a sale, quotation or parked cart belongs to. On a shop PC (standalone) that is always
+     * this PC's shop: its stock is the only stock here. Only at HQ may an owner pick another branch.
+     */
+    private function sellingBranch(Request $request, bool $mayChooseBranch): string
+    {
+        $activeBranch = \App\Services\BranchContext::getActiveBranch();
+        if (\App\Services\BranchContext::isStandalone() && $activeBranch) {
+            return $activeBranch;
+        }
+        $fallback = $activeBranch ?: (auth()->user()->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop'));
+
+        return $mayChooseBranch ? ($request->branch_name ?: $fallback) : $fallback;
     }
 
     public function parkSale(Request $request)
@@ -594,7 +641,7 @@ class PosController extends Controller
         ]);
 
         $user = auth()->user();
-        $branchName = $request->branch_name ?: ($user->branch_name ?: 'Main Shop');
+        $branchName = $this->sellingBranch($request, $user->hasAnyRole(['admin', 'owner', 'system_administrator']));
 
         $parked = ParkedSale::create([
             'user_id'          => $user->id,
@@ -615,7 +662,7 @@ class PosController extends Controller
     public function getParkedSales(Request $request)
     {
         $user = auth()->user();
-        $branchName = $request->branch_name ?: ($user->branch_name ?: 'Main Shop');
+        $branchName = $this->sellingBranch($request, $user->hasAnyRole(['admin', 'owner', 'system_administrator']));
 
         $parkedSales = ParkedSale::with('customer')
             ->where('branch_name', $branchName)
@@ -661,44 +708,41 @@ class PosController extends Controller
 
         $receiptNumber = $sale->receipt_number;
 
+        // A sale with processed returns has already had part of its stock restored and
+        // part of its value refunded. Voiding it would restock those items a second time.
+        if (\App\Models\SaleReturn::where('sale_id', $sale->id)->exists()) {
+            return redirect()->route('sales.index')
+                ->with('error', "Receipt #{$receiptNumber} has processed returns and cannot be voided. Use the Returns module for the remaining items.");
+        }
+
         DB::transaction(function () use ($sale) {
-            // Restore stock for every line item back to the branch shelf
-            foreach ($sale->items as $item) {
-                $branchStock = BranchStock::where('branch_name', $sale->branch_name)
-                    ->where('product_variant_id', $item->product_variant_id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if ($branchStock) {
-                    $branchStock->increment('stock_quantity', $item->quantity);
-                } else {
-                    BranchStock::create([
-                        'branch_name'        => $sale->branch_name,
-                        'product_variant_id' => $item->product_variant_id,
-                        'stock_quantity'     => $item->quantity,
-                    ]);
+            // Restore stock for every line item back to the branch shelf (with ledger entry)
+            foreach ($sale->items()->with('productVariant')->get() as $item) {
+                $variant = $item->productVariant;
+                if (!$variant) {
+                    continue;
                 }
 
-                // Sync variant cached total
-                if ($item->productVariant) {
-                    $item->productVariant->update([
-                        'stock_quantity' => $item->productVariant->branchStocks()->sum('stock_quantity'),
-                    ]);
-                }
+                $variant->adjustStockForBranch(
+                    $sale->branch_name,
+                    (float) $item->quantity,
+                    'sale_void',
+                    $sale->id,
+                    $sale->receipt_number,
+                    "Void of POS Sale #{$sale->receipt_number}"
+                );
             }
 
-            // Reverse shift totals if the sale was linked to a shift
-            if ($sale->shift_id) {
-                $shift = Shift::find($sale->shift_id);
-                if ($shift) {
-                    $shift->decrement('total_sales', $sale->total_amount);
-                    $shift->decrement('total_transactions', 1);
-                }
-            }
+            $shiftId = $sale->shift_id;
 
             // Delete line items then the sale header
             $sale->items()->delete();
             $sale->delete();
+
+            // Rebuild the shift's totals from its remaining sales
+            if ($shiftId && ($shift = Shift::find($shiftId))) {
+                $shift->recalculateTotals();
+            }
         });
 
         return redirect()->route('sales.index')

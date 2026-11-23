@@ -203,6 +203,16 @@
                                         </span>
                                     </td>
                                     <td class="px-5 py-3 text-right whitespace-nowrap space-x-1.5">
+                                        @if($shift->status === 'open' && $isGlobal && $shift->user_id !== auth()->id())
+                                            <form method="POST" action="{{ route('shifts.force-close', $shift) }}" class="inline"
+                                                  onsubmit="const c = prompt('Close {{ addslashes($shift->user->name ?? 'this cashier') }}\'s shift. Enter the cash physically counted in the drawer (KES):'); if (c === null || c.trim() === '' || isNaN(c)) return false; this.querySelector('[name=actual_cash]').value = c; return true;">
+                                                @csrf
+                                                <input type="hidden" name="actual_cash">
+                                                <button type="submit" class="inline-flex items-center px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 rounded text-[11px] font-bold transition">
+                                                    Close Shift
+                                                </button>
+                                            </form>
+                                        @endif
                                         @if($shift->status === 'closed' && $isGlobal)
                                             <button type="button"
                                                     @click="openCollectModal({{ $shift->id }}, '{{ addslashes($shift->branch_name ?? 'Main Shop') }}', {{ $totCash }}, {{ $curFloatLeft }}, {{ $curCol }}, '{{ addslashes($shift->collected_by_name ?? auth()->user()->name) }}')"

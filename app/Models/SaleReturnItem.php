@@ -8,7 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SaleReturnItem extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Models\Concerns\Syncable;
+
+    /** Record type used when uploading to HQ (see App\Sync). */
+    public const SYNC_TYPE = 'sale_return';
 
     protected $fillable = [
         'sale_return_id',
@@ -32,5 +35,11 @@ class SaleReturnItem extends Model
     public function productVariant(): BelongsTo
     {
         return $this->belongsTo(ProductVariant::class);
+    }
+
+    /** Return lines are uploaded as part of their return. */
+    public function syncTarget(): array
+    {
+        return [SaleReturn::SYNC_TYPE, SaleReturn::whereKey($this->sale_return_id)->value('uuid')];
     }
 }

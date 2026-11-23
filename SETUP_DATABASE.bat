@@ -70,13 +70,24 @@ if exist "uniform_shop_erp.sql" (
     )
 )
 
+:: Never import over a shop that already has data: only into an empty database.
+set "TABLE_COUNT=0"
+for /f "skip=1 tokens=*" %%c in ('"!MYSQL_BIN!" -u root -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='uniform_shop_erp';" 2^>nul') do set "TABLE_COUNT=%%c"
+if not "!TABLE_COUNT!"=="0" (
+    echo [3/3] Database already has !TABLE_COUNT! tables: this shop is set up. Nothing imported.
+    echo       Start the POS with RUN_POS.bat; it applies any updates itself.
+    set "SQL_FILE="
+    goto :done
+)
+
 if not "%SQL_FILE%"=="" (
     echo [3/3] Importing %SQL_FILE% into uniform_shop_erp ...
     "!MYSQL_BIN!" -u root uniform_shop_erp < "%SQL_FILE%"
-    if "%ERRORLEVEL%"=="0" (
-        echo       Database imported successfully!
+    if errorlevel 1 (
+        color 0C
+        echo       [ERROR] The import FAILED. The database may be incomplete; call support.
     ) else (
-        echo       Notice: SQL import completed with warnings.
+        echo       Database imported successfully!
     )
 ) else (
     echo [3/3] No .sql file found in folder. Running migrations instead...
@@ -88,6 +99,7 @@ if not "%SQL_FILE%"=="" (
     )
 )
 
+:done
 echo.
 echo ====================================================================
 echo  SETUP COMPLETE!

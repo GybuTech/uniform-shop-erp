@@ -63,17 +63,16 @@ class StockAdjustmentController extends Controller
     {
         $this->checkOwnerOrAdmin();
         $validated = $request->validate([
-            'branch_name' => ['required', 'string'],
+            'branch_name' => ['required', 'string', 'exists:branches,name'],
             'reason'      => ['required', 'string'],
             'notes'       => ['nullable', 'string'],
             'items'       => ['required', 'array', 'min:1'],
             'items.*.product_variant_id' => ['required', 'exists:product_variants,id'],
             'items.*.type'               => ['required', 'in:add,subtract'],
-            'items.*.quantity'           => ['required', 'integer', 'min:1'],
+            'items.*.quantity'           => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        $count = StockAdjustment::count() + 1;
-        $adjustmentNumber = 'ADJ-' . \App\Services\SystemTime::now()->format('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $adjustmentNumber = \App\Services\DocumentNumber::make('ADJ', $validated['branch_name']);
 
         DB::transaction(function () use ($validated, $adjustmentNumber) {
             $adjustment = StockAdjustment::create([
@@ -91,13 +90,17 @@ class StockAdjustmentController extends Controller
                     'quantity'           => $item['quantity'],
                 ]);
 
-                // Adjust stock on ProductVariant
+                // Adjust the sellable stock at the selected branch (with ledger entry)
                 $variant = ProductVariant::findOrFail($item['product_variant_id']);
-                if ($item['type'] === 'add') {
-                    $variant->increment('stock_quantity', $item['quantity']);
-                } else {
-                    $variant->decrement('stock_quantity', $item['quantity']);
-                }
+                $qty = (float) $item['quantity'];
+                $variant->adjustStockForBranch(
+                    $validated['branch_name'],
+                    $item['type'] === 'add' ? $qty : -$qty,
+                    'adjustment',
+                    $adjustment->id,
+                    $adjustment->adjustment_number,
+                    $validated['reason']
+                );
             }
         });
 
@@ -206,8 +209,7 @@ class StockAdjustmentController extends Controller
 
         if ($diff != 0) {
             DB::transaction(function () use ($variant, $oldStock, $newStock, $diff, $branchName, $validated) {
-                $count = StockAdjustment::count() + 1;
-                $adjNum = 'ADJ-DIR-' . \App\Services\SystemTime::now()->format('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+                $adjNum = \App\Services\DocumentNumber::make('ADJ', $branchName);
 
                 $adjustment = StockAdjustment::create([
                     'adjustment_number' => $adjNum,
@@ -223,7 +225,7 @@ class StockAdjustmentController extends Controller
                     'quantity'           => abs($diff),
                 ]);
 
-                $variant->setStockForBranch($branchName, $newStock);
+                $variant->setStockForBranch($branchName, $newStock, 'adjustment', $adjustment->id, $adjNum, $adjustment->reason);
             });
 
             return back()->with('success', "Stock for {$variant->product->name} (Size {$variant->size}) at {$branchName} updated from {$oldStock} to {$newStock}.");
@@ -259,7 +261,7 @@ class StockAdjustmentController extends Controller
                 $diff = $newQty - $oldQty;
 
                 if ($diff != 0) {
-                    $variant->setStockForBranch($branchName, $newQty);
+                    $variant->setStockForBranch($branchName, $newQty, 'adjustment', null, null, $reason);
                     $itemsToLog[] = [
                         'product_variant_id' => $variant->id,
                         'type'               => $diff > 0 ? 'add' : 'subtract',
@@ -270,8 +272,7 @@ class StockAdjustmentController extends Controller
             }
 
             if (!empty($itemsToLog)) {
-                $count = StockAdjustment::count() + 1;
-                $adjNum = 'ADJ-BULK-' . \App\Services\SystemTime::now()->format('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+                $adjNum = \App\Services\DocumentNumber::make('ADJ', $branchName);
 
                 $adjustment = StockAdjustment::create([
                     'adjustment_number' => $adjNum,

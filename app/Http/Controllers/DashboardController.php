@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Category;
 use App\Models\Customer;
+use App\Models\CustomerPayment;
+use App\Models\SaleReturn;
 use App\Models\Expense;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -61,25 +63,46 @@ class DashboardController extends Controller
             $expensesQuery->where('branch_name', $activeBranch);
         }
         $totalExpenses = (float) $expensesQuery->sum('amount');
-        $netProfit = max(0, $totalSalesAmount - $totalExpenses);
 
-        // 3. Customer Debt Due (Credit Sales)
+        // Refunds issued on returned goods (all refund methods reduce revenue)
+        $returnsQuery = SaleReturn::query()
+            ->when(!$isAllBranches, fn($q) => $q->where('branch_name', $activeBranch));
+        $totalReturnsAmount = (float) (clone $returnsQuery)->sum('refund_total');
+
+        // Cost of goods sold, from the cost snapshotted on each sale line, less returned goods
+        $cogs = (float) DB::table('sale_items')
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->when(!$isAllBranches, fn($q) => $q->where('sales.branch_name', $activeBranch))
+            ->sum(DB::raw('sale_items.quantity * sale_items.cost_price'));
+        $returnedCogs = (float) DB::table('sale_return_items')
+            ->join('sale_returns', 'sale_returns.id', '=', 'sale_return_items.sale_return_id')
+            ->join('product_variants', 'product_variants.id', '=', 'sale_return_items.product_variant_id')
+            ->when(!$isAllBranches, fn($q) => $q->where('sale_returns.branch_name', $activeBranch))
+            ->sum(DB::raw('sale_return_items.quantity * COALESCE(product_variants.cost_price, 0)'));
+
+        $netProfit = ($totalSalesAmount - $totalReturnsAmount) - ($cogs - $returnedCogs) - $totalExpenses;
+
+        // 3. Customer Debt Due (Credit Sales less repayments and goods returned on credit)
         $creditSalesQuery = (clone $salesQuery)->with('customer')
             ->where(function ($q) {
                 $q->where('payment_status', 'credit')
                   ->orWhere('payment_method', 'Credit');
             });
-        $totalCustomerDebt = (float) (clone $creditSalesQuery)->sum('total_amount');
+        $grossCreditSales = (float) (clone $creditSalesQuery)->sum('total_amount');
+        $creditRepayments = (float) CustomerPayment::query()
+            ->when(!$isAllBranches, fn($q) => $q->where('branch_name', $activeBranch))
+            ->sum('amount');
+        $creditReturns = (float) (clone $returnsQuery)
+            ->whereHas('sale', fn($q) => $q->where(function ($q) {
+                $q->where('payment_status', 'credit')->orWhere('payment_method', 'Credit');
+            }))
+            ->sum('refund_total');
+        $totalCustomerDebt = max(0.0, round($grossCreditSales - $creditRepayments - $creditReturns, 2));
         $customerCreditLedger = (clone $creditSalesQuery)->latest()->take(8)->get();
         $allCreditSales = (clone $creditSalesQuery)->latest()->get();
 
-        // 4. Sales Returns / Stock Adjustments
-        $salesReturnsCount = StockAdjustment::when(!$isAllBranches, fn($q) => $q->where('branch_name', $activeBranch))
-            ->where('reason', 'like', '%return%')
-            ->count();
-        if ($salesReturnsCount === 0) {
-            $salesReturnsCount = StockAdjustment::when(!$isAllBranches, fn($q) => $q->where('branch_name', $activeBranch))->count();
-        }
+        // 4. Sales Returns processed
+        $salesReturnsCount = (clone $returnsQuery)->count();
 
         // Row 2 Metrics:
         // 5. Stock Inventory Valuation

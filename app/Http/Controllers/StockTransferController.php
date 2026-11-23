@@ -85,21 +85,54 @@ class StockTransferController extends Controller
         }
 
         $validated = $request->validate([
-            'from_branch'   => ['required', 'string', 'different:to_branch'],
-            'to_branch'     => ['required', 'string'],
+            'from_branch'   => ['required', 'string', 'different:to_branch', 'exists:branches,name'],
+            'to_branch'     => ['required', 'string', 'exists:branches,name'],
             'transfer_date' => ['required', 'date'],
             'status'        => ['nullable', 'string', 'in:Pending,Received'],
             'notes'         => ['nullable', 'string'],
             'items'         => ['required', 'array', 'min:1'],
             'items.*.product_variant_id' => ['required', 'exists:product_variants,id'],
-            'items.*.quantity'           => ['required', 'integer', 'min:1'],
+            'items.*.quantity'           => ['required', 'numeric', 'min:0.01'],
         ]);
 
         $status         = $validated['status'] ?? 'Pending';
-        $count          = StockTransfer::count() + 1;
-        $transferNumber = 'TRF-' . SystemTime::now()->format('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $transferNumber = \App\Services\DocumentNumber::make('TRF', $validated['from_branch']);
 
-        DB::transaction(function () use ($validated, $transferNumber, $status) {
+        // Combine duplicate lines for the same variant so the stock check sees the true total
+        $lines = collect($validated['items'])
+            ->groupBy('product_variant_id')
+            ->map(fn ($group, $variantId) => [
+                'product_variant_id' => (int) $variantId,
+                'quantity'           => (float) $group->sum('quantity'),
+            ])
+            ->values();
+
+        try {
+            DB::transaction(function () use ($validated, $transferNumber, $status, $lines) {
+                // 1. Verify the source branch actually holds the stock (locked against concurrent sales)
+                foreach ($lines as $line) {
+                    $variant   = ProductVariant::findOrFail($line['product_variant_id']);
+                    $available = $variant->lockedStockForBranch($validated['from_branch']);
+                    if ($available < $line['quantity']) {
+                        throw new \RuntimeException("Insufficient stock: '{$variant->sku}' has only {$available} unit(s) at {$validated['from_branch']} (requested {$line['quantity']}).");
+                    }
+                }
+
+                $this->createTransfer($validated, $transferNumber, $status, $lines);
+            });
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        }
+
+        $message = $status === 'Pending'
+            ? "Stock transfer {$transferNumber} created with status 'Pending'. Awaiting confirmation from {$validated['to_branch']}."
+            : "Stock transfer {$transferNumber} created and marked as 'Received' at {$validated['to_branch']}. Inventory updated.";
+
+        return redirect()->route('transfers.index')->with('success', $message);
+    }
+
+    private function createTransfer(array $validated, string $transferNumber, string $status, $lines): void
+    {
             $transfer = StockTransfer::create([
                 'transfer_number' => $transferNumber,
                 'from_branch'     => $validated['from_branch'],
@@ -112,7 +145,7 @@ class StockTransferController extends Controller
                 'received_by'     => $status === 'Received' ? auth()->id() : null,
             ]);
 
-            foreach ($validated['items'] as $item) {
+            foreach ($lines as $item) {
                 $transfer->items()->create([
                     'product_variant_id' => $item['product_variant_id'],
                     'quantity'           => $item['quantity'],
@@ -121,21 +154,28 @@ class StockTransferController extends Controller
                 // Deduct from source branch stock immediately on dispatch
                 $variant = ProductVariant::find($item['product_variant_id']);
                 if ($variant) {
-                    $variant->adjustStockForBranch($validated['from_branch'], -1 * $item['quantity']);
+                    $variant->adjustStockForBranch(
+                        $validated['from_branch'],
+                        -1 * $item['quantity'],
+                        'transfer_out',
+                        $transfer->id,
+                        $transferNumber,
+                        "Dispatched to {$validated['to_branch']}"
+                    );
 
                     // If created directly as Received, also credit to destination branch immediately
                     if ($status === 'Received') {
-                        $variant->adjustStockForBranch($validated['to_branch'], $item['quantity']);
+                        $variant->adjustStockForBranch(
+                            $validated['to_branch'],
+                            $item['quantity'],
+                            'transfer_in',
+                            $transfer->id,
+                            $transferNumber,
+                            "Received from {$validated['from_branch']}"
+                        );
                     }
                 }
             }
-        });
-
-        $message = $status === 'Pending'
-            ? "Stock transfer {$transferNumber} created with status 'Pending'. Awaiting confirmation from {$validated['to_branch']}."
-            : "Stock transfer {$transferNumber} created and marked as 'Received' at {$validated['to_branch']}. Inventory updated.";
-
-        return redirect()->route('transfers.index')->with('success', $message);
     }
 
     public function confirmReceipt(StockTransfer $transfer)
@@ -148,21 +188,34 @@ class StockTransferController extends Controller
                 ->with('success', "Transfer {$transfer->transfer_number} is already confirmed as Received.");
         }
 
-        // Must be staff at destination branch or Owner/Admin
-        if (!$isOwnerOrAdmin && (!empty($user->branch_name) && strtolower(trim($user->branch_name)) !== strtolower(trim($transfer->to_branch)))) {
-            abort(403, "You can only confirm transfers dispatched to your assigned branch ({$user->branch_name}).");
+        // Must be staff assigned to the destination branch, or Owner/Admin
+        if (!$isOwnerOrAdmin && strtolower(trim((string) $user->branch_name)) !== strtolower(trim($transfer->to_branch))) {
+            abort(403, "You can only confirm transfers dispatched to your assigned branch.");
         }
 
         DB::transaction(function () use ($transfer) {
+            // Re-check status under a row lock so a double-click cannot credit the stock twice
+            $locked = StockTransfer::whereKey($transfer->id)->lockForUpdate()->first();
+            if (!$locked || $locked->status === 'Received') {
+                return;
+            }
+
             // Add stock to destination branch on confirmation
-            foreach ($transfer->items as $item) {
+            foreach ($locked->items as $item) {
                 $variant = ProductVariant::find($item->product_variant_id);
                 if ($variant) {
-                    $variant->adjustStockForBranch($transfer->to_branch, $item->quantity);
+                    $variant->adjustStockForBranch(
+                        $locked->to_branch,
+                        (float) $item->quantity,
+                        'transfer_in',
+                        $locked->id,
+                        $locked->transfer_number,
+                        "Received from {$locked->from_branch}"
+                    );
                 }
             }
 
-            $transfer->update([
+            $locked->update([
                 'status'      => 'Received',
                 'received_at' => SystemTime::now(),
                 'received_by' => auth()->id(),

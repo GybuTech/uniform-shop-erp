@@ -14,6 +14,7 @@
     </x-slot>
 
     @php
+        if (!function_exists('formatWhatsAppUrl')) {
         function formatWhatsAppUrl($phone, $name, $amount, $receipt) {
             if (!$phone) return null;
             $cleaned = preg_replace('/[^0-9]/', '', $phone);
@@ -22,8 +23,9 @@
             } elseif (!str_starts_with($cleaned, '254') && strlen($cleaned) === 9) {
                 $cleaned = '254' . $cleaned;
             }
-            $text = "Hello " . ($name ?: 'Customer') . ", this is a friendly reminder regarding your outstanding credit balance of KES " . number_format($amount, 2) . " on Receipt #" . $receipt . " at GybuTech Uniforms. Kindly arrange payment. Thank you!";
+            $text = "Hello " . ($name ?: 'Customer') . ", this is a friendly reminder regarding your outstanding credit balance of KES " . number_format($amount, 2) . " on Receipt #" . $receipt . " at " . \App\Models\BusinessSetting::get('business_name', 'our shop') . ". Kindly arrange payment. Thank you!";
             return "https://wa.me/" . $cleaned . "?text=" . rawurlencode($text);
+        }
         }
     @endphp
 
@@ -34,6 +36,23 @@
         lowStockSearch: '',
         customerDebtSearch: ''
     }">
+
+        {{-- HQ: how fresh each shop's figures are (shops upload whenever they are online) --}}
+        @if(!\App\Services\BranchContext::isStandalone() && $isAdminOrOwner)
+            @php $syncBranches = \App\Models\Branch::where('is_active', true)->whereNotNull('sync_token_hash')->orderBy('name')->get(); @endphp
+            @if($syncBranches->isNotEmpty())
+                <div class="bg-white border border-slate-200 rounded-2xl p-3 flex flex-wrap gap-2 text-[11px]">
+                    <span class="font-bold text-slate-500 uppercase tracking-wider self-center mr-1">Shop sync</span>
+                    @foreach($syncBranches as $sb)
+                        @php $fresh = $sb->last_synced_at && $sb->last_synced_at->gt(now()->subMinutes(15)); @endphp
+                        <span class="px-2.5 py-1 rounded-full font-semibold border {{ $fresh ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200' }}"
+                              title="{{ $sb->sync_pending_count }} change(s) still waiting at the shop">
+                            {{ $sb->name }}: {{ $sb->last_synced_at ? $sb->last_synced_at->diffForHumans() : 'never synced' }}
+                        </span>
+                    @endforeach
+                </div>
+            @endif
+        @endif
 
         {{-- Pending Incoming Stock Transfer Notification Banner --}}
         @if(isset($pendingIncomingTransfers) && $pendingIncomingTransfers->isNotEmpty())
@@ -157,7 +176,7 @@
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Quick Actions</span>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        @can('create-sales')
+                        @if(\App\Services\BranchContext::isStandalone() && auth()->user()->can('create-sales'))
                         <a href="{{ route('pos.index') }}"
                            class="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-2xs hover:shadow-sm transition group border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-50/20">
                             <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold bg-blue-50 text-blue-700 group-hover:scale-105 transition">
@@ -170,7 +189,7 @@
                                 <p class="text-xs text-slate-500">Fast checkout & thermal receipts</p>
                             </div>
                         </a>
-                        @endcan
+                        @endif
 
                         <a href="{{ route('transfers.index') }}"
                            class="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-2xs hover:shadow-sm transition group border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-50/20">
@@ -295,7 +314,7 @@
                         {{-- 2. Gross Margin / Profit (Light Green Boundary) --}}
                         <div class="bg-white p-5 rounded-2xl border border-emerald-300 shadow-xs flex flex-col justify-between">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Gross Margin</span>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Net Profit</span>
                                 <span class="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -304,7 +323,7 @@
                             </div>
                             <div>
                                 <p class="text-2xl sm:text-3xl font-black font-mono text-slate-900">KES {{ number_format($netProfit, 0) }}</p>
-                                <p class="text-[11px] text-slate-500 mt-1">Revenue minus shop expenses</p>
+                                <p class="text-[11px] text-slate-500 mt-1">Revenue less returns, cost of goods &amp; expenses</p>
                             </div>
                         </div>
 
@@ -416,13 +435,14 @@
                     </div>
                 </div>
 
-                {{-- SEPARATION DIVIDER & QUICK OPERATIONAL ACTIONS (Blue Boundary) --}}
+                {{-- SEPARATION DIVIDER & QUICK OPERATIONAL ACTIONS (shop PCs only; the online copy is view/manage) --}}
+                @if(\App\Services\BranchContext::isStandalone())
                 <div class="pt-2 border-t border-slate-200">
                     <div class="flex items-center justify-between mb-3">
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Quick Actions</span>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        @can('create-sales')
+                        @if(\App\Services\BranchContext::isStandalone() && auth()->user()->can('create-sales'))
                         <a href="{{ route('pos.index') }}"
                            class="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-2xs hover:shadow-sm transition group border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-50/20">
                             <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold bg-blue-50 text-blue-700 group-hover:scale-105 transition">
@@ -435,7 +455,7 @@
                                 <p class="text-xs text-slate-500">Fast checkout & thermal receipts</p>
                             </div>
                         </a>
-                        @endcan
+                        @endif
 
                         @can('create-stock-entries')
                         <a href="{{ route('stock-entries.create') }}"
@@ -479,6 +499,7 @@
                         </a>
                     </div>
                 </div>
+                @endif
 
                 {{-- REVENUE LINE GRAPH --}}
                 <div class="bg-white shadow-xs rounded-2xl p-6 border border-slate-200">

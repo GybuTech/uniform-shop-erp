@@ -15,7 +15,7 @@
                         <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Branch Outlet *</label>
                         <select name="branch_name" required class="w-full rounded-md border-gray-300 shadow-sm text-sm">
                             @foreach($branches as $b)
-                                <option value="{{ $b }}">{{ $b }}</option>
+                                <option value="{{ $b }}" @selected($b === (\App\Services\BranchContext::getActiveBranch() ?? auth()->user()->branch_name))>{{ $b }}</option>
                             @endforeach
                         </select>
                     </div>

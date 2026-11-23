@@ -16,10 +16,10 @@ class SettingsController extends Controller
     public function index()
     {
         $user = auth()->user();
-        $branches = Branch::withCount('sales')->get();
+        $branches = Branch::withCount('sales')->with('registers')->get();
         $allUsers = [];
 
-        $isOwnerOrAdmin = in_array(strtolower($user->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin']);
+        $isOwnerOrAdmin = $user->hasAnyRole(['owner', 'system_administrator', 'admin']);
         if ($isOwnerOrAdmin) {
             $allUsers = User::with(['roles', 'branch'])->where('id', '!=', $user->id)->get();
         }
@@ -42,6 +42,16 @@ class SettingsController extends Controller
         $mpesaPaybill = BusinessSetting::get('mpesa_paybill_number', '');
         $receiptHeader = BusinessSetting::get('receipt_header_note', '');
         $receiptFooter = BusinessSetting::get('receipt_footer_note', 'Goods once sold are returnable within 7 days with valid receipt.');
+        $isHq = !\App\Services\BranchContext::isStandalone();
+        $syncStatus = $isHq ? null : [
+            'configured'   => \App\Sync\SyncPusher::isConfigured(),
+            'hq_url'       => config('sync.hq_url'),
+            'last_success' => BusinessSetting::get(\App\Sync\SyncPusher::SETTING_LAST_SUCCESS),
+            'last_error'   => BusinessSetting::get(\App\Sync\SyncPusher::SETTING_LAST_ERROR),
+            'pending'      => \App\Models\SyncOutbox::pendingCount(),
+        ];
+        $receiptPaperWidth = (string) BusinessSetting::get('receipt_paper_width', '80');
+        $receiptAutoPrint = (string) BusinessSetting::get('receipt_auto_print', '1');
 
         $currentSystemTime = SystemTime::formatted('d M Y, h:i A');
         $currentSystemTimeIso = SystemTime::now()->format('Y-m-d\TH:i');
@@ -69,6 +79,10 @@ class SettingsController extends Controller
             'mpesaPaybill',
             'receiptHeader',
             'receiptFooter',
+            'receiptPaperWidth',
+            'receiptAutoPrint',
+            'isHq',
+            'syncStatus',
             'currentSystemTime',
             'currentSystemTimeIso',
             'hasTimeOffset',
@@ -104,7 +118,7 @@ class SettingsController extends Controller
     public function updateBusinessInfo(Request $request)
     {
         $user = auth()->user();
-        $isOwnerOrAdmin = in_array(strtolower($user->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin']);
+        $isOwnerOrAdmin = $user->hasAnyRole(['owner', 'system_administrator', 'admin']);
         if (!$isOwnerOrAdmin) {
             abort(403, 'Only business owners and system administrators can update store information.');
         }
@@ -122,6 +136,8 @@ class SettingsController extends Controller
             'mpesa_paybill_number'           => ['nullable', 'string', 'max:50'],
             'receipt_header_note'            => ['nullable', 'string', 'max:255'],
             'receipt_footer_note'            => ['nullable', 'string', 'max:255'],
+            'receipt_paper_width'            => ['nullable', 'in:58,80'],
+            'receipt_auto_print'             => ['nullable', 'in:0,1'],
             'pricing_tier_bulk_discount'     => ['required', 'numeric', 'min:0', 'max:99'],
             'pricing_tier_wholesale_discount'=> ['required', 'numeric', 'min:0', 'max:99'],
             'pricing_tier_bulk_label'        => ['required', 'string', 'max:50'],
@@ -138,7 +154,7 @@ class SettingsController extends Controller
     public function storeBranch(Request $request)
     {
         $user = auth()->user();
-        $isOwnerOrAdmin = in_array(strtolower($user->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin']);
+        $isOwnerOrAdmin = $user->hasAnyRole(['owner', 'system_administrator', 'admin']);
         if (!$isOwnerOrAdmin) {
             abort(403, 'Only business owners and system administrators can add new branches.');
         }
@@ -164,7 +180,7 @@ class SettingsController extends Controller
     public function updateBranch(Request $request, Branch $branch)
     {
         $user = auth()->user();
-        $isOwnerOrAdmin = in_array(strtolower($user->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin']);
+        $isOwnerOrAdmin = $user->hasAnyRole(['owner', 'system_administrator', 'admin']);
         if (!$isOwnerOrAdmin) {
             abort(403, 'Unauthorized.');
         }
@@ -177,20 +193,120 @@ class SettingsController extends Controller
         ]);
 
         $oldName = $branch->name;
-        $branch->update($validated);
+        $newName = $validated['name'];
 
-        if ($oldName !== $validated['name']) {
-            User::where('branch_id', $branch->id)->update(['branch_name' => $validated['name']]);
-            Sale::where('branch_name', $oldName)->update(['branch_name' => $validated['name']]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($branch, $validated, $oldName, $newName) {
+            $branch->update($validated);
+
+            if ($oldName === $newName) {
+                return;
+            }
+
+            // Branches are referenced by name across the system (stock lookups in the POS
+            // included), so every table that stores the name has to follow the rename.
+            $columnsByTable = [
+                'users'             => ['branch_name'],
+                'sales'             => ['branch_name'],
+                'branch_stocks'     => ['branch_name'],
+                'shifts'            => ['branch_name'],
+                'expenses'          => ['branch_name'],
+                'stock_entries'     => ['branch_name'],
+                'stock_adjustments' => ['branch_name'],
+                'stock_movements'   => ['branch_name'],
+                'purchases'         => ['branch_name'],
+                'quotations'        => ['branch_name'],
+                'sale_returns'      => ['branch_name'],
+                'customer_payments' => ['branch_name'],
+                'parked_sales'      => ['branch_name'],
+                'stock_transfers'   => ['from_branch', 'to_branch'],
+            ];
+
+            foreach ($columnsByTable as $table => $columns) {
+                if (!\Illuminate\Support\Facades\Schema::hasTable($table)) {
+                    continue;
+                }
+                foreach ($columns as $column) {
+                    if (\Illuminate\Support\Facades\Schema::hasColumn($table, $column)) {
+                        \Illuminate\Support\Facades\DB::table($table)
+                            ->where($column, $oldName)
+                            ->update([$column => $newName]);
+                    }
+                }
+            }
+        });
+
+        if (session('active_branch_name') === $oldName) {
+            \App\Services\BranchContext::setActiveBranch($newName);
         }
 
         return back()->with('success', "Branch '{$branch->name}' details updated successfully.");
     }
 
+    /**
+     * Add a till (selling PC with its own cash drawer) to a branch.
+     */
+    public function storeRegister(Request $request, Branch $branch)
+    {
+        if (!auth()->user()->hasAnyRole(['owner', 'system_administrator', 'admin'])) {
+            abort(403, 'Only business owners and system administrators can add tills.');
+        }
+
+        \App\Models\Register::forBranch($branch); // make sure Till 1 exists first
+
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:60'],
+        ]);
+
+        $name = trim($validated['name'] ?? '') ?: 'Till ' . ($branch->registers()->count() + 1);
+        if ($branch->registers()->where('name', $name)->exists()) {
+            return back()->with('error', "{$branch->name} already has a till called '{$name}'.");
+        }
+
+        $branch->registers()->create(['name' => $name]);
+
+        return back()->with('success', "Added '{$name}' to {$branch->name}. Pick it on that PC the first time a shift is opened there.");
+    }
+
+    /**
+     * HQ: issue (or replace) the secret key a shop PC uses to upload to HQ.
+     * The key is shown once; only its hash is stored. Issuing a new key revokes the old one.
+     */
+    public function generateSyncKey(Branch $branch)
+    {
+        if (!auth()->user()->hasAnyRole(['owner', 'system_administrator', 'admin'])) {
+            abort(403);
+        }
+        if (\App\Services\BranchContext::isStandalone()) {
+            return back()->with('error', 'Sync keys are issued at HQ (the cloud copy), not on a shop PC.');
+        }
+
+        $key = 'shop_' . \Illuminate\Support\Str::random(48);
+        $branch->forceFill(['sync_token_hash' => hash('sha256', $key)])->save();
+
+        return back()
+            ->with('success', "New sync key for {$branch->name} created. Any previous key for this branch no longer works.")
+            ->with('sync_key_branch', $branch->name)
+            ->with('sync_key_value', $key);
+    }
+
+    /**
+     * Shop PC: upload queued changes to HQ now instead of waiting for the next minute.
+     */
+    public function syncNow()
+    {
+        if (!auth()->user()->hasAnyRole(['owner', 'system_administrator', 'admin', 'manager'])) {
+            abort(403);
+        }
+
+        $result = app(\App\Sync\SyncPusher::class)->run();
+
+        return back()->with($result['status'] === 'ok' ? 'success' : 'error', $result['message'] . " Waiting: {$result['pending']}.");
+    }
+
     public function toggleBranch(Branch $branch)
     {
         $user = auth()->user();
-        $isOwnerOrAdmin = in_array(strtolower($user->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin']);
+        $isOwnerOrAdmin = $user->hasAnyRole(['owner', 'system_administrator', 'admin']);
         if (!$isOwnerOrAdmin) {
             abort(403, 'Unauthorized.');
         }
@@ -204,7 +320,7 @@ class SettingsController extends Controller
     public function destroyBranch(Branch $branch)
     {
         $user = auth()->user();
-        $isOwnerOrAdmin = in_array(strtolower($user->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin']);
+        $isOwnerOrAdmin = $user->hasAnyRole(['owner', 'system_administrator', 'admin']);
         if (!$isOwnerOrAdmin) {
             abort(403, 'Unauthorized.');
         }
@@ -225,7 +341,7 @@ class SettingsController extends Controller
     public function updateSystemTime(Request $request)
     {
         $user = auth()->user();
-        $isOwnerOrAdmin = in_array(strtolower($user->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin']);
+        $isOwnerOrAdmin = $user->hasAnyRole(['owner', 'system_administrator', 'admin']);
         if (!$isOwnerOrAdmin) {
             abort(403, 'Only business owners and system administrators can calibrate system date and time.');
         }
@@ -242,7 +358,7 @@ class SettingsController extends Controller
     public function resetSystemTime()
     {
         $user = auth()->user();
-        $isOwnerOrAdmin = in_array(strtolower($user->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin']);
+        $isOwnerOrAdmin = $user->hasAnyRole(['owner', 'system_administrator', 'admin']);
         if (!$isOwnerOrAdmin) {
             abort(403, 'Unauthorized.');
         }
@@ -255,7 +371,7 @@ class SettingsController extends Controller
     public function deleteUser(User $user)
     {
         $currentUser = auth()->user();
-        $isOwnerOrAdmin = in_array(strtolower($currentUser->roles->first()?->name ?? ''), ['owner', 'system_administrator', 'admin']);
+        $isOwnerOrAdmin = $currentUser->hasAnyRole(['owner', 'system_administrator', 'admin']);
         if (!$isOwnerOrAdmin) {
             abort(403, 'You do not have permission to delete user accounts.');
         }
@@ -266,6 +382,10 @@ class SettingsController extends Controller
 
         if ($user->hasRole('system_administrator') || $user->hasRole('owner')) {
             return back()->with('error', 'System Administrator and Owner accounts cannot be deleted for system safety.');
+        }
+
+        if ($user->hasTradingHistory()) {
+            return back()->with('error', "'{$user->name}' has recorded sales, shifts or stock activity and cannot be deleted. Deactivate the account instead.");
         }
 
         $userName = $user->name;

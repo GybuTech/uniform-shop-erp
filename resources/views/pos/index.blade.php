@@ -720,13 +720,25 @@
                 const query = event.target.value.trim();
                 if (!query) return;
 
-                // Immediate exact match lookup for Barcode Scanners
+                // Immediate exact match lookup for Barcode Scanners.
+                // Stop the type-ahead search the scanner's keystrokes queued, or it would overwrite the result.
+                clearTimeout(searchTimeout);
                 const currentBranch = document.getElementById('branchSelect') ? document.getElementById('branchSelect').value : '';
                 document.getElementById('searchSpinner').classList.remove('hidden');
                 fetch(`{{ route('pos.search') }}?q=${encodeURIComponent(query)}&branch=${encodeURIComponent(currentBranch)}&exact=1`)
                     .then(res => res.json())
                     .then(data => {
                         document.getElementById('searchSpinner').classList.add('hidden');
+                        // Only an exact barcode/SKU match goes straight into the cart. A near match
+                        // (e.g. the same sweater in another colour) is shown for the cashier to pick.
+                        if (data && data.length > 0 && !data[0].exact_match) {
+                            renderSearchResults(data);
+                            const notice = document.createElement('div');
+                            notice.className = 'mb-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs font-bold';
+                            notice.textContent = `No item has exactly "${query}". Pick the right one below.`;
+                            document.getElementById('searchResults').prepend(notice);
+                            return;
+                        }
                         if (data && data.length > 0) {
                             const topMatch = data[0];
                             const displayName = topMatch.formatted_title || topMatch.product_name;
@@ -745,17 +757,36 @@
                             event.target.value = '';
                             document.getElementById('searchResults').innerHTML = `
                                 <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-bold flex items-center justify-between">
-                                    <span>Added to cart: ${displayName}</span>
-                                    <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-mono">${topMatch.sku}</span>
+                                    <span>Added to cart: ${esc(displayName)}</span>
+                                    <span class="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-mono">${esc(topMatch.sku)}</span>
                                 </div>`;
                         } else {
-                            alert(`Barcode or SKU "${query}" was not found in catalog.`);
+                            // No alert(): a popup would swallow the next scans. Show it in place instead.
+                            event.target.value = '';
+                            document.getElementById('searchResults').innerHTML = `
+                                <div class="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs font-bold">
+                                    Not found: "${esc(query)}". Check the label or search by name.
+                                </div>`;
                         }
                     })
                     .catch(() => {
                         document.getElementById('searchSpinner').classList.add('hidden');
                     });
             }
+        }
+
+        // Escape catalog/customer text before inserting it with innerHTML (prevents stored XSS)
+        function esc(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Escape text used as a single-quoted JS string inside a double-quoted onclick="" attribute
+        function jsArg(value) {
+            return esc(String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
         }
 
         function renderSearchResults(variants) {
@@ -770,11 +801,11 @@
 
             container.innerHTML = variants.map(v => {
                 const displayName = v.formatted_title || v.product_name;
-                const safeName = displayName.replace(/'/g, "\\'");
-                const safeSize = (v.size || '').replace(/'/g, "\\'");
-                const safeColour = (v.colour || '').replace(/'/g, "\\'");
-                const safeUnit = (v.unit_of_measure || 'Piece').replace(/'/g, "\\'");
-                const safeBrand = (v.brand_name || '').replace(/'/g, "\\'");
+                const safeName = jsArg(displayName);
+                const safeSize = jsArg(v.size || '');
+                const safeColour = jsArg(v.colour || '');
+                const safeUnit = jsArg(v.unit_of_measure || 'Piece');
+                const safeBrand = jsArg(v.brand_name || '');
                 const effectivePrice = Math.round((v.selling_price * multiplier) * 100) / 100;
 
                 // Attribute badge: size/colour for uniforms, unit/brand for hardware/agrovet
@@ -783,24 +814,24 @@
                     const normColour = (v.colour || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                     const normName = (v.product_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                     const showColour = v.colour && normColour !== normName && !normName.includes(normColour) && v.colour.toLowerCase() !== 'standard';
-                    const colourTag = showColour ? ` &bull; <span class="text-indigo-600 font-semibold">${v.colour}</span>` : '';
-                    attrPill = `&bull; Size: <strong class="text-gray-800">${v.size}</strong>${colourTag}`;
+                    const colourTag = showColour ? ` &bull; <span class="text-indigo-600 font-semibold">${esc(v.colour)}</span>` : '';
+                    attrPill = `&bull; Size: <strong class="text-gray-800">${esc(v.size)}</strong>${colourTag}`;
                 } else if (v.unit_of_measure) {
-                    attrPill = `&bull; Unit: <strong class="text-indigo-700">${v.unit_of_measure}</strong>`;
+                    attrPill = `&bull; Unit: <strong class="text-indigo-700">${esc(v.unit_of_measure)}</strong>`;
                 }
 
-                const brandPill = v.brand_name ? `<span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold mr-1.5">${v.brand_name}</span>` : '';
+                const brandPill = v.brand_name ? `<span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold mr-1.5">${esc(v.brand_name)}</span>` : '';
 
                 let otherStockNotice = '';
                 if (v.stock_quantity <= 0 && v.other_branches_info) {
-                    otherStockNotice = `<span class="text-[10px] text-indigo-700 block mt-0.5 font-bold">In stock at: ${v.other_branches_info}</span>`;
+                    otherStockNotice = `<span class="text-[10px] text-indigo-700 block mt-0.5 font-bold">In stock at: ${esc(v.other_branches_info)}</span>`;
                 }
 
                 const stockBadge = v.stock_quantity <= 0
                     ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">Out of Stock at this station</span>${otherStockNotice}`
                     : (v.stock_quantity <= 5
                         ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">Low Stock (${v.stock_quantity} left)</span>`
-                        : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${v.stock_quantity} ${v.unit_of_measure || 'units'})</span>`);
+                        : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${v.stock_quantity} ${esc(v.unit_of_measure || 'units')})</span>`);
 
                 const actionButton = v.stock_quantity <= 0
                     ? `<span class="inline-block text-xs bg-gray-100 text-gray-400 px-3 py-1 rounded font-bold border cursor-not-allowed">0 Stock</span>`
@@ -808,11 +839,11 @@
 
                 return `
                 <div class="flex items-center justify-between p-3 border rounded-xl hover:bg-indigo-50/60 transition cursor-pointer bg-white"
-                     onclick="addToCart(${v.id}, '${safeName}', '${safeSize}', '${safeColour}', ${v.selling_price}, ${v.stock_quantity}, '${v.sku}', '${safeUnit}', '${safeBrand}')">
+                     onclick="addToCart(${v.id}, '${safeName}', '${safeSize}', '${safeColour}', ${v.selling_price}, ${v.stock_quantity}, '${jsArg(v.sku)}', '${safeUnit}', '${safeBrand}')">
                     <div>
-                        <p class="font-bold text-gray-900 text-sm">${brandPill}${displayName}</p>
+                        <p class="font-bold text-gray-900 text-sm">${brandPill}${esc(displayName)}</p>
                         <p class="text-xs text-gray-500 font-mono mb-1">
-                            <span class="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-bold">${v.sku}</span>
+                            <span class="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-bold">${esc(v.sku)}</span>
                             ${attrPill}
                         </p>
                         ${stockBadge}
@@ -971,9 +1002,9 @@
 
                 let subtitle = '';
                 if (item.size && item.size.trim() !== '') {
-                    subtitle = `<span class="font-bold text-gray-700">Size: ${item.size}</span>${item.colour && item.colour.toLowerCase() !== 'standard' ? ` &bull; ${item.colour}` : ''}`;
+                    subtitle = `<span class="font-bold text-gray-700">Size: ${esc(item.size)}</span>${item.colour && item.colour.toLowerCase() !== 'standard' ? ` &bull; ${esc(item.colour)}` : ''}`;
                 } else if (item.unit) {
-                    subtitle = `<span class="font-bold text-indigo-700">Unit: ${item.unit}</span>`;
+                    subtitle = `<span class="font-bold text-indigo-700">Unit: ${esc(item.unit)}</span>`;
                 }
 
                 const isCont = isContinuousUnit(item.unit);
@@ -983,7 +1014,7 @@
                 return `
                 <div class="flex items-center justify-between p-2 bg-gray-50 border rounded-lg text-xs">
                     <div class="flex-1 pr-2">
-                        <p class="font-bold text-gray-900 leading-tight">${item.name}</p>
+                        <p class="font-bold text-gray-900 leading-tight">${esc(item.name)}</p>
                         <p class="text-[11px] text-gray-500 font-mono">
                             ${subtitle}
                         </p>
@@ -1235,18 +1266,18 @@
                 <div class="p-3 bg-gray-50 border rounded-xl flex items-center justify-between">
                     <div>
                         <div class="flex items-center space-x-2">
-                            <span class="font-bold text-gray-900 text-xs">${p.customerName}</span>
-                            <span class="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded font-mono">${p.timestamp}</span>
+                            <span class="font-bold text-gray-900 text-xs">${esc(p.customerName)}</span>
+                            <span class="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded font-mono">${esc(p.timestamp)}</span>
                         </div>
-                        <p class="text-[11px] text-gray-500 mt-0.5">${p.items.length} items &bull; Tier: <span class="capitalize font-semibold text-gray-700">${p.pricingTier}</span></p>
+                        <p class="text-[11px] text-gray-500 mt-0.5">${p.items.length} items &bull; Tier: <span class="capitalize font-semibold text-gray-700">${esc(p.pricingTier)}</span></p>
                         <p class="text-xs font-black text-indigo-700 font-mono mt-0.5">KES ${parseFloat(p.total).toFixed(2)}</p>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <button type="button" onclick="recallParkedSale('${p.id}')"
+                        <button type="button" onclick="recallParkedSale('${jsArg(p.id)}')"
                             class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
                             Recall Cart
                         </button>
-                        <button type="button" onclick="discardParkedSale('${p.id}')"
+                        <button type="button" onclick="discardParkedSale('${jsArg(p.id)}')"
                             class="p-1.5 text-rose-500 hover:text-rose-700 font-bold text-xs" title="Discard">
                             ✕
                         </button>
@@ -1438,17 +1469,17 @@
                     <div class="p-3 bg-white border rounded-xl shadow-sm space-y-2 hover:border-indigo-300 transition">
                         <div class="flex justify-between items-start">
                             <div>
-                                <span class="font-mono font-black text-xs text-indigo-700">${s.receipt_number}</span>
-                                <p class="text-xs font-bold text-gray-800">${s.customer_name}</p>
+                                <span class="font-mono font-black text-xs text-indigo-700">${esc(s.receipt_number)}</span>
+                                <p class="text-xs font-bold text-gray-800">${esc(s.customer_name)}</p>
                             </div>
                             <span class="text-xs font-black text-gray-900 font-mono">KES ${s.total_amount}</span>
                         </div>
                         <div class="flex justify-between items-center text-[11px] text-gray-500">
-                            <span>${s.items_count} items &bull; <strong class="text-gray-700">${s.payment_method}</strong></span>
+                            <span>${s.items_count} items &bull; <strong class="text-gray-700">${esc(s.payment_method)}</strong></span>
                             <span>${s.time_ago}</span>
                         </div>
                         <div class="pt-1 border-t flex justify-end">
-                            <button type="button" onclick="window.open('${s.receipt_url}', '_blank')"
+                            <button type="button" onclick="window.open('${jsArg(s.print_url)}', '_blank')"
                                 class="inline-flex items-center px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition">
                                 <svg class="w-3.5 h-3.5 mr-1 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -1531,6 +1562,7 @@
 
         // 9. SHIFT MANAGEMENT & RECONCILIATION
         let currentShiftExpectedCash = 0;
+        let blindCount = true;
 
         function openEndShiftModal() {
             const branchName = document.getElementById('branchSelect').value;
@@ -1544,11 +1576,15 @@
                     btn.disabled = false;
                     btn.innerText = 'Seal Shift & Print Z-Report';
 
+                    const money = v => (v === null || v === undefined) ? 'Shown on Z-Report' : 'KES ' + parseFloat(v).toFixed(2);
+                    blindCount = !!data.blind_count;
+
                     document.getElementById('shiftDurationLabel').innerText = data.duration + ' (' + data.started_at + ')';
-                    document.getElementById('shiftOpeningFloat').innerText = 'KES ' + parseFloat(data.opening_float).toFixed(2);
-                    document.getElementById('shiftExpectedCash').innerText = 'KES ' + parseFloat(data.expected_cash).toFixed(2);
-                    document.getElementById('shiftMpesaTotal').innerText = 'KES ' + parseFloat(data.mpesa_total).toFixed(2);
-                    document.getElementById('shiftTotalRevenue').innerText = 'KES ' + parseFloat(data.total_sales_amount).toFixed(2);
+                    document.getElementById('shiftOpeningFloat').innerText = money(data.opening_float);
+                    document.getElementById('shiftExpectedCash').innerText = money(data.expected_cash);
+                    document.getElementById('shiftMpesaTotal').innerText = money(data.mpesa_total);
+                    document.getElementById('shiftTotalRevenue').innerText = money(data.total_sales_amount);
+                    document.getElementById('shiftVarianceBox').classList.toggle('hidden', blindCount);
 
                     currentShiftExpectedCash = parseFloat(data.expected_cash) || 0;
                     document.getElementById('actualCashInput').value = '';
@@ -1569,6 +1605,9 @@
         }
 
         function onActualCashChange() {
+            if (blindCount) {
+                return; // cashier counts blind; variance is revealed on the Z-Report
+            }
             const inputVal = document.getElementById('actualCashInput').value;
             const actual = parseFloat(inputVal) || 0;
             const variance = Math.round((actual - currentShiftExpectedCash) * 100) / 100;

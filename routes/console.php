@@ -3,6 +3,10 @@
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
+
+// Shop PCs: upload queued changes to HQ every minute whenever online (no-op until configured)
+Schedule::command('sync:run')->everyMinute()->withoutOverlapping(10)->runInBackground();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

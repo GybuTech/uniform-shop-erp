@@ -16,8 +16,8 @@
     </x-slot>
 
     <div class="py-8" x-data="{
-        expectedCash: {{ (float) $expectedCash }},
-        actualCash: {{ (float) $expectedCash }},
+        expectedCash: {{ $blindCount ? 0 : (float) $expectedCash }},
+        actualCash: {{ $blindCount ? "''" : (float) $expectedCash }},
         ownerCollecting: false,
         floatLeft: 0,
         amountCol: 0,
@@ -34,6 +34,21 @@
                     <span class="text-xs text-gray-500">Opened At: <strong class="text-gray-700">{{ $shift->started_at->format('M d, Y h:i A') }}</strong></span>
                 </div>
 
+                @if($blindCount)
+                <div class="grid grid-cols-2 gap-3 text-center">
+                    <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Starting Float</span>
+                        <span class="text-base font-black text-gray-900 font-mono">KES {{ number_format($startingFloat, 2) }}</span>
+                    </div>
+                    <div class="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                        <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">Receipts This Shift</span>
+                        <span class="text-base font-black text-indigo-900 font-mono">{{ $shift->total_sales_count }}</span>
+                    </div>
+                </div>
+                <p class="text-[11px] text-slate-500 px-1">
+                    <strong>Blind count:</strong> count the drawer and enter the total below. The expected amount and any difference appear on your Z-Report after you submit.
+                </p>
+                @else
                 <div class="grid grid-cols-3 gap-3 text-center">
                     <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
                         <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Starting Float</span>
@@ -55,6 +70,7 @@
                     <span>Opened At: <strong class="text-gray-700">{{ $shift->started_at->format('M d, Y h:i A') }}</strong></span>
                     <span>Total Sales: <strong class="text-gray-700">{{ $shift->total_sales_count }} receipts</strong> (KES {{ number_format($shift->total_sales_amount, 2) }})</span>
                 </div>
+                @endif
             </div>
 
             {{-- 2. Concluding & Handover Form (Zero Owner Collection Prompts) --}}
@@ -69,10 +85,12 @@
                             <label class="block text-xs font-bold text-gray-800 uppercase tracking-wider">
                                 Actual Cash Counted in Drawer (KES) *
                             </label>
+                            @unless($blindCount)
                             <span class="text-xs font-bold font-mono"
                                   :class="variance === 0 ? 'text-emerald-600' : (variance > 0 ? 'text-blue-600' : 'text-rose-600')">
                                 Variance: <span x-text="(variance >= 0 ? '+' : '') + variance.toFixed(2)"></span>
                             </span>
+                            @endunless
                         </div>
                         <div class="relative">
                             <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 font-bold text-xs">

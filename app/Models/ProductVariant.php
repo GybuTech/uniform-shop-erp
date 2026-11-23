@@ -77,6 +77,18 @@ class ProductVariant extends Model
     }
 
     /**
+     * True once the item has been sold, stocked or moved anywhere. From then on its SKU and
+     * barcode must not change (labels are already on garments, and sync matches by SKU).
+     */
+    public function hasBeenUsed(): bool
+    {
+        return $this->saleItems()->exists()
+            || \App\Models\StockMovement::where('product_variant_id', $this->id)->exists()
+            || $this->branchStocks()->where('stock_quantity', '!=', 0)->exists()
+            || (float) $this->stock_quantity != 0.0;
+    }
+
+    /**
      * Get stock for a specific branch (or aggregate total across all branches if branch is null).
      */
     public function getStockForBranch(?string $branchName = null): float
@@ -99,60 +111,139 @@ class ProductVariant extends Model
 
     /**
      * Set exact stock for a specific branch.
+     *
+     * When $movementType is given, the net change is written to the stock_movements ledger.
      */
-    public function setStockForBranch(string $branchName, float $quantity): BranchStock
-    {
-        $branch = Branch::where('name', trim($branchName))->first()
-            ?? Branch::firstOrCreate(['name' => trim($branchName)], ['code' => 'BR-' . rand(10, 99)]);
+    public function setStockForBranch(
+        string $branchName,
+        float $quantity,
+        ?string $movementType = null,
+        ?int $referenceId = null,
+        ?string $referenceNo = null,
+        ?string $notes = null
+    ): BranchStock {
+        $branch = static::resolveBranch($branchName);
+        $bs = $this->lockedBranchStock($branch, 0.00);
 
-        $bs = BranchStock::updateOrCreate(
-            [
-                'branch_id'          => $branch->id,
-                'product_variant_id' => $this->id,
-            ],
-            [
-                'branch_name'        => $branch->name,
-                'stock_quantity'     => max(0, $quantity),
-            ]
-        );
+        $oldQty = (float) $bs->stock_quantity;
+        $newQty = max(0, $quantity);
+        $bs->update(['stock_quantity' => $newQty]);
 
-        // Keep aggregate variant stock_quantity synchronized
-        $this->update(['stock_quantity' => $this->branchStocks()->sum('stock_quantity')]);
+        $this->syncAggregateStock();
+        $this->recordMovement($branch, $newQty - $oldQty, $newQty, $movementType, $referenceId, $referenceNo, $notes);
 
         return $bs;
     }
 
     /**
-     * Adjust stock for a specific branch (increment or decrement).
+     * Adjust stock for a specific branch (increment or decrement). Stock never drops below zero.
+     *
+     * When $movementType is given, the applied change is written to the stock_movements ledger.
      */
-    public function adjustStockForBranch(string $branchName, float $diff): BranchStock
-    {
-        $branch = Branch::where('name', trim($branchName))->first()
-            ?? Branch::firstOrCreate(['name' => trim($branchName)], ['code' => 'BR-' . rand(10, 99)]);
+    public function adjustStockForBranch(
+        string $branchName,
+        float $diff,
+        ?string $movementType = null,
+        ?int $referenceId = null,
+        ?string $referenceNo = null,
+        ?string $notes = null
+    ): BranchStock {
+        $branch = static::resolveBranch($branchName);
 
-        // If no branch_stocks record exists, initialize with existing variant stock_quantity
+        // If no branch_stocks record exists at all, seed it with the legacy variant stock_quantity
         $initialQty = 0.00;
-        if ($this->branchStocks()->count() === 0 && (float)$this->stock_quantity > 0) {
+        if ($this->branchStocks()->count() === 0 && (float) $this->stock_quantity > 0) {
             $initialQty = (float) $this->stock_quantity;
         }
 
-        $bs = BranchStock::firstOrCreate(
-            [
-                'branch_id'          => $branch->id,
-                'product_variant_id' => $this->id,
-            ],
-            [
-                'branch_name'        => $branch->name,
-                'stock_quantity'     => $initialQty,
-            ]
-        );
+        $bs = $this->lockedBranchStock($branch, $initialQty);
 
-        $newQty = max(0, (float)$bs->stock_quantity + $diff);
+        $oldQty = (float) $bs->stock_quantity;
+        $newQty = max(0, $oldQty + $diff);
         $bs->update(['stock_quantity' => $newQty]);
 
-        // Keep aggregate variant stock_quantity synchronized
-        $this->update(['stock_quantity' => $this->branchStocks()->sum('stock_quantity')]);
+        $this->syncAggregateStock();
+        $this->recordMovement($branch, $newQty - $oldQty, $newQty, $movementType, $referenceId, $referenceNo, $notes);
 
         return $bs;
+    }
+
+    /**
+     * Current stock at a branch, read with a row lock (use inside a DB transaction).
+     */
+    public function lockedStockForBranch(string $branchName): float
+    {
+        $bs = BranchStock::where('branch_name', trim($branchName))
+            ->where('product_variant_id', $this->id)
+            ->lockForUpdate()
+            ->first();
+
+        return $bs ? (float) $bs->stock_quantity : 0.00;
+    }
+
+    public static function resolveBranch(string $branchName): Branch
+    {
+        $name = trim($branchName);
+
+        return Branch::where('name', $name)->first()
+            ?? Branch::firstOrCreate(['name' => $name], ['code' => 'BR-' . strtoupper(substr(md5($name), 0, 6))]);
+    }
+
+    private function lockedBranchStock(Branch $branch, float $initialQty): BranchStock
+    {
+        $bs = BranchStock::where('branch_id', $branch->id)
+            ->where('product_variant_id', $this->id)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$bs) {
+            $bs = BranchStock::create([
+                'branch_id'          => $branch->id,
+                'branch_name'        => $branch->name,
+                'product_variant_id' => $this->id,
+                'stock_quantity'     => $initialQty,
+            ]);
+        } elseif ($bs->branch_name !== $branch->name) {
+            // Heal rows left behind by an older branch rename
+            $bs->branch_name = $branch->name;
+        }
+
+        return $bs;
+    }
+
+    private function syncAggregateStock(): void
+    {
+        $this->update(['stock_quantity' => $this->branchStocks()->sum('stock_quantity')]);
+    }
+
+    private function recordMovement(
+        Branch $branch,
+        float $change,
+        float $balanceAfter,
+        ?string $movementType,
+        ?int $referenceId,
+        ?string $referenceNo,
+        ?string $notes
+    ): void {
+        if ($movementType === null || abs($change) < 0.00001) {
+            return;
+        }
+
+        if ($movementType === 'adjustment') {
+            $movementType = $change > 0 ? 'adjustment_gain' : 'adjustment_loss';
+        }
+
+        StockMovement::create([
+            'branch_id'          => $branch->id,
+            'branch_name'        => $branch->name,
+            'product_variant_id' => $this->id,
+            'quantity'           => round($change, 2),
+            'balance_after'      => round($balanceAfter, 2),
+            'movement_type'      => $movementType,
+            'reference_id'       => $referenceId,
+            'reference_no'       => $referenceNo,
+            'user_id'            => auth()->id(),
+            'notes'              => $notes,
+        ]);
     }
 }
