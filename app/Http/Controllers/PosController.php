@@ -70,10 +70,13 @@ class PosController extends Controller
         $exact = $request->boolean('exact');
 
         // If scanning an exact barcode or SKU
-        if ($rawQuery !== '' && ($exact || str_starts_with($rawQuery, 'BC-'))) {
+        if ($rawQuery !== '' && ($exact || strlen($rawQuery) >= 8 || str_starts_with($rawQuery, 'BC-'))) {
+            $codes = array_values(array_unique([$rawQuery, strtoupper($rawQuery), strtolower($rawQuery)]));
             $exactVariant = ProductVariant::with(['product.category'])
-                ->where('barcode', $rawQuery)
-                ->orWhere('sku', $rawQuery)
+                ->where(function ($q) use ($codes) {
+                    $q->whereIn('barcode', $codes)
+                      ->orWhereIn('sku', $codes);
+                })
                 ->first();
 
             if ($exactVariant) {
@@ -492,7 +495,10 @@ class PosController extends Controller
             'user'
         ])->findOrFail($saleId);
 
-        return view('pos.receipt', compact('sale'));
+        $isReprint = false;
+        $autoPrintReceipt = (bool) \App\Models\BusinessSetting::get('auto_print_receipt', '1');
+
+        return view('pos.receipt', compact('sale', 'isReprint', 'autoPrintReceipt'));
     }
 
     public function salesIndex(Request $request)
@@ -550,7 +556,9 @@ class PosController extends Controller
     public function salesShow(Sale $sale)
     {
         $sale->load(['customer', 'user', 'saleItems.productVariant.product']);
-        return view('pos.receipt', compact('sale'));
+        $isReprint = true;
+        $autoPrintReceipt = false;
+        return view('pos.receipt', compact('sale', 'isReprint', 'autoPrintReceipt'));
     }
 
     public function parkSale(Request $request)
@@ -630,6 +638,11 @@ class PosController extends Controller
         }
 
         $invoiceNo = $sale->invoice_no ?: $sale->receipt_number;
+
+        if (\App\Models\SaleReturn::where('sale_id', $sale->id)->exists()) {
+            return redirect()->route('sales.index')
+                ->with('error', "Receipt #{$invoiceNo} has processed returns and cannot be voided. Please handle item returns via the Returns module.");
+        }
 
         DB::transaction(function () use ($sale) {
             // Restore stock for every line item back to product variant
