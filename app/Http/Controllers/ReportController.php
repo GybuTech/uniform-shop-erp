@@ -50,55 +50,13 @@ class ReportController extends Controller
         $monthlySalesCount = (clone $salesQuery)->where('created_at', '>=', $startOfMonth)->count();
         $monthlyRevenue    = (float) (clone $salesQuery)->where('created_at', '>=', $startOfMonth)->sum('total_amount');
 
-        // 2. Inventory & Valuation Scoped by Branch
-        $isStandalone = \App\Services\BranchContext::isStandalone();
-        if ($selectedBranch !== 'all' && !$isStandalone) {
-            // Specific Branch Inventory
-            $totalItemsInStock = (float) \App\Models\BranchStock::where('branch_name', $selectedBranch)->sum('stock_quantity');
-            $inventoryValue = (float) \App\Models\BranchStock::join('product_variants', 'branch_stocks.product_variant_id', '=', 'product_variants.id')
-                ->where('branch_stocks.branch_name', $selectedBranch)
-                ->sum(DB::raw('branch_stocks.stock_quantity * product_variants.selling_price'));
-
-            $lowStockBranchRecords = \App\Models\BranchStock::with(['productVariant.product'])
-                ->where('branch_name', $selectedBranch)
-                ->where('stock_quantity', '<=', 5)
-                ->orderBy('stock_quantity', 'asc')
-                ->get();
-
-            $lowStockVariants = $lowStockBranchRecords->map(function ($bs) {
-                $v = $bs->productVariant;
-                if ($v) {
-                    $v->branch_stock_quantity = $bs->stock_quantity;
-                }
-                return $v;
-            })->filter();
-
-            // Resilient fallback if this branch has no separate ledger records
-            if ($totalItemsInStock == 0) {
-                $totalItemsInStock = (float) ProductVariant::sum('stock_quantity');
-                $inventoryValue = (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
-                $lowStockVariants = ProductVariant::with('product')
-                    ->where('stock_quantity', '<=', 5)
-                    ->orderBy('stock_quantity', 'asc')
-                    ->get();
-            }
-        } else {
-            // Consolidated Across All Branches or Single-Store Standalone
-            $totalItemsInStock = (float) \App\Models\BranchStock::sum('stock_quantity');
-            if ($totalItemsInStock == 0 || $isStandalone) {
-                // Direct variant shelf stock
-                $totalItemsInStock = (float) ProductVariant::sum('stock_quantity');
-                $inventoryValue = (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
-            } else {
-                $inventoryValue = (float) \App\Models\BranchStock::join('product_variants', 'branch_stocks.product_variant_id', '=', 'product_variants.id')
-                    ->sum(DB::raw('branch_stocks.stock_quantity * product_variants.selling_price'));
-            }
-
-            $lowStockVariants = ProductVariant::with('product')
-                ->where('stock_quantity', '<=', 5)
-                ->orderBy('stock_quantity', 'asc')
-                ->get();
-        }
+        // 2. Inventory & Valuation (Single Store Single Source of Truth)
+        $totalItemsInStock = (float) ProductVariant::sum('stock_quantity');
+        $inventoryValue = (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
+        $lowStockVariants = ProductVariant::with('product')
+            ->where('stock_quantity', '<=', 5)
+            ->orderBy('stock_quantity', 'asc')
+            ->get();
 
         // 3. Best Sellers
         $bestSellersQuery = SaleItem::select('product_variant_id', DB::raw('SUM(quantity) as total_qty'), DB::raw('SUM(line_total) as total_revenue'))

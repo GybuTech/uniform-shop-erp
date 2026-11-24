@@ -13,31 +13,32 @@ class WipeClientDummyData extends Command
      *
      * @var string
      */
-    protected $signature = 'app:wipe-dummy-data {--force : Force the operation to run without confirmation}';
+    protected $signature = 'pos:handover {--force : Force the operation to run without confirmation} {--keep-stock : Retain catalog stock quantities without zeroing}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Wipe all transactional demo data (sales, shifts, expenses, stock entries, transfers, adjustments) while preserving catalog, users, roles, and business settings for client handover.';
+    protected $description = 'Cleanly reset all transactional test data (sales, shifts, payments, expenses, returns) for client handover while preserving product catalog, users, and settings.';
 
     /**
      * Execute the console command.
      */
     public function handle(): int
     {
-        if (!$this->option('force') && !$this->confirm('WARNING: This will permanently delete all sales, shifts, expenses, stock movements, and zero out all inventory quantities for client handover. Do you want to proceed?')) {
+        $keepStock = $this->option('keep-stock');
+
+        if (!$this->option('force') && !$this->confirm('WARNING: This will permanently clear all sales transactions, shifts, expenses, and returns for client handover. Do you want to proceed?')) {
             $this->info('Operation cancelled.');
             return 0;
         }
 
-        $this->info('Starting Client Handover Data Wipe...');
+        $this->info('Starting Client Store Handover Reset...');
 
         DB::beginTransaction();
 
         try {
-            // Disable foreign key constraints during truncate/delete
             Schema::disableForeignKeyConstraints();
 
             $tablesToClear = [
@@ -64,18 +65,21 @@ class WipeClientDummyData extends Command
                 }
             }
 
-            // Zero out stock quantities on shelves and catalog
-            if (Schema::hasTable('branch_stocks')) {
-                DB::table('branch_stocks')->update(['stock_quantity' => 0]);
-                $this->line("  ✓ Zeroed inventory in: <fg=green>branch_stocks</>");
+            // Zero out stock quantities unless --keep-stock is specified
+            if (!$keepStock) {
+                if (Schema::hasTable('branch_stocks')) {
+                    DB::table('branch_stocks')->update(['stock_quantity' => 0]);
+                    $this->line("  ✓ Zeroed inventory in: <fg=green>branch_stocks</>");
+                }
+
+                if (Schema::hasTable('product_variants')) {
+                    DB::table('product_variants')->update(['stock_quantity' => 0]);
+                    $this->line("  ✓ Zeroed inventory totals in: <fg=green>product_variants</>");
+                }
+            } else {
+                $this->line("  ✓ Kept existing product stock quantities as requested (--keep-stock).");
             }
 
-            if (Schema::hasTable('product_variants')) {
-                DB::table('product_variants')->update(['stock_quantity' => 0]);
-                $this->line("  ✓ Zeroed inventory totals in: <fg=green>product_variants</>");
-            }
-
-            // Re-enable foreign key constraints
             Schema::enableForeignKeyConstraints();
 
             DB::commit();
@@ -84,11 +88,11 @@ class WipeClientDummyData extends Command
             $this->info('====================================================');
             $this->info('  CLIENT CLEAN HANDOVER COMPLETED SUCCESSFULLY!    ');
             $this->info('====================================================');
-            $this->line('  ✓ All demo sales, receipts, and shifts removed.');
-            $this->line('  ✓ All demo expenses, adjustments, and movements cleared.');
-            $this->line('  ✓ Inventory quantities reset to 0 (ready for real stock-in).');
+            $this->line('  ✓ All test sales, receipts, and shifts cleared.');
+            $this->line('  ✓ All test expenses, adjustments, and movements cleared.');
+            $this->line($keepStock ? '  ✓ Inventory quantities preserved.' : '  ✓ Inventory quantities reset to 0 (ready for live stock-in).');
             $this->line('  ✓ All Categories, Products, and Variants preserved.');
-            $this->line('  ✓ All Users, Roles, Permissions, and Settings preserved.');
+            $this->line('  ✓ All Users, Roles, Permissions, and Store Settings preserved.');
             $this->newLine();
 
             return 0;

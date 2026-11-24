@@ -77,6 +77,14 @@ class ProductVariant extends Model
     }
 
     /**
+     * Scope to variants currently in stock.
+     */
+    public function scopeInStock($query)
+    {
+        return $query->where('stock_quantity', '>', 0);
+    }
+
+    /**
      * Single definitive source of shelf inventory.
      */
     public function getStock(): float
@@ -87,51 +95,50 @@ class ProductVariant extends Model
     /**
      * Backward-compatible stock accessor returning single store shelf inventory.
      */
-    public function getStockForBranch(?string $branchName = null): float
+    public function getStockForBranch($branchId = null): float
     {
         return $this->getStock();
     }
 
     /**
-     * Update shelf inventory directly on the product variant and sync BranchStock.
+     * Update shelf inventory directly on the product variant without touching branch_stocks.
      */
-    public function setStockForBranch(?string $branchName, float $quantity): self
+    public function setStockForBranch($branchId = null, float $quantity = 0.0): self
     {
         $newQty = max(0, $quantity);
-        $this->update(['stock_quantity' => $newQty]);
-
-        try {
-            $name = $branchName ?: config('app.default_branch', 'Main Shop');
-            $branch = Branch::where('name', $name)->first() ?? Branch::first();
-            if ($branch) {
-                BranchStock::updateOrCreate(
-                    ['product_variant_id' => $this->id, 'branch_id' => $branch->id],
-                    ['branch_name' => $branch->name, 'stock_quantity' => $newQty]
-                );
-            }
-        } catch (\Throwable) {
-            // Non-blocking fallback for resilient offline execution
-        }
+        $this->stock_quantity = $newQty;
+        $this->save();
 
         return $this;
     }
 
     /**
-     * Adjust shelf inventory directly on the product variant and sync BranchStock.
+     * Adjust shelf inventory directly on the product variant without touching branch_stocks.
      */
-    public function adjustStockForBranch(?string $branchName, float $diff): self
+    public function adjustStockForBranch($branchId = null, float $quantity = 0.0, string $type = 'in', ?string $notes = null): self
     {
+        if ($type === 'in' || $type === 'add') {
+            $diff = abs($quantity);
+        } elseif ($type === 'out' || $type === 'subtract') {
+            $diff = -abs($quantity);
+        } else {
+            $diff = $quantity;
+        }
+
         $newQty = max(0, (float)$this->stock_quantity + $diff);
-        $this->update(['stock_quantity' => $newQty]);
+        $this->stock_quantity = $newQty;
+        $this->save();
 
         try {
-            $name = $branchName ?: config('app.default_branch', 'Main Shop');
-            $branch = Branch::where('name', $name)->first() ?? Branch::first();
-            if ($branch) {
-                BranchStock::updateOrCreate(
-                    ['product_variant_id' => $this->id, 'branch_id' => $branch->id],
-                    ['branch_name' => $branch->name, 'stock_quantity' => $newQty]
-                );
+            if (class_exists(\App\Models\StockMovement::class)) {
+                \App\Models\StockMovement::create([
+                    'product_variant_id' => $this->id,
+                    'quantity'           => abs($diff),
+                    'balance_after'      => $newQty,
+                    'movement_type'      => $diff >= 0 ? 'adjustment_in' : 'adjustment_out',
+                    'user_id'            => auth()->id(),
+                    'notes'              => $notes ?? 'Direct stock adjustment',
+                ]);
             }
         } catch (\Throwable) {
             // Non-blocking fallback for resilient offline execution

@@ -894,24 +894,6 @@
             }
         }
 
-        function addCatalogItemToCart(variantId) {
-            const v = posCatalogVariants[variantId];
-            if (!v) return;
-            const displayName = v.formatted_title || v.product_name || 'Product';
-            addToCart(
-                v.id,
-                displayName,
-                v.size,
-                v.colour,
-                v.selling_price,
-                v.stock_quantity,
-                v.sku,
-                v.unit_of_measure,
-                v.brand_name,
-                v.is_service || false
-            );
-        }
-
         function renderSearchResults(variants) {
             const container = document.getElementById('searchResults');
 
@@ -920,12 +902,15 @@
                 return;
             }
 
-            posCatalogVariants = {};
             const multiplier = TIER_MULTIPLIERS[pricingTier] || 1.00;
 
             container.innerHTML = variants.map(v => {
-                posCatalogVariants[v.id] = v;
-                const displayName = v.formatted_title || v.product_name || 'Product';
+                const displayName = v.formatted_title || v.product_name;
+                const safeName = displayName.replace(/'/g, "\\'");
+                const safeSize = (v.size || '').replace(/'/g, "\\'");
+                const safeColour = (v.colour || '').replace(/'/g, "\\'");
+                const safeUnit = (v.unit_of_measure || 'Piece').replace(/'/g, "\\'");
+                const safeBrand = (v.brand_name || '').replace(/'/g, "\\'");
                 const effectivePrice = Math.round((parseFloat(v.selling_price || 0) * multiplier) * 100) / 100;
                 const stockQty = parseFloat(v.stock_quantity || 0);
                 const isService = !!v.is_service;
@@ -944,25 +929,21 @@
                 const brandPill = v.brand_name ? `<span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold mr-1.5">${v.brand_name}</span>` : '';
 
                 let stockBadge = '';
-                let actionButton = '';
-
                 if (isService) {
                     stockBadge = `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">Service / Fee (Zero Stock)</span>`;
-                    actionButton = `<button type="button" onclick="event.stopPropagation(); addCatalogItemToCart(${v.id})" class="inline-block text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</button>`;
+                } else if (stockQty <= 0) {
+                    stockBadge = `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">0 On Shelf</span>`;
+                } else if (stockQty <= 5) {
+                    stockBadge = `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">Low Stock (${stockQty} left)</span>`;
                 } else {
-                    stockBadge = stockQty <= 0
-                        ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">0 On Shelf</span>`
-                        : (stockQty <= 5
-                            ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">Low Stock (${stockQty} left)</span>`
-                            : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${stockQty} ${v.unit_of_measure || 'units'})</span>`);
-
-                    // Retail POS allows cashier to select and sell any catalog item
-                    actionButton = `<button type="button" onclick="event.stopPropagation(); addCatalogItemToCart(${v.id})" class="inline-block text-xs ${stockQty <= 0 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</button>`;
+                    stockBadge = `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${stockQty} ${v.unit_of_measure || 'units'})</span>`;
                 }
+
+                const actionButton = `<span class="inline-block text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</span>`;
 
                 return `
                 <div class="flex items-center justify-between p-3 border rounded-xl hover:bg-indigo-50/60 transition cursor-pointer bg-white"
-                     onclick="addCatalogItemToCart(${v.id})">
+                     onclick="addToCart(${v.id}, '${safeName}', '${safeSize}', '${safeColour}', ${v.selling_price}, ${v.stock_quantity}, '${v.sku}', '${safeUnit}', '${safeBrand}', ${isService})">
                     <div>
                         <p class="font-bold text-gray-900 text-sm">${brandPill}${displayName}</p>
                         <p class="text-xs text-gray-500 font-mono mb-1">
@@ -1150,7 +1131,7 @@
                     </div>
                     <div class="flex items-center space-x-1">
                         <button type="button" onclick="updateQty(${item.id}, -1)" class="w-6 h-6 bg-white hover:bg-gray-200 border rounded font-black text-gray-700 text-xs">-</button>
-                        <input type="number" step="${stepAttr}" min="0.01" max="${item.stock}" value="${displayQty}"
+                        <input type="number" step="${stepAttr}" min="0.01" ${item.stock > 0 ? `max="${item.stock}"` : ''} value="${displayQty}"
                                onchange="setQtyDirect(${item.id}, this.value)"
                                onfocus="this.select()"
                                class="w-16 h-6 text-center text-xs font-mono font-extrabold border border-gray-300 rounded bg-white px-1 py-0 focus:ring-1 focus:ring-indigo-500">
@@ -1352,10 +1333,6 @@
                     statusEl.innerText = `Balance discrepancy: KES ${remaining.toFixed(2)}`;
                     statusEl.className = 'text-[11px] font-bold text-rose-600';
                 }
-            }
-        }
-                statusEl.innerText = `Balance discrepancy: KES ${remaining.toFixed(2)}`;
-                statusEl.className = 'text-[11px] font-bold text-rose-600';
             }
         }
 
@@ -2092,52 +2069,6 @@
             splitCash = 0;
             splitMpesa = 0;
             executeCheckout();
-        }
-
-        // POS QUOTATION GENERATOR
-        function generatePosQuotation() {
-            if (cart.length === 0) {
-                alert('Your cart is empty. Add items to generate a quotation.');
-                return;
-            }
-
-            const customerId = document.getElementById('customerSelect').value;
-            const customerName = document.getElementById('customerSelect').selectedOptions[0]?.text || '';
-            const branchName = document.getElementById('branchSelect').value;
-
-            // Use fetch with Accept: application/json for immediate redirect
-            fetch(POS_QUOTATION_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    customer_id: customerId || null,
-                    customer_name: customerName,
-                    branch_name: branchName,
-                    pricing_tier: pricingTier,
-                    items: cart.map(item => ({
-                        variant_id: item.id,
-                        quantity: item.qty
-                    }))
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success && data.redirect_url) {
-                    cart = [];
-                    sessionStorage.removeItem('pos_cart');
-                    updateCartDisplay();
-                    window.location.href = data.redirect_url;
-                } else {
-                    alert('Error creating quotation: ' + (data.message || 'Unknown error occurred.'));
-                }
-            })
-            .catch(err => {
-                alert('Quotation submission error: ' + err.message);
-            });
         }
 
         // GLOBAL KEYBOARD SHORTCUTS

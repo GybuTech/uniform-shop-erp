@@ -14,146 +14,16 @@
      @keydown.window="handleGlobalKeys($event)" 
      class="flex items-center space-x-2 text-xs">
 
-    {{-- 1. Branch Identity Pill / Store Context Selector --}}
-    @if($isStandalone)
-        @if(config('app.allow_local_branch_switch'))
-            {{-- Interactive dropdown for offline mode when allowed --}}
-            <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" type="button"
-                        class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 font-bold transition shadow-2xs">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span class="text-xs">{{ $displayLabel }}</span>
-                    <svg class="w-3.5 h-3.5 text-slate-500 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </button>
-
-                <div x-show="open" @click.away="open = false" x-cloak
-                     x-transition:enter="transition ease-out duration-100"
-                     x-transition:enter-start="transform opacity-0 scale-95"
-                     x-transition:enter-end="transform opacity-100 scale-100"
-                     class="absolute left-0 mt-2 w-64 rounded-xl bg-white shadow-xl border border-slate-200 py-1.5 z-50">
-                    <div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Switch Active Store View
-                    </div>
-                    <form method="POST" action="{{ route('branch.switch-context') }}" id="branchSwitchForm">
-                        @csrf
-                        <input type="hidden" name="branch_name" id="branchSwitchValue" value="">
-                    </form>
-                    <button type="button"
-                            onclick="document.getElementById('branchSwitchValue').value=''; document.getElementById('branchSwitchForm').submit();"
-                            @click="open = false"
-                            class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ empty($activeBranch) ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
-                        <span class="flex items-center space-x-2">
-                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-                            <span>All Branches (Combined Summary)</span>
-                        </span>
-                        @if(empty($activeBranch))
-                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        @endif
-                    </button>
-                    @foreach($allBranches as $br)
-                        <button type="button"
-                                onclick="document.getElementById('branchSwitchValue').value='{{ addslashes($br->name) }}'; document.getElementById('branchSwitchForm').submit();"
-                                @click="open = false"
-                                class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ $activeBranch === $br->name ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
-                            <span class="flex items-center space-x-2">
-                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                                <span>{{ $br->name }}</span>
-                            </span>
-                            @if($activeBranch === $br->name)
-                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            @endif
-                        </button>
-                    @endforeach
-                </div>
-            </div>
-        @else
-            {{-- Locked Status Badge for Offline Machines --}}
-            <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-800 font-bold shadow-2xs select-none"
-                 title="Hardware machine locked to physical store location">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                <span class="text-xs">{{ $activeBranch }}</span>
-                <span class="text-[10px] text-slate-500 font-medium bg-slate-200/80 px-1.5 py-0.5 rounded">Offline Local Till</span>
-            </div>
-        @endif
-    @elseif($isSuperAdmin)
-    @elseif($isSuperAdmin)
-        {{-- Interactive Cloud Multi-Branch Dropdown for Admin/Owner --}}
-        <div class="relative" x-data="{ open: false }">
-            <button @click="open = !open" type="button" 
-                    class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 font-bold transition shadow-2xs">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                @if($isAll)
-                    <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                    </svg>
-                @else
-                    <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                @endif
-                <span class="text-xs">{{ $displayLabel }}</span>
-                <svg class="w-3.5 h-3.5 text-slate-500 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-            </button>
-
-            <div x-show="open" @click.away="open = false" x-cloak 
-                 x-transition:enter="transition ease-out duration-100"
-                 x-transition:enter-start="transform opacity-0 scale-95"
-                 x-transition:enter-end="transform opacity-100 scale-100"
-                 class="absolute left-0 mt-2 w-64 rounded-xl bg-white shadow-xl border border-slate-200 py-1.5 z-50">
-                <div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Switch Active Store View
-                </div>
-                {{-- Hidden form that POSTs the branch name and stays on current page --}}
-                <form method="POST" action="{{ route('branch.switch-context') }}" id="branchSwitchForm">
-                    @csrf
-                    <input type="hidden" name="branch_name" id="branchSwitchValue" value="">
-                </form>
-                <button type="button"
-                        onclick="document.getElementById('branchSwitchValue').value=''; document.getElementById('branchSwitchForm').submit();"
-                        @click="open = false"
-                        class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ $isAll ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
-                    <span class="flex items-center space-x-2">
-                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                        </svg>
-                        <span>All Branches (Combined Summary)</span>
-                    </span>
-                    @if($isAll)
-                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                    @endif
-                </button>
-                @foreach($allBranches as $br)
-                    <button type="button"
-                            onclick="document.getElementById('branchSwitchValue').value='{{ addslashes($br->name) }}'; document.getElementById('branchSwitchForm').submit();"
-                            @click="open = false"
-                            class="flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition w-full text-left {{ $activeBranch === $br->name ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700' }}">
-                        <span class="flex items-center space-x-2">
-                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                            <span>{{ $br->name }}</span>
-                        </span>
-                        @if($activeBranch === $br->name)
-                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                        @endif
-                    </button>
-                @endforeach
-            </div>
-        </div>
-    @else
-        {{-- Static Station Badge for Cashiers in Cloud Mode --}}
-        <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-800 font-bold shadow-2xs">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="text-xs">{{ $activeBranch }} &bull; Station 1</span>
-        </div>
-    @endif
+    {{-- 1. Store Identity Badge --}}
+    <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wide">
+            {{ \App\Models\BusinessSetting::get('business_name', 'Retail Store') }}
+        </span>
+        <span class="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.5 rounded font-mono">
+            Terminal Active
+        </span>
+    </div>
 
     {{-- 2. Built-in Quick Calculator Modal Toggle (Clean SVG) --}}
     <button @click="showCalc = !showCalc" type="button" 

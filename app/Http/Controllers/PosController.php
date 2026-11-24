@@ -128,7 +128,28 @@ class PosController extends Controller
                     ->get();
             }
         } else {
-            // 1. First attempt: match ALL tokens (AND search)
+        // 1. Single direct LIKE query (exact as in previous working version D:)
+        // This guarantees that typing "sweater", "accurate", "tracksuit", "blue", "22", or partial product name works immediately
+        $directMatches = (clone $variantsQuery)->where(function($q) use ($rawQuery) {
+            $q->whereHas('product', function($p) use ($rawQuery) {
+                $p->where('name', 'like', "%{$rawQuery}%")
+                  ->orWhere('sku_prefix', 'like', "%{$rawQuery}%")
+                  ->orWhereHas('category', function($c) use ($rawQuery) {
+                      $c->where('name', 'like', "%{$rawQuery}%");
+                  });
+            })
+            ->orWhere('size', 'like', "%{$rawQuery}%")
+            ->orWhere('colour', 'like', "%{$rawQuery}%")
+            ->orWhere('brand_name', 'like', "%{$rawQuery}%")
+            ->orWhere('unit_of_measure', 'like', "%{$rawQuery}%")
+            ->orWhere('sku', 'like', "%{$rawQuery}%")
+            ->orWhere('barcode', 'like', "%{$rawQuery}%");
+        })->limit(50)->get();
+
+        if ($directMatches->isNotEmpty()) {
+            $variants = $directMatches;
+        } else {
+            // 2. Multi-token query: handles queries like "Accurate Sweater 24" or "Sweater size 22"
             $andQuery = (clone $variantsQuery)->where(function ($sub) use ($tokens) {
                 foreach ($tokens as $token) {
                     $sub->where(function ($q) use ($token) {
@@ -149,16 +170,13 @@ class PosController extends Controller
                 }
             });
 
-            $variants = $andQuery->orderByDesc('stock_quantity')
-                ->limit(50)
-                ->get();
+            $variants = $andQuery->limit(50)->get();
 
-            // 2. Intelligent fallback: if no items matched ALL tokens (e.g. typos or mismatched school name like 'brookshine'),
-            // match ANY significant token (OR search) so cashier gets relevant suggested products
+            // 3. Fallback: match any significant token
             if ($variants->isEmpty()) {
                 $orQuery = (clone $variantsQuery)->where(function ($sub) use ($tokens) {
                     foreach ($tokens as $token) {
-                        if (strlen($token) < 2) continue; // skip single character noise
+                        if (strlen($token) < 2) continue;
                         $sub->orWhere(function ($q) use ($token) {
                             $q->whereHas('product', function ($p) use ($token) {
                                 $p->where('name', 'like', "%{$token}%")
@@ -177,10 +195,9 @@ class PosController extends Controller
                     }
                 });
 
-                $variants = $orQuery->orderByDesc('stock_quantity')
-                    ->limit(50)
-                    ->get();
+                $variants = $orQuery->limit(50)->get();
             }
+        }
         }
 
         return response()->json($variants->map(function($variant) {
@@ -683,11 +700,15 @@ class PosController extends Controller
         ]);
     }
 
-    public function destroySale(Sale $sale)
+    public function destroySale(Request $request, Sale $sale)
     {
         $user = auth()->user();
-        if (!$user || !$user->hasAnyRole(['admin', 'owner', 'system_administrator'])) {
-            abort(403, 'Only administrators and owners can void completed sales.');
+        $pin = $request->input('supervisor_pin');
+        $validPin = BusinessSetting::get('manager_pin', '1234');
+        $isAuthorized = ($pin && $pin === $validPin) || ($user && $user->hasAnyRole(['admin', 'owner', 'system_administrator']));
+
+        if (!$isAuthorized) {
+            return back()->with('error', 'Supervisor authorization required to void completed sales.');
         }
 
         $invoiceNo = $sale->invoice_no ?: $sale->receipt_number;
@@ -698,17 +719,33 @@ class PosController extends Controller
         }
 
         DB::transaction(function () use ($sale) {
-            // Restore stock for every line item back to product variant
+            // Restore physical stock for non-service items
             foreach ($sale->items as $item) {
-                if ($item->productVariant) {
-                    $item->productVariant->increment('stock_quantity', $item->quantity);
+                $variant = $item->productVariant ?: ProductVariant::withTrashed()->find($item->product_variant_id);
+                $isService = (bool) ($variant?->product?->is_service ?? false);
+
+                if ($variant && !$isService) {
+                    $variant->increment('stock_quantity', (float) $item->quantity);
+
+                    try {
+                        StockMovement::create([
+                            'product_variant_id' => $variant->id,
+                            'quantity'           => (float) $item->quantity,
+                            'balance_after'      => (float) $variant->fresh()->stock_quantity,
+                            'movement_type'      => 'adjustment_gain',
+                            'reference_id'       => $sale->id,
+                            'reference_no'       => $sale->receipt_number,
+                            'user_id'            => auth()->id(),
+                            'notes'              => "Void Receipt #{$sale->receipt_number} inventory return",
+                        ]);
+                    } catch (\Throwable) {}
                 }
             }
 
-            // Recalculate shift totals if the sale was linked to an active/open shift
+            // Recalculate shift totals if the sale was linked to a shift
             $shiftId = $sale->shift_id;
 
-            // Delete line items then the sale header
+            // Delete line items then the sale record
             $sale->items()->delete();
             $sale->delete();
 
