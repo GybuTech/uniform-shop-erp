@@ -102,21 +102,24 @@ class PosController extends Controller
             }
         }
 
-        $tokens = array_filter(explode(' ', $rawQuery), fn($t) => $t !== '');
+        // Clean search query: strip noise words like 'size', 'sz', 'no', 'number'
+        // Example: "sweater size 22" becomes ["sweater", "22"]
+        $cleanQuery = preg_replace('/\b(size|sz|no|number|pcs|piece|pieces)\b/i', ' ', $rawQuery);
+        $tokens = array_values(array_filter(explode(' ', $cleanQuery), fn($t) => strlen(trim($t)) > 0));
 
         $variantsQuery = ProductVariant::with(['product.category']);
 
         if (empty($tokens)) {
-            // When query is empty, immediately return the top 40 in-stock catalog items ordered by product name
-            $variants = (clone $variantsQuery)->where('stock_quantity', '>', 0)
-                ->join('products', 'product_variants.product_id', '=', 'products.id')
-                ->select('product_variants.*')
-                ->orderBy('products.name', 'asc')
-                ->limit(40)
-                ->get();
-
-            // Resilient fallback: if zero stock in shop or service items only, display first 40 catalog items
-            if ($variants->isEmpty()) {
+            // When query is empty, pre-populate catalog pane: prefer in-stock, fallback to all catalog
+            $hasInStock = (clone $variantsQuery)->where('stock_quantity', '>', 0)->exists();
+            if ($hasInStock) {
+                $variants = (clone $variantsQuery)->where('stock_quantity', '>', 0)
+                    ->join('products', 'product_variants.product_id', '=', 'products.id')
+                    ->select('product_variants.*')
+                    ->orderBy('products.name', 'asc')
+                    ->limit(40)
+                    ->get();
+            } else {
                 $variants = (clone $variantsQuery)
                     ->join('products', 'product_variants.product_id', '=', 'products.id')
                     ->select('product_variants.*')
@@ -125,8 +128,8 @@ class PosController extends Controller
                     ->get();
             }
         } else {
-            // Grouped multi-token matching across Product Name, SKU Prefix, Category, Size, Colour, SKU, and Barcode
-            $variantsQuery->where(function ($sub) use ($tokens) {
+            // 1. First attempt: match ALL tokens (AND search)
+            $andQuery = (clone $variantsQuery)->where(function ($sub) use ($tokens) {
                 foreach ($tokens as $token) {
                     $sub->where(function ($q) use ($token) {
                         $q->whereHas('product', function ($p) use ($token) {
@@ -146,9 +149,38 @@ class PosController extends Controller
                 }
             });
 
-            $variants = $variantsQuery->orderByDesc('stock_quantity')
+            $variants = $andQuery->orderByDesc('stock_quantity')
                 ->limit(50)
                 ->get();
+
+            // 2. Intelligent fallback: if no items matched ALL tokens (e.g. typos or mismatched school name like 'brookshine'),
+            // match ANY significant token (OR search) so cashier gets relevant suggested products
+            if ($variants->isEmpty()) {
+                $orQuery = (clone $variantsQuery)->where(function ($sub) use ($tokens) {
+                    foreach ($tokens as $token) {
+                        if (strlen($token) < 2) continue; // skip single character noise
+                        $sub->orWhere(function ($q) use ($token) {
+                            $q->whereHas('product', function ($p) use ($token) {
+                                $p->where('name', 'like', "%{$token}%")
+                                  ->orWhere('sku_prefix', 'like', "%{$token}%")
+                                  ->orWhereHas('category', function ($c) use ($token) {
+                                      $c->where('name', 'like', "%{$token}%");
+                                  });
+                            })
+                            ->orWhere('size', 'like', "%{$token}%")
+                            ->orWhere('colour', 'like', "%{$token}%")
+                            ->orWhere('brand_name', 'like', "%{$token}%")
+                            ->orWhere('unit_of_measure', 'like', "%{$token}%")
+                            ->orWhere('sku', 'like', "%{$token}%")
+                            ->orWhere('barcode', 'like', "%{$token}%");
+                        });
+                    }
+                });
+
+                $variants = $orQuery->orderByDesc('stock_quantity')
+                    ->limit(50)
+                    ->get();
+            }
         }
 
         return response()->json($variants->map(function($variant) {
@@ -236,11 +268,7 @@ class PosController extends Controller
                     $requestedQty = (float) $item['quantity'];
                     $isService = (bool) ($variant->product?->is_service ?? false);
 
-                    // Physical goods require on-hand shelf inventory; Service items skip stock check
-                    if (!$isService && (float)$variant->stock_quantity < $requestedQty) {
-                        throw new \Exception("Insufficient stock for {$variant->sku}. Available on shelf: {$variant->stock_quantity}");
-                    }
-
+                    // Retail POS checkout calculates line total and deducts inventory
                     $unitPrice = round($variant->selling_price * $tierMultiplier, 2);
                     $lineTotal = round($unitPrice * $requestedQty, 2);
                     $total += $lineTotal;

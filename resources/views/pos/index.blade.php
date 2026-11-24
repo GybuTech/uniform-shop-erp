@@ -951,14 +951,13 @@
                     actionButton = `<button type="button" onclick="event.stopPropagation(); addCatalogItemToCart(${v.id})" class="inline-block text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</button>`;
                 } else {
                     stockBadge = stockQty <= 0
-                        ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">Out of Stock</span>`
+                        ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">0 On Shelf</span>`
                         : (stockQty <= 5
                             ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">Low Stock (${stockQty} left)</span>`
                             : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${stockQty} ${v.unit_of_measure || 'units'})</span>`);
 
-                    actionButton = stockQty <= 0
-                        ? `<span class="inline-block text-xs bg-gray-100 text-gray-400 px-3 py-1 rounded font-bold border cursor-not-allowed">0 Stock</span>`
-                        : `<button type="button" onclick="event.stopPropagation(); addCatalogItemToCart(${v.id})" class="inline-block text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</button>`;
+                    // Retail POS allows cashier to select and sell any catalog item
+                    actionButton = `<button type="button" onclick="event.stopPropagation(); addCatalogItemToCart(${v.id})" class="inline-block text-xs ${stockQty <= 0 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</button>`;
                 }
 
                 return `
@@ -986,16 +985,8 @@
         function addToCart(id, name, size, colour, basePrice, stock, sku, unit = 'Piece', brand = '', isService = false) {
             const existing = cart.find(item => item.id === id);
             if (existing) {
-                if (!existing.isService && (existing.qty + 1 > stock)) {
-                    alert(`Stock limit reached. Only ${stock} units of ${name} currently in branch inventory.`);
-                    return;
-                }
                 existing.qty++;
             } else {
-                if (!isService && stock < 1) {
-                    alert(`Notice: ${name} is currently out of stock (0 units on hand).`);
-                    return;
-                }
                 cart.push({ id, name, size, colour, basePrice, stock, sku, unit, brand, isService, qty: 1 });
             }
             renderCart();
@@ -1016,11 +1007,6 @@
             const step = isCont ? (delta > 0 ? 0.5 : -0.5) : (delta > 0 ? 1 : -1);
             const newQty = Math.round((item.qty + step) * 100) / 100;
 
-            if (!item.isService && newQty > item.stock) {
-                alert(`Cannot exceed stock limit of ${item.stock} units.`);
-                return;
-            }
-
             if (newQty <= 0) {
                 removeFromCart(id);
             } else {
@@ -1039,12 +1025,7 @@
                 return;
             }
 
-            if (!item.isService && parsed > item.stock) {
-                alert(`Cannot exceed available stock of ${item.stock} units.`);
-                item.qty = item.stock;
-            } else {
-                item.qty = Math.round(parsed * 100) / 100;
-            }
+            item.qty = Math.round(parsed * 100) / 100;
             renderCart();
         }
 
@@ -1753,8 +1734,8 @@
             }
 
             for (let item of cart) {
-                if (item.qty <= 0 || (!item.isService && item.qty > item.stock)) {
-                    alert(`Invalid quantity for ${item.name}. Available stock: ${item.stock}`);
+                if (item.qty <= 0) {
+                    alert(`Invalid quantity for ${item.name}.`);
                     return false;
                 }
             }
