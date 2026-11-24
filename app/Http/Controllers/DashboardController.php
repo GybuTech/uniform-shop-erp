@@ -83,12 +83,13 @@ class DashboardController extends Controller
 
         // Row 2 Metrics:
         // 5. Stock Inventory Valuation
-        if (!$isAllBranches) {
-            $inventoryValuation = (float) \App\Models\BranchStock::where('branch_name', $activeBranch)
+        if (\App\Services\BranchContext::isStandalone() || $isAllBranches) {
+            $inventoryValuation = (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
+        } else {
+            $branchValuation = (float) \App\Models\BranchStock::where('branch_name', $activeBranch)
                 ->join('product_variants', 'branch_stocks.product_variant_id', '=', 'product_variants.id')
                 ->sum(DB::raw('branch_stocks.stock_quantity * product_variants.selling_price'));
-        } else {
-            $inventoryValuation = (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
+            $inventoryValuation = $branchValuation > 0 ? $branchValuation : (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
         }
 
         // 6. Supplier Debt Due (Pending Purchases)
@@ -105,28 +106,36 @@ class DashboardController extends Controller
             ->count();
 
         // Low stock alerts (stock <= 5 units)
-        if (!$isAllBranches) {
-            $lowStockProducts = Product::whereHas('variants', function($q) use ($activeBranch) {
-                    $q->whereHas('branchStocks', function($bs) use ($activeBranch) {
-                        $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
-                    });
-                })
-                ->with(['category', 'variants' => function($q) use ($activeBranch) {
-                    $q->whereHas('branchStocks', function($bs) use ($activeBranch) {
-                        $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
-                    })->with(['branchStocks' => fn($b) => $b->where('branch_name', $activeBranch)]);
-                }])
-                ->orderBy('name')
-                ->get();
-
-            $lowStockCount = ProductVariant::whereHas('branchStocks', function($bs) use ($activeBranch) {
+        $hasBranchLowStock = false;
+        if (!\App\Services\BranchContext::isStandalone() && !$isAllBranches) {
+            $branchLowStockCount = ProductVariant::whereHas('branchStocks', function($bs) use ($activeBranch) {
                 $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
             })->count();
 
-            $lowStockVariants = ProductVariant::whereHas('branchStocks', function($bs) use ($activeBranch) {
-                $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
-            })->with('product')->take(5)->get();
-        } else {
+            if ($branchLowStockCount > 0) {
+                $hasBranchLowStock = true;
+                $lowStockCount = $branchLowStockCount;
+
+                $lowStockProducts = Product::whereHas('variants', function($q) use ($activeBranch) {
+                        $q->whereHas('branchStocks', function($bs) use ($activeBranch) {
+                            $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
+                        });
+                    })
+                    ->with(['category', 'variants' => function($q) use ($activeBranch) {
+                        $q->whereHas('branchStocks', function($bs) use ($activeBranch) {
+                            $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
+                        })->with(['branchStocks' => fn($b) => $b->where('branch_name', $activeBranch)]);
+                    }])
+                    ->orderBy('name')
+                    ->get();
+
+                $lowStockVariants = ProductVariant::whereHas('branchStocks', function($bs) use ($activeBranch) {
+                    $bs->where('branch_name', $activeBranch)->where('stock_quantity', '<=', 5);
+                })->with('product')->take(5)->get();
+            }
+        }
+
+        if (!$hasBranchLowStock) {
             $lowStockCount = ProductVariant::where('stock_quantity', '<=', 5)->count();
             $lowStockVariants = ProductVariant::with('product')
                 ->where('stock_quantity', '<=', 5)

@@ -51,7 +51,8 @@ class ReportController extends Controller
         $monthlyRevenue    = (float) (clone $salesQuery)->where('created_at', '>=', $startOfMonth)->sum('total_amount');
 
         // 2. Inventory & Valuation Scoped by Branch
-        if ($selectedBranch !== 'all') {
+        $isStandalone = \App\Services\BranchContext::isStandalone();
+        if ($selectedBranch !== 'all' && !$isStandalone) {
             // Specific Branch Inventory
             $totalItemsInStock = (float) \App\Models\BranchStock::where('branch_name', $selectedBranch)->sum('stock_quantity');
             $inventoryValue = (float) \App\Models\BranchStock::join('product_variants', 'branch_stocks.product_variant_id', '=', 'product_variants.id')
@@ -71,11 +72,21 @@ class ReportController extends Controller
                 }
                 return $v;
             })->filter();
-        } else {
-            // Consolidated Across All Branches
-            $totalItemsInStock = (float) \App\Models\BranchStock::sum('stock_quantity');
+
+            // Resilient fallback if this branch has no separate ledger records
             if ($totalItemsInStock == 0) {
-                // Fallback to variant stock_quantity if branch_stocks is empty
+                $totalItemsInStock = (float) ProductVariant::sum('stock_quantity');
+                $inventoryValue = (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
+                $lowStockVariants = ProductVariant::with('product')
+                    ->where('stock_quantity', '<=', 5)
+                    ->orderBy('stock_quantity', 'asc')
+                    ->get();
+            }
+        } else {
+            // Consolidated Across All Branches or Single-Store Standalone
+            $totalItemsInStock = (float) \App\Models\BranchStock::sum('stock_quantity');
+            if ($totalItemsInStock == 0 || $isStandalone) {
+                // Direct variant shelf stock
                 $totalItemsInStock = (float) ProductVariant::sum('stock_quantity');
                 $inventoryValue = (float) ProductVariant::sum(DB::raw('stock_quantity * selling_price'));
             } else {

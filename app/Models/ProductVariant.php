@@ -93,20 +93,50 @@ class ProductVariant extends Model
     }
 
     /**
-     * Update shelf inventory directly on the product variant.
+     * Update shelf inventory directly on the product variant and sync BranchStock.
      */
     public function setStockForBranch(?string $branchName, float $quantity): self
     {
-        $this->update(['stock_quantity' => max(0, $quantity)]);
+        $newQty = max(0, $quantity);
+        $this->update(['stock_quantity' => $newQty]);
+
+        try {
+            $name = $branchName ?: config('app.default_branch', 'Main Shop');
+            $branch = Branch::where('name', $name)->first() ?? Branch::first();
+            if ($branch) {
+                BranchStock::updateOrCreate(
+                    ['product_variant_id' => $this->id, 'branch_id' => $branch->id],
+                    ['branch_name' => $branch->name, 'stock_quantity' => $newQty]
+                );
+            }
+        } catch (\Throwable) {
+            // Non-blocking fallback for resilient offline execution
+        }
+
         return $this;
     }
 
     /**
-     * Adjust shelf inventory directly on the product variant.
+     * Adjust shelf inventory directly on the product variant and sync BranchStock.
      */
     public function adjustStockForBranch(?string $branchName, float $diff): self
     {
-        $this->update(['stock_quantity' => max(0, (float)$this->stock_quantity + $diff)]);
+        $newQty = max(0, (float)$this->stock_quantity + $diff);
+        $this->update(['stock_quantity' => $newQty]);
+
+        try {
+            $name = $branchName ?: config('app.default_branch', 'Main Shop');
+            $branch = Branch::where('name', $name)->first() ?? Branch::first();
+            if ($branch) {
+                BranchStock::updateOrCreate(
+                    ['product_variant_id' => $this->id, 'branch_id' => $branch->id],
+                    ['branch_name' => $branch->name, 'stock_quantity' => $newQty]
+                );
+            }
+        } catch (\Throwable) {
+            // Non-blocking fallback for resilient offline execution
+        }
+
         return $this;
     }
 }

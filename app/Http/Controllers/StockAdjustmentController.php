@@ -251,7 +251,7 @@ class StockAdjustmentController extends Controller
                 $diff = $newQty - $oldQty;
 
                 if ($diff != 0) {
-                    $variant->update(['stock_quantity' => $newQty]);
+                    $variant->setStockForBranch('Main Shop', $newQty);
                     $itemsToLog[] = [
                         'product_variant_id' => $variant->id,
                         'type'               => $diff > 0 ? 'add' : 'subtract',

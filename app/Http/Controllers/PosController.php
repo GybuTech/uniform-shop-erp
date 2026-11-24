@@ -105,11 +105,18 @@ class PosController extends Controller
         $variantsQuery = ProductVariant::with(['product.category']);
 
         if (empty($tokens)) {
-            // Initial load or cleared search: show top available shelf inventory
-            $variants = $variantsQuery->where('stock_quantity', '>', 0)
-                ->orderByDesc('stock_quantity')
-                ->limit(50)
-                ->get();
+            // Initial load or cleared search: show top available shelf inventory (or catalog if 0 stock)
+            $hasInStock = (clone $variantsQuery)->where('stock_quantity', '>', 0)->exists();
+            if ($hasInStock) {
+                $variants = $variantsQuery->where('stock_quantity', '>', 0)
+                    ->orderByDesc('stock_quantity')
+                    ->limit(50)
+                    ->get();
+            } else {
+                $variants = $variantsQuery->orderBy('id', 'desc')
+                    ->limit(50)
+                    ->get();
+            }
         } else {
             foreach ($tokens as $token) {
                 $variantsQuery->where(function($q) use ($token) {

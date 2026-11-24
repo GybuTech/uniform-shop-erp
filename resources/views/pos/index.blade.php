@@ -654,17 +654,15 @@
     </div>
 
     <script>
-        // Dynamic resilient URLs that adapt to any local XAMPP subfolder, port or host
-        const POS_BASE_URL = window.location.href.split('?')[0].replace(/\/+$/, '');
-        const APP_ROOT_URL = POS_BASE_URL.replace(/\/pos\/?$/, '');
-        const POS_SEARCH_URL = POS_BASE_URL.endsWith('/pos') ? (POS_BASE_URL + '/search') : '{{ route("pos.search") }}';
-        const POS_PARK_URL = POS_BASE_URL.endsWith('/pos') ? (POS_BASE_URL + '/park') : '{{ route("pos.park") }}';
-        const POS_QUICK_CUSTOMER_URL = POS_BASE_URL.endsWith('/pos') ? (POS_BASE_URL + '/quick-customer') : '{{ route("pos.quick-customer") }}';
-        const POS_QUOTATION_URL = POS_BASE_URL.endsWith('/pos') ? (POS_BASE_URL + '/quotation') : '{{ route("pos.quotation") }}';
-        const POS_RECENT_SALES_URL = POS_BASE_URL.endsWith('/pos') ? (POS_BASE_URL + '/recent-sales') : '{{ route("pos.recent-sales") }}';
-        const SHIFTS_CURRENT_URL = APP_ROOT_URL + '/shifts/current';
-        const SHIFTS_CLOSE_URL = APP_ROOT_URL + '/shifts/close';
-        const LOGIN_URL = APP_ROOT_URL + '/login';
+        // Dynamic resilient URLs using relative routing (works on any host, port, subfolder, XAMPP or artisan serve)
+        const POS_SEARCH_URL = "{{ route('pos.search', [], false) }}";
+        const POS_PARK_URL = "{{ route('pos.park', [], false) }}";
+        const POS_QUICK_CUSTOMER_URL = "{{ route('pos.quick-customer', [], false) }}";
+        const POS_QUOTATION_URL = "{{ route('pos.quotation', [], false) }}";
+        const POS_RECENT_SALES_URL = "{{ route('pos.recent-sales', [], false) }}";
+        const SHIFTS_CURRENT_URL = "{{ route('shifts.current', [], false) }}";
+        const SHIFTS_CLOSE_URL = "{{ route('shifts.close', [], false) }}";
+        const LOGIN_URL = "{{ route('login', [], false) }}";
 
         // Main POS State
         let cart = [];
@@ -723,23 +721,12 @@
                         renderSearchResults(data);
                     })
                     .catch(err => {
-                        console.warn('POS search via primary URL failed, trying fallback:', err);
-                        // Fallback to absolute Laravel route
-                        fetch('{{ route("pos.search") }}?q=' + encodeURIComponent(trimmed), {
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        })
-                            .then(r => r.json())
-                            .then(fallbackData => {
-                                if (spinner) spinner.classList.add('hidden');
-                                renderSearchResults(fallbackData);
-                            })
-                            .catch(fallbackErr => {
-                                console.error('POS search completely failed:', fallbackErr);
-                                if (spinner) spinner.classList.add('hidden');
-                            });
+                        console.error('POS search failed:', err);
+                        if (spinner) spinner.classList.add('hidden');
+                        const container = document.getElementById('searchResults');
+                        if (container && trimmed !== '') {
+                            container.innerHTML = '<p class="text-rose-500 text-xs text-center py-12">Search encountered an error. Please try again.</p>';
+                        }
                     });
             }, 180);
         }
