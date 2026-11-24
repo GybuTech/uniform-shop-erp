@@ -132,6 +132,11 @@ class UserController extends Controller
                 ->with('error', 'Business owner accounts are protected from deletion.');
         }
 
+        if ($user->hasTradingHistory()) {
+            return redirect()->route('users.index')
+                ->with('error', "'{$user->name}' has recorded sales, shifts or stock activity and cannot be deleted. Deactivate the account instead to block their login.");
+        }
+
         $name = $user->name;
         $user->delete();
 

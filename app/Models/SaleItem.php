@@ -8,7 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SaleItem extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Models\Concerns\Syncable;
+
+    /** Record type used when uploading to HQ (see App\Sync). */
+    public const SYNC_TYPE = 'sale';
 
     protected $fillable = [
         'sale_id',
@@ -17,6 +20,9 @@ class SaleItem extends Model
         'unit_price',
         'cost_price',
         'line_total',
+        // Set explicitly from SystemTime (the business clock) when a sale is recorded
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [
@@ -39,5 +45,11 @@ class SaleItem extends Model
     public function variant(): BelongsTo
     {
         return $this->productVariant();
+    }
+
+    /** Sale lines are uploaded as part of their sale. */
+    public function syncTarget(): array
+    {
+        return [Sale::SYNC_TYPE, Sale::whereKey($this->sale_id)->value('uuid')];
     }
 }

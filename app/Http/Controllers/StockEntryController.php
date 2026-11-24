@@ -192,12 +192,12 @@ class StockEntryController extends Controller
             'items.*.quantity'          => ['required', 'integer', 'min:1'],
         ]);
 
-        $user = auth()->user();
-        $branchName = $request->input('branch_name', $user->branch_name ?: 'Main Shop');
+        $branchName = $this->resolveEntryBranch($request);
 
         DB::transaction(function () use ($request, $branchName) {
             $stockEntry = StockEntry::create([
                 'user_id'      => auth()->id(),
+                'branch_name'  => $branchName,
                 'reference_no' => $request->reference_no,
                 'notes'        => $request->notes,
             ]);
@@ -210,7 +210,7 @@ class StockEntryController extends Controller
 
                 $variant = ProductVariant::find($item['product_variant_id']);
                 if ($variant) {
-                    $variant->adjustStockForBranch($branchName, (float)$item['quantity']);
+                    $variant->adjustStockForBranch($branchName, (float)$item['quantity'], 'stock_entry', $stockEntry->id, $stockEntry->reference_no, 'Stock entry');
                 }
             }
         });
@@ -245,15 +245,16 @@ class StockEntryController extends Controller
             'items.*.quantity'          => ['required', 'integer', 'min:1'],
         ]);
 
-        $user = auth()->user();
-        $branchName = $request->input('branch_name', $user->branch_name ?: 'Main Shop');
+        // Revert against the branch the entry was originally booked to
+        $originalBranch = $this->entryBranch($stockEntry);
+        $branchName = $request->filled('branch_name') ? $this->resolveEntryBranch($request) : $originalBranch;
 
-        DB::transaction(function () use ($request, $branchName, $stockEntry) {
+        DB::transaction(function () use ($request, $branchName, $originalBranch, $stockEntry) {
             // 1. Revert previous stock additions safely
             foreach ($stockEntry->items as $oldItem) {
                 $variant = ProductVariant::find($oldItem->product_variant_id);
                 if ($variant) {
-                    $variant->adjustStockForBranch($branchName, -1 * (float)$oldItem->quantity);
+                    $variant->adjustStockForBranch($originalBranch, -1 * (float)$oldItem->quantity, 'stock_entry_reversal', $stockEntry->id, $stockEntry->reference_no, 'Stock entry edited');
                 }
             }
 
@@ -262,6 +263,7 @@ class StockEntryController extends Controller
 
             // 3. Update metadata
             $stockEntry->update([
+                'branch_name'  => $branchName,
                 'reference_no' => $request->reference_no,
                 'notes'        => $request->notes,
             ]);
@@ -275,7 +277,7 @@ class StockEntryController extends Controller
 
                 $variant = ProductVariant::find($item['product_variant_id']);
                 if ($variant) {
-                    $variant->adjustStockForBranch($branchName, (float)$item['quantity']);
+                    $variant->adjustStockForBranch($branchName, (float)$item['quantity'], 'stock_entry', $stockEntry->id, $stockEntry->reference_no, 'Stock entry edited');
                 }
             }
         });
@@ -286,15 +288,15 @@ class StockEntryController extends Controller
 
     public function destroy(StockEntry $stockEntry)
     {
-        $user = auth()->user();
-        $branchName = $user->branch_name ?: 'Main Shop';
+        // Revert against the branch the entry was booked to, not the current user's branch
+        $branchName = $this->entryBranch($stockEntry);
 
         DB::transaction(function () use ($stockEntry, $branchName) {
             // Revert stock additions safely
             foreach ($stockEntry->items as $item) {
                 $variant = ProductVariant::find($item->product_variant_id);
                 if ($variant) {
-                    $variant->adjustStockForBranch($branchName, -1 * (float)$item->quantity);
+                    $variant->adjustStockForBranch($branchName, -1 * (float)$item->quantity, 'stock_entry_reversal', $stockEntry->id, $stockEntry->reference_no, 'Stock entry deleted');
                 }
             }
 
@@ -303,6 +305,32 @@ class StockEntryController extends Controller
         });
 
         return redirect()->route('stock-entries.index')
-            ->with('success', 'Stock entry deleted and inventory stock levels reverted successfully.');
+            ->with('success', "Stock entry deleted and inventory stock levels reverted at {$branchName}.");
+    }
+
+    /**
+     * Branch a new/edited entry is booked to. Non-admins are locked to their own branch.
+     */
+    private function resolveEntryBranch(Request $request): string
+    {
+        $user = auth()->user();
+        $isOwnerOrAdmin = $user->hasAnyRole(['owner', 'system_administrator', 'admin']);
+        $requested = trim((string) $request->input('branch_name', ''));
+
+        if ($isOwnerOrAdmin && $requested !== '' && \App\Models\Branch::where('name', $requested)->exists()) {
+            return $requested;
+        }
+
+        return $user->branch_name ?: (\App\Services\BranchContext::getActiveBranch() ?: 'Main Shop');
+    }
+
+    /**
+     * Branch an existing entry was booked to. Older entries did not record it; for those
+     * the previous behaviour (the current user's branch) is the only information available.
+     */
+    private function entryBranch(StockEntry $stockEntry): string
+    {
+        return $stockEntry->branch_name
+            ?: (auth()->user()->branch_name ?: 'Main Shop');
     }
 }

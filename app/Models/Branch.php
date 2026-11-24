@@ -18,8 +18,11 @@ class Branch extends Model
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'      => 'boolean',
+        'last_synced_at' => 'datetime',
     ];
+
+    protected $hidden = ['sync_token_hash'];
 
     public function users()
     {
@@ -29,5 +32,11 @@ class Branch extends Model
     public function sales()
     {
         return $this->hasMany(Sale::class, 'branch_name', 'name');
+    }
+
+    /** Tills (selling PCs with their own cash drawer) at this branch. */
+    public function registers()
+    {
+        return $this->hasMany(Register::class)->orderBy('id');
     }
 }

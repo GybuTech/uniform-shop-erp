@@ -107,6 +107,29 @@
                         @endif
                     </div>
 
+                    {{-- Till (cash drawer) selection: each till carries its own float --}}
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                            Till / Cash Drawer *
+                        </label>
+                        @if($registers->count() > 1)
+                            <select name="register_id"
+                                    onchange="window.location.href = '{{ route('shifts.open') }}?branch_id={{ $branchId }}&register_id=' + encodeURIComponent(this.value)"
+                                    class="w-full text-xs font-bold rounded-xl border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
+                                @foreach($registers as $r)
+                                    @php $openOn = $r->openShift(); @endphp
+                                    <option value="{{ $r->id }}" @selected($register && $register->id === $r->id)>
+                                        {{ $r->name }}{{ $openOn ? ' (open: ' . ($openOn->user->name ?? 'in use') . ')' : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="text-[11px] text-gray-500 mt-1">This PC remembers its till after the first shift.</p>
+                        @elseif($register)
+                            <div class="px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-extrabold text-gray-900">{{ $register->name }}</div>
+                            <input type="hidden" name="register_id" value="{{ $register->id }}">
+                        @endif
+                    </div>
+
                     {{-- Starting Float Input (Readonly for Cashiers) --}}
                     <div>
                         <div class="flex justify-between items-center mb-1">

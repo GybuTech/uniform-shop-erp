@@ -48,9 +48,6 @@ class QuotationController extends Controller
             'items.*.quantity'           => ['required', 'integer', 'min:1'],
         ]);
 
-        $count = Quotation::count() + 1;
-        $quotationNumber = 'QTN-' . date('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
-
         $total = 0;
         foreach ($validated['items'] as $item) {
             $total += $item['quantity'] * $item['unit_price'];
@@ -60,6 +57,8 @@ class QuotationController extends Controller
         if (empty($branchName) || $branchName === 'all') {
             $branchName = 'Main Shop';
         }
+
+        $quotationNumber = \App\Services\DocumentNumber::make('QTN', $branchName);
 
         $quotation = Quotation::create([
             'quotation_number' => $quotationNumber,

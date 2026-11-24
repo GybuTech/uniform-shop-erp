@@ -44,9 +44,32 @@ class SaleReturnController extends Controller
             $sale = Sale::with(['customer', 'user', 'saleItems.productVariant.product'])
                 ->where('receipt_number', $receiptNumber)
                 ->first();
+
+            if ($sale && ($blocked = $this->otherShopReason($sale))) {
+                return redirect()->route('returns.create')->with('error', $blocked);
+            }
         }
 
         return view('returns.create', compact('sale', 'receiptNumber'));
+    }
+
+    /**
+     * Goods can only be returned at the shop that issued the receipt (each shop prints its
+     * own receipts and holds its own stock and cash). Returns null when this shop may accept it.
+     */
+    private function otherShopReason(Sale $sale): ?string
+    {
+        $currentShop = \App\Services\BranchContext::getActiveBranch();
+
+        if ($currentShop === null) {
+            return "Receipt {$sale->receipt_number} was issued at {$sale->branch_name}. Switch to that branch before processing the return.";
+        }
+
+        if (strcasecmp(trim($currentShop), trim((string) $sale->branch_name)) !== 0) {
+            return "Receipt {$sale->receipt_number} was issued at {$sale->branch_name}. Returns must be made at the shop where the goods were bought.";
+        }
+
+        return null;
     }
 
     public function store(Request $request)
@@ -61,16 +84,27 @@ class SaleReturnController extends Controller
         ]);
 
         $sale = Sale::with('saleItems.productVariant')->findOrFail($validated['sale_id']);
+
+        if ($blocked = $this->otherShopReason($sale)) {
+            return back()->withErrors(['return_error' => $blocked])->withInput();
+        }
+
         $user = auth()->user();
         $branchName = $sale->branch_name ?: ($user->branch_name ?: 'Main Shop');
-        $branch = Branch::where('name', $branchName)->first();
         $now = SystemTime::now();
 
-        $count = SaleReturn::count() + 1;
-        $returnNumber = 'RET-' . date('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $isCreditSale = $sale->payment_status === 'credit' || $sale->payment_method === 'Credit';
+        if ($isCreditSale && $validated['refund_method'] === 'cash') {
+            return back()->withErrors(['return_error' => 'This was a credit (on-account) sale, so no cash was received. Choose "store credit" to reduce the customer\'s balance instead of paying out cash.'])->withInput();
+        }
+
+        $returnNumber = \App\Services\DocumentNumber::make('RET', $branchName);
 
         try {
-            $saleReturn = DB::transaction(function () use ($validated, $sale, $user, $branch, $branchName, $now, $returnNumber) {
+            $saleReturn = DB::transaction(function () use ($validated, $sale, $user, $branchName, $returnNumber) {
+                // Serialise returns against the same sale so two clerks cannot over-return it
+                Sale::whereKey($sale->id)->lockForUpdate()->first();
+
                 $refundTotal = 0;
                 $returnItemsData = [];
 
@@ -109,7 +143,11 @@ class SaleReturnController extends Controller
                     throw new \Exception("No items selected for return.");
                 }
 
-                $activeShift = Shift::getActiveShift($user->id, $branchName);
+                // Cash refunds leave the branch's open drawer; store credit and exchanges need none
+                $activeShift = Shift::drawerFor($user->id, $branchName);
+                if ($validated['refund_method'] === 'cash' && !$activeShift) {
+                    throw new \Exception("Cash refunds must come out of an open till drawer. Open your own till shift at {$branchName} (or have the cashier on duty process it), or choose store credit.");
+                }
 
                 $saleReturn = SaleReturn::create([
                     'sale_id'       => $sale->id,
@@ -134,33 +172,19 @@ class SaleReturnController extends Controller
                         'subtotal'           => $itemData['subtotal'],
                     ]);
 
-                    // Increment branch stock
-                    $branchStock = BranchStock::firstOrCreate(
-                        ['branch_id' => $branch?->id, 'product_variant_id' => $variant->id],
-                        ['branch_name' => $branchName, 'stock_quantity' => 0]
+                    // Restock the branch shelf and write the ledger entry
+                    $variant->adjustStockForBranch(
+                        $branchName,
+                        $qty,
+                        'sale_return',
+                        $saleReturn->id,
+                        $returnNumber,
+                        "Return for Sale #{$sale->receipt_number}: {$saleReturn->reason}"
                     );
-                    $branchStock->increment('stock_quantity', $qty);
-                    $variant->update(['stock_quantity' => $variant->branchStocks()->sum('stock_quantity')]);
-
-                    // Immutable stock movement ledger entry
-                    StockMovement::create([
-                        'branch_id'          => $branch?->id,
-                        'branch_name'        => $branchName,
-                        'product_variant_id' => $variant->id,
-                        'quantity'           => $qty,
-                        'balance_after'      => (float) $branchStock->fresh()->stock_quantity,
-                        'movement_type'      => 'sale_return',
-                        'reference_id'       => $saleReturn->id,
-                        'reference_no'       => $returnNumber,
-                        'user_id'            => $user->id,
-                        'notes'              => "Return for Sale #{$sale->receipt_number}: {$saleReturn->reason}",
-                    ]);
                 }
 
-                // If cash refund, reduce expected cash in active register shift
-                if ($validated['refund_method'] === 'cash' && $activeShift) {
-                    $activeShift->decrement('expected_cash', $refundTotal);
-                }
+                // Cash refunds are deducted from the drawer inside Shift::recalculateTotals()
+                $activeShift?->recalculateTotals();
 
                 return $saleReturn;
             });

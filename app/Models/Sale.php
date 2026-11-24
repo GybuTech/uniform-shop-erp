@@ -9,7 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Sale extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Models\Concerns\Syncable;
+
+    /** Record type used when uploading to HQ (see App\Sync). */
+    public const SYNC_TYPE = 'sale';
 
     protected $fillable = [
         'customer_id',
@@ -21,6 +24,9 @@ class Sale extends Model
         'payment_status',
         'payment_reference',
         'branch_name',
+        // Set explicitly from SystemTime (the business clock) when a sale is recorded
+        'created_at',
+        'updated_at',
     ];
 
     public function getInvoiceNoAttribute(): string

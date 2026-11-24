@@ -70,8 +70,33 @@ for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":8000 "') do (
         taskkill /F /PID %%p >nul 2>&1
     )
 )
-taskkill /F /IM php.exe >nul 2>&1
 timeout /t 1 /nobreak >nul
+
+:: Back up the database before applying any updates (only when updates are waiting).
+:: Backups are kept in storage\backups (the newest 20).
+if defined EXT_DIR (
+    set "PHP_RUN="!PHP_BIN!" -d extension_dir="!EXT_DIR!" -d extension=mbstring -d extension=pdo_mysql -d extension=fileinfo -d extension=openssl"
+) else (
+    set "PHP_RUN="!PHP_BIN!""
+)
+echo       Checking for database updates...
+!PHP_RUN! artisan pos:backup --if-pending
+if errorlevel 1 (
+    color 0E
+    echo.
+    echo [WARNING] The database could not be backed up, so updates were NOT applied.
+    echo           Call support before trading. Press any key to start the POS anyway,
+    echo           or close this window to stop.
+    pause >nul
+    color 0A
+) else (
+    rem Apply any pending database migrations (new tables/columns shipped with updates)
+    !PHP_RUN! artisan migrate --force
+)
+
+:: Health check: lists anything that would stop trading or print wrong details on receipts
+!PHP_RUN! artisan pos:check
+echo.
 
 :: 5. Launch POS Application
 echo [5/5] Launching POS Server on http://127.0.0.1:8000 ...
@@ -84,6 +109,14 @@ echo  KEEP THIS WINDOW OPEN while using the POS.
 echo  To shut down the POS at the end of the day, simply close this window.
 echo ====================================================================
 echo.
+
+:: Background cloud sync: uploads this shop's sales to HQ every minute when online.
+:: Does nothing until SYNC_HQ_URL and SYNC_TOKEN are set in .env. Runs minimized.
+if defined EXT_DIR (
+    start "POS Cloud Sync (keep open)" /min "!PHP_BIN!" -d extension_dir="!EXT_DIR!" -d extension=mbstring -d extension=pdo_mysql -d extension=fileinfo -d extension=openssl -d extension=curl artisan schedule:work
+) else (
+    start "POS Cloud Sync (keep open)" /min "!PHP_BIN!" -d extension=mbstring -d extension=pdo_mysql -d extension=fileinfo -d extension=openssl -d extension=curl artisan schedule:work
+)
 
 :: Open browser after a brief 2-second delay so the PHP server is fully listening
 start "" cmd /c "timeout /t 2 /nobreak >nul & start http://127.0.0.1:8000/login"

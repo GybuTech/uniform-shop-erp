@@ -61,4 +61,18 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Branch::class);
     }
+
+    /**
+     * Whether this account has recorded business transactions. Such accounts must be
+     * deactivated rather than deleted: sales, returns and stock entries reference the
+     * user, and deleting the user would also cascade-delete their shift history.
+     */
+    public function hasTradingHistory(): bool
+    {
+        return Sale::where('user_id', $this->id)->exists()
+            || Shift::where('user_id', $this->id)->exists()
+            || SaleReturn::where('user_id', $this->id)->exists()
+            || CustomerPayment::where('user_id', $this->id)->exists()
+            || StockEntry::where('user_id', $this->id)->exists();
+    }
 }

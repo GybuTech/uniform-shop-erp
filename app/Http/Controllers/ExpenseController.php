@@ -27,22 +27,22 @@ class ExpenseController extends Controller
     public function create()
     {
         $categories = ['Rent', 'Electricity & Water', 'Tailor Wages', 'Transport', 'Packaging & Bags', 'Snacks & Office', 'Maintenance'];
-        $branches   = ['Main Branch', 'Branch 2 Sweaters', 'Branch 3 Sweaters'];
+        // Must match real branch names, or branch dashboards and reports never pick the expense up
+        $branches = \App\Models\Branch::where('is_active', true)->orderBy('name')->pluck('name')->toArray();
         return view('expenses.create', compact('categories', 'branches'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'branch_name'  => ['required', 'string'],
+            'branch_name'  => ['required', 'string', 'exists:branches,name'],
             'category'     => ['required', 'string'],
             'amount'       => ['required', 'numeric', 'min:0.01'],
             'expense_date' => ['required', 'date'],
             'note'         => ['nullable', 'string', 'max:255'],
         ]);
 
-        $count = Expense::count() + 1;
-        $expenseNumber = 'EXP-' . date('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $expenseNumber = \App\Services\DocumentNumber::make('EXP', $validated['branch_name']);
 
         Expense::create([
             'expense_number' => $expenseNumber,

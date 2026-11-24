@@ -5,6 +5,9 @@
                 Stock Intake Entry #{{ $stockEntry->id }}
             </h2>
             <div class="flex items-center space-x-3">
+                <a href="{{ route('labels.index', ['entry' => $stockEntry->id]) }}" class="bg-blue-600 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs hover:bg-blue-700 shadow-sm transition">
+                    Print Labels
+                </a>
                 <a href="{{ route('stock-entries.edit', $stockEntry) }}" class="bg-indigo-600 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs hover:bg-indigo-700 shadow-sm transition">
                     Edit & Recalculate
                 </a>

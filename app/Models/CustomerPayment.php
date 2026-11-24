@@ -8,7 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CustomerPayment extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Models\Concerns\Syncable;
+
+    /** Record type used when uploading to HQ (see App\Sync). */
+    public const SYNC_TYPE = 'customer_payment';
 
     protected $fillable = [
         'customer_id',

@@ -238,12 +238,7 @@ class PosController extends Controller
         $user = auth()->user();
         $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
 
-        $activeBranch = \App\Services\BranchContext::getActiveBranch();
-        if ($isOwnerOrAdmin) {
-            $branchName = $request->branch_name ?: ($activeBranch ?: ($user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop')));
-        } else {
-            $branchName = $activeBranch ?: ($user->branch_name ?: (Branch::where('is_active', true)->first()?->name ?? 'Main Shop'));
-        }
+        $branchName = $this->sellingBranch($request, $isOwnerOrAdmin);
 
         $paymentMethod = $request->payment_method;
         $paymentStatus = 'paid';
@@ -311,11 +306,17 @@ class PosController extends Controller
 
                 $storedPaymentMethod = $paymentMethod;
                 if ($paymentMethod === 'Split') {
-                    $cashAmt = (float) $request->input('cash_amount', 0);
-                    $mpesaAmt = (float) $request->input('mpesa_amount', 0);
-                    $storedPaymentMethod = "Split (Cash: " . number_format($cashAmt, 0) . ", M-Pesa: " . number_format($mpesaAmt, 0) . ")";
+                    $cashAmt = round((float) $request->input('cash_amount', 0), 2);
+                    $mpesaAmt = round((float) $request->input('mpesa_amount', 0), 2);
+
+                    // Server-side check: the browser check alone can be bypassed
+                    if (abs(($cashAmt + $mpesaAmt) - $total) >= 0.05) {
+                        throw new \Exception("Split payment error: Cash (KES " . number_format($cashAmt, 2) . ") + M-Pesa (KES " . number_format($mpesaAmt, 2) . ") must equal the sale total of KES " . number_format($total, 2) . ".");
+                    }
+
+                    $storedPaymentMethod = "Split (Cash: " . number_format($cashAmt, 2) . ", M-Pesa: " . number_format($mpesaAmt, 2) . ")";
                     if (strlen($storedPaymentMethod) > 50) {
-                        $storedPaymentMethod = "Split (C:" . intval($cashAmt) . " + M:" . intval($mpesaAmt) . ")";
+                        $storedPaymentMethod = "Split (C:" . $cashAmt . " + M:" . $mpesaAmt . ")";
                     }
                 }
 
@@ -331,7 +332,7 @@ class PosController extends Controller
                     'customer_id'       => $request->customer_id ?: null,
                     'user_id'           => auth()->id(),
                     'shift_id'          => $shift->id,
-                    'receipt_number'    => 'RCP-' . strtoupper(uniqid()),
+                    'receipt_number'    => \App\Services\DocumentNumber::make('RCP', $branchName),
                     'total_amount'      => $total,
                     'payment_method'    => $storedPaymentMethod,
                     'payment_status'    => $paymentStatus,
@@ -427,7 +428,7 @@ class PosController extends Controller
         ]);
 
         $user = auth()->user();
-        $branchName = $request->branch_name ?: ($user->branch_name ?: 'Main Shop');
+        $branchName = $this->sellingBranch($request, $user->hasAnyRole(['admin', 'owner', 'system_administrator']));
 
         $customer = null;
         $customerName = trim($request->customer_name ?? '');
@@ -450,8 +451,7 @@ class PosController extends Controller
             default     => 1.00,
         };
 
-        $count = Quotation::count() + 1;
-        $quotationNumber = 'QTN-' . date('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $quotationNumber = \App\Services\DocumentNumber::make('QTN', $branchName);
 
         try {
             $quotation = DB::transaction(function () use ($request, $customer, $customerName, $branchName, $tierMultiplier, $quotationNumber) {
@@ -548,6 +548,7 @@ class PosController extends Controller
                 'time'           => $sale->created_at->format('d M H:i'),
                 'time_ago'       => $sale->created_at->diffForHumans(),
                 'receipt_url'    => route('sales.show', $sale),
+                'print_url'      => route('sales.print', ['sale' => $sale, 'copy' => 1]),
             ];
         }));
     }
@@ -642,7 +643,7 @@ class PosController extends Controller
         ]);
 
         $user = auth()->user();
-        $branchName = $request->branch_name ?: ($user->branch_name ?: 'Main Shop');
+        $branchName = $this->sellingBranch($request, $user->hasAnyRole(['admin', 'owner', 'system_administrator']));
 
         $parked = ParkedSale::create([
             'user_id'          => $user->id,
@@ -663,7 +664,7 @@ class PosController extends Controller
     public function getParkedSales(Request $request)
     {
         $user = auth()->user();
-        $branchName = $request->branch_name ?: ($user->branch_name ?: 'Main Shop');
+        $branchName = $this->sellingBranch($request, $user->hasAnyRole(['admin', 'owner', 'system_administrator']));
 
         $parkedSales = ParkedSale::with('customer')
             ->where('branch_name', $branchName)
@@ -716,6 +717,13 @@ class PosController extends Controller
         if (\App\Models\SaleReturn::where('sale_id', $sale->id)->exists()) {
             return redirect()->route('sales.index')
                 ->with('error', "Receipt #{$invoiceNo} has processed returns and cannot be voided. Please handle item returns via the Returns module.");
+        }
+
+        // A sale with processed returns has already had part of its stock restored and
+        // part of its value refunded. Voiding it would restock those items a second time.
+        if (\App\Models\SaleReturn::where('sale_id', $sale->id)->exists()) {
+            return redirect()->route('sales.index')
+                ->with('error', "Receipt #{$receiptNumber} has processed returns and cannot be voided. Use the Returns module for the remaining items.");
         }
 
         DB::transaction(function () use ($sale) {

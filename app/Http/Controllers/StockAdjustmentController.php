@@ -69,11 +69,10 @@ class StockAdjustmentController extends Controller
             'items'       => ['required', 'array', 'min:1'],
             'items.*.product_variant_id' => ['required', 'exists:product_variants,id'],
             'items.*.type'               => ['required', 'in:add,subtract'],
-            'items.*.quantity'           => ['required', 'integer', 'min:1'],
+            'items.*.quantity'           => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        $count = StockAdjustment::count() + 1;
-        $adjustmentNumber = 'ADJ-' . \App\Services\SystemTime::now()->format('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $adjustmentNumber = \App\Services\DocumentNumber::make('ADJ', $validated['branch_name']);
 
         DB::transaction(function () use ($validated, $adjustmentNumber) {
             $adjustment = StockAdjustment::create([
@@ -93,11 +92,15 @@ class StockAdjustmentController extends Controller
 
                 // Adjust stock directly on ProductVariant
                 $variant = ProductVariant::findOrFail($item['product_variant_id']);
-                if ($item['type'] === 'add') {
-                    $variant->increment('stock_quantity', $item['quantity']);
-                } else {
-                    $variant->decrement('stock_quantity', $item['quantity']);
-                }
+                $qty = (float) $item['quantity'];
+                $variant->adjustStockForBranch(
+                    $validated['branch_name'],
+                    $item['type'] === 'add' ? $qty : -$qty,
+                    'adjustment',
+                    $adjustment->id,
+                    $adjustment->adjustment_number,
+                    $validated['reason']
+                );
             }
         });
 
@@ -262,8 +265,7 @@ class StockAdjustmentController extends Controller
             }
 
             if (!empty($itemsToLog)) {
-                $count = StockAdjustment::count() + 1;
-                $adjNum = 'ADJ-BULK-' . \App\Services\SystemTime::now()->format('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+                $adjNum = \App\Services\DocumentNumber::make('ADJ', $branchName);
 
                 $adjustment = StockAdjustment::create([
                     'adjustment_number' => $adjNum,

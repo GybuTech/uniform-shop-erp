@@ -138,7 +138,7 @@ class InventoryWorkflowController extends Controller
 
                 $variant = ProductVariant::find($itemData['product_variant_id']);
                 if ($variant) {
-                    $variant->adjustStockForBranch($branchName, $qty);
+                    $variant->adjustStockForBranch($branchName, $qty, 'opening_stock', $stockEntry->id, $stockEntry->reference_no, 'Opening stock intake');
                 }
             }
         });
@@ -235,8 +235,9 @@ class InventoryWorkflowController extends Controller
         }
 
         $totalUnits = 0;
+        $entryId = null;
 
-        DB::transaction(function () use ($validated, $tailorName, $composedNotes, $receivedItems, $branchName, &$totalUnits) {
+        DB::transaction(function () use ($validated, $tailorName, $composedNotes, $receivedItems, $branchName, &$totalUnits, &$entryId) {
             $stockEntry = StockEntry::create([
                 'user_id'          => auth()->id(),
                 'source_type'      => 'factory_receipt',
@@ -246,6 +247,7 @@ class InventoryWorkflowController extends Controller
                 'reference_no'     => 'FCT-' . strtoupper($validated['delivery_note_no']),
                 'notes'            => $composedNotes,
             ]);
+            $entryId = $stockEntry->id;
 
             foreach ($receivedItems as $itemData) {
                 $qty = (float) $itemData['quantity'];
@@ -258,12 +260,13 @@ class InventoryWorkflowController extends Controller
 
                 $variant = ProductVariant::find($itemData['product_variant_id']);
                 if ($variant) {
-                    $variant->adjustStockForBranch($branchName, $qty);
+                    $variant->adjustStockForBranch($branchName, $qty, 'factory_receipt', $stockEntry->id, $stockEntry->reference_no, "Workshop delivery note {$validated['delivery_note_no']}");
                 }
             }
         });
 
         return redirect()->route('inventory.factory-receipts', ['branch_name' => $branchName])
+            ->with('label_entry', ['id' => $entryId, 'units' => (int) $totalUnits])
             ->with('success', "Factory receipt Delivery Note #{$validated['delivery_note_no']} recorded successfully! Added {$totalUnits} produced piece(s) across {$receivedItems->count()} uniform line item(s) into {$branchName} stock.");
     }
 }

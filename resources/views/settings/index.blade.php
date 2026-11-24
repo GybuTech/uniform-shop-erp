@@ -284,6 +284,22 @@
                                 <span class="text-[11px] text-slate-400">Printed at the bottom of customer receipts.</span>
                                 @error('receipt_footer_note') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
                             </div>
+                            <div>
+                                <x-input-label for="receipt_paper_width" value="Receipt Printer Paper Width" />
+                                <select name="receipt_paper_width" id="receipt_paper_width" class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm">
+                                    <option value="80" @selected(old('receipt_paper_width', $receiptPaperWidth) === '80')>80 mm (standard counter printer)</option>
+                                    <option value="58" @selected(old('receipt_paper_width', $receiptPaperWidth) === '58')>58 mm (small / mobile printer)</option>
+                                </select>
+                                <span class="text-[11px] text-slate-400">Match the width of the paper roll in the receipt printer.</span>
+                            </div>
+                            <div>
+                                <x-input-label for="receipt_auto_print" value="Print Receipt Automatically After Each Sale" />
+                                <select name="receipt_auto_print" id="receipt_auto_print" class="w-full mt-1 border-slate-300 rounded-lg shadow-sm text-sm">
+                                    <option value="1" @selected(old('receipt_auto_print', $receiptAutoPrint) === '1')>Yes, print immediately</option>
+                                    <option value="0" @selected(old('receipt_auto_print', $receiptAutoPrint) === '0')>No, print only when the Print button is pressed</option>
+                                </select>
+                                <span class="text-[11px] text-slate-400">See docs/Receipt Printer Setup.md to print without a dialog box.</span>
+                            </div>
                         </div>
 
                         {{-- Dynamic Pricing Tiers Configuration --}}
@@ -329,6 +345,48 @@
 
             {{-- Tab 4: Store Branches Management --}}
             <div x-show="tab === 'branches'" class="space-y-6">
+                {{-- Cloud sync (HQ ⇄ shops) --}}
+                @if(session('sync_key_value'))
+                    <div class="bg-amber-50 border-2 border-amber-400 p-5 rounded-2xl max-w-4xl space-y-2">
+                        <h3 class="font-extrabold text-amber-950 text-sm">Sync key for {{ session('sync_key_branch') }}: copy it now, it is shown only once</h3>
+                        <code class="block bg-white border border-amber-300 rounded-lg p-3 text-xs font-mono break-all select-all">{{ session('sync_key_value') }}</code>
+                        <p class="text-xs text-amber-900">On that shop's PC, add these two lines to the <code>.env</code> file, then restart the POS:</p>
+                        <pre class="bg-white border border-amber-300 rounded-lg p-3 text-[11px] font-mono overflow-x-auto">SYNC_HQ_URL={{ url('/') }}
+SYNC_TOKEN={{ session('sync_key_value') }}</pre>
+                    </div>
+                @endif
+
+                @if($isHq)
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm max-w-4xl">
+                        <h3 class="font-extrabold text-slate-900 text-sm">Shop Sync (HQ)</h3>
+                        <p class="text-xs text-slate-500 mt-1">Each shop PC uploads its sales, cash-ups and stock here whenever it has internet. Give each shop its own key with <strong>Generate Sync Key</strong> in the table below. Figures for a shop are as fresh as its last sync.</p>
+                    </div>
+                @elseif($syncStatus)
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm max-w-4xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div class="text-xs text-slate-600 space-y-1">
+                            <h3 class="font-extrabold text-slate-900 text-sm">Cloud Sync (this shop → HQ)</h3>
+                            @if(!$syncStatus['configured'])
+                                <p>Not set up yet. This PC keeps working offline and records every change, ready to upload once HQ is live. Setup: <code>SYNC_HQ_URL</code> and <code>SYNC_TOKEN</code> in <code>.env</code> (the key comes from HQ → Settings → Branches).</p>
+                            @else
+                                <p>Uploading to <span class="font-mono">{{ $syncStatus['hq_url'] }}</span></p>
+                                <p>Last successful sync:
+                                    <strong>{{ $syncStatus['last_success'] ? \Illuminate\Support\Carbon::parse($syncStatus['last_success'])->diffForHumans() : 'never' }}</strong>
+                                </p>
+                                @if($syncStatus['last_error'])
+                                    <p class="text-rose-700">Last problem: {{ $syncStatus['last_error'] }}</p>
+                                @endif
+                            @endif
+                            <p>Changes waiting to upload: <strong>{{ number_format($syncStatus['pending']) }}</strong></p>
+                        </div>
+                        @if($syncStatus['configured'])
+                            <form method="POST" action="{{ route('settings.sync-now') }}">
+                                @csrf
+                                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-sm">Sync Now</button>
+                            </form>
+                        @endif
+                    </div>
+                @endif
+
                 {{-- Add New Branch Form --}}
                 <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-4xl">
                     <h3 class="font-extrabold text-slate-900 text-lg mb-1">Add New Store Branch</h3>
@@ -387,6 +445,31 @@
                                     {{ $b->name }}
                                     @if($b->sales_count > 0)
                                         <span class="block text-[11px] font-normal text-slate-400 font-mono">{{ $b->sales_count }} sales recorded</span>
+                                    @endif
+                                    <span class="block text-[11px] font-normal text-slate-500 mt-1">
+                                        Tills: {{ $b->registers->pluck('name')->implode(', ') ?: 'Till 1' }}
+                                    </span>
+                                    <form method="POST" action="{{ route('settings.branches.registers.store', $b) }}" class="mt-1 flex items-center gap-1">
+                                        @csrf
+                                        <input type="text" name="name" placeholder="Till {{ max(2, $b->registers->count() + 1) }}" class="w-24 text-[11px] py-0.5 px-1.5 rounded border-slate-300">
+                                        <button type="submit" class="px-2 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 rounded hover:bg-emerald-100">+ Add Till</button>
+                                    </form>
+                                    @if($isHq)
+                                        <span class="block text-[11px] font-normal mt-1 {{ $b->last_synced_at && $b->last_synced_at->gt(now()->subMinutes(15)) ? 'text-emerald-700' : 'text-slate-500' }}">
+                                            @if($b->sync_token_hash)
+                                                Last synced: {{ $b->last_synced_at ? $b->last_synced_at->diffForHumans() : 'never' }}
+                                                @if($b->sync_pending_count > 0) &bull; {{ number_format($b->sync_pending_count) }} waiting at shop @endif
+                                            @else
+                                                No sync key issued
+                                            @endif
+                                        </span>
+                                        <form method="POST" action="{{ route('settings.branches.sync-key', $b) }}" class="mt-1"
+                                              onsubmit="return confirm('{{ $b->sync_token_hash ? 'Replace the sync key for ' . addslashes($b->name) . '? The shop PC stops syncing until its .env is updated with the new key.' : 'Create a sync key for ' . addslashes($b->name) . '?' }}');">
+                                            @csrf
+                                            <button type="submit" class="px-2 py-0.5 text-[11px] font-bold text-indigo-700 bg-indigo-50 rounded hover:bg-indigo-100">
+                                                {{ $b->sync_token_hash ? 'Replace Sync Key' : 'Generate Sync Key' }}
+                                            </button>
+                                        </form>
                                     @endif
                                 </td>
                                 <td class="px-6 py-3.5 font-mono text-xs text-indigo-600 font-bold">{{ $b->code ?? '—' }}</td>

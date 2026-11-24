@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\BusinessSetting;
+use App\Models\Register;
 use App\Models\Shift;
 use App\Services\SystemTime;
 use Illuminate\Http\Request;
@@ -38,21 +39,19 @@ class ShiftController extends Controller
         $branchSummaries = [];
         if ($isGlobal) {
             $branches = Branch::where('is_active', true)->orderBy('name')->get();
+            // One card per till: each drawer has its own float carry-over
             foreach ($branches as $b) {
-                [$resolvedFloat, $lastClosed, $label] = Shift::resolveOpeningFloatForBranch($b->name, $b->id);
-                $activeShift = Shift::where(function($q) use ($b) {
-                        $q->where('branch_id', $b->id)->orWhere('branch_name', $b->name);
-                    })
-                    ->where('status', 'open')
-                    ->first();
+                foreach (Register::forBranch($b) as $register) {
+                    [$resolvedFloat, $lastClosed, $label] = Shift::resolveOpeningFloatForRegister($register);
 
-                $branchSummaries[] = [
-                    'branch'      => $b,
-                    'activeShift' => $activeShift,
-                    'lastClosed'  => $lastClosed,
-                    'nextFloat'   => $resolvedFloat,
-                    'statusLabel' => $label,
-                ];
+                    $branchSummaries[] = [
+                        'branch'      => (object) ['name' => $b->name . ' · ' . $register->name, 'code' => $b->code],
+                        'activeShift' => $register->openShift(),
+                        'lastClosed'  => $lastClosed,
+                        'nextFloat'   => $resolvedFloat,
+                        'statusLabel' => $label,
+                    ];
+                }
             }
         }
 
@@ -107,8 +106,8 @@ class ShiftController extends Controller
             }
         }
 
+        [$branchId, $branchName] = $this->tillBranch($branchId, $user->branch_name ?: 'Main Shop');
         $branch = Branch::find($branchId);
-        $branchName = $branch ? $branch->name : ($user->branch_name ?: 'Main Shop');
 
         // If cashier already has an active open shift, proceed straight to POS
         $existingShift = Shift::where('user_id', $user->id)
@@ -120,41 +119,17 @@ class ShiftController extends Controller
                 ->with('info', "You already have an active open shift at {$existingShift->branch_name}.");
         }
 
-        // Query the most recent closed shift for THIS specific branch
-        $lastShift = Shift::where('branch_id', $branchId)
-            ->where('status', 'closed')
-            ->where(function ($q) {
-                $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
-            })
-            ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
-            ->orderByDesc('id')
-            ->first();
+        // Which till (cash drawer) this PC is. The float carries over per till.
+        $registers = $branch ? Register::forBranch($branch) : collect();
+        $register = $this->chooseRegister($request, $registers);
 
-        // Fallback search by branch_name if branch_id was unpopulated on legacy records
-        if (!$lastShift && $branchName) {
-            $lastShift = Shift::where('branch_name', $branchName)
-                ->where('status', 'closed')
-                ->where(function ($q) {
-                    $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
-                })
-                ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
-                ->orderByDesc('id')
-                ->first();
+        if ($register && ($busy = $register->openShift()) && $busy->user_id !== $user->id) {
+            session()->now('error', $this->tillBusyMessage($register, $busy));
         }
 
-        // Calculate the Automatic Starting Float
-        if ($lastShift) {
-            if ($lastShift->cash_collected_by_owner) {
-                $startingFloat = (float) ($lastShift->float_left_in_drawer ?? 0.00);
-                $statusLabel = 'Collected by Owner (Float Remaining in Drawer)';
-            } else {
-                $startingFloat = (float) ($lastShift->actual_cash ?? $lastShift->expected_cash);
-                $statusLabel = 'Uncollected Overnight Rollover';
-            }
-        } else {
-            $startingFloat = 0.00;
-            $statusLabel = 'Initial Shift (Brand New Store Baseline)';
-        }
+        [$startingFloat, $lastShift, $statusLabel] = $register
+            ? Shift::resolveOpeningFloatForRegister($register)
+            : [0.00, null, 'Initial Shift (Brand New Till Baseline)'];
 
         $defaultFloat = $startingFloat;
 
@@ -163,6 +138,8 @@ class ShiftController extends Controller
             'branch',
             'branchId',
             'branchName',
+            'registers',
+            'register',
             'startingFloat',
             'defaultFloat',
             'lastShift',
@@ -218,8 +195,7 @@ class ShiftController extends Controller
             }
         }
 
-        $branch = Branch::find($branchId);
-        $branchName = $branch ? $branch->name : ($request->input('branch_name') ?: ($user->branch_name ?: 'Main Shop'));
+        [$branchId, $branchName] = $this->tillBranch($branchId, $request->input('branch_name') ?: ($user->branch_name ?: 'Main Shop'));
 
         // Check if an open shift already exists for this user
         $existingShift = Shift::where('user_id', $user->id)
@@ -230,34 +206,19 @@ class ShiftController extends Controller
             return redirect()->route('pos.index');
         }
 
-        // Query the most recent closed shift for THIS specific branch
-        $lastShift = Shift::where('branch_id', $branchId)
-            ->where('status', 'closed')
-            ->where(function ($q) {
-                $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
-            })
-            ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
-            ->orderByDesc('id')
-            ->first();
-
-        if (!$lastShift && $branchName) {
-            $lastShift = Shift::where('branch_name', $branchName)
-                ->where('status', 'closed')
-                ->where(function ($q) {
-                    $q->whereNotNull('closed_at')->orWhereNotNull('ended_at');
-                })
-                ->orderByRaw('COALESCE(closed_at, ended_at) DESC')
-                ->orderByDesc('id')
-                ->first();
+        // One open shift per till: two shifts on the same drawer would both inherit its
+        // rolled-over float and the cash would be counted twice. Other tills are unaffected.
+        $branch = Branch::find($branchId);
+        $register = $branch ? $this->chooseRegister($request, Register::forBranch($branch)) : null;
+        if (!$register) {
+            return redirect()->route('shifts.open')->with('error', "No till is set up for {$branchName}. Ask an owner to add one under Settings → Branches.");
+        }
+        if (($busy = $register->openShift()) && $busy->user_id !== $user->id) {
+            return redirect()->route('shifts.open', ['register_id' => $register->id])
+                ->with('error', $this->tillBusyMessage($register, $busy));
         }
 
-        if ($lastShift) {
-            $defaultFloat = $lastShift->cash_collected_by_owner
-                ? (float) ($lastShift->float_left_in_drawer ?? 0.00)
-                : (float) ($lastShift->actual_cash ?? $lastShift->expected_cash);
-        } else {
-            $defaultFloat = 0.00;
-        }
+        [$defaultFloat, $lastShift] = Shift::resolveOpeningFloatForRegister($register);
 
         $submittedFloat = (float) $request->input('starting_float', $defaultFloat);
         $overrideReason = null;
@@ -277,6 +238,7 @@ class ShiftController extends Controller
         $shift = Shift::create([
             'user_id'             => $user->id,
             'branch_id'           => $branchId, // Never NULL
+            'register_id'         => $register->id,
             'branch_name'         => $branchName,
             'started_at'          => SystemTime::now(),
             'opening_float'       => $startingFloat,
@@ -293,8 +255,10 @@ class ShiftController extends Controller
             'override_by_user_id' => $overrideUserId,
         ]);
 
+        // Remember on this PC which till it is, so the next shift here defaults to it
         return redirect()->route('pos.index')
-            ->with('success', "Register shift opened successfully at {$branchName}. Starting float: KES " . number_format($startingFloat, 2));
+            ->withCookie(cookie()->forever(Register::DEVICE_COOKIE, (string) $register->id))
+            ->with('success', "Shift opened at {$register->label()}. Starting float: KES " . number_format($startingFloat, 2));
     }
 
     /**
@@ -321,8 +285,9 @@ class ShiftController extends Controller
         $cashSales = $shift->getCashSalesAmount();
         $expectedCash = (float) $shift->expected_cash;
         $isOwnerOrAdmin = $user && $user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager']);
+        $blindCount = static::isBlindCount($user);
 
-        return view('shifts.close', compact('shift', 'startingFloat', 'cashSales', 'expectedCash', 'isOwnerOrAdmin'));
+        return view('shifts.close', compact('shift', 'startingFloat', 'cashSales', 'expectedCash', 'isOwnerOrAdmin', 'blindCount'));
     }
 
     /**
@@ -343,16 +308,66 @@ class ShiftController extends Controller
 
         $user = auth()->user();
         $isOwnerOrAdmin = $user && $user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager']);
-        $branch = $validated['branch_name'] ?? ($user->branch_name ?: 'Main Shop');
 
         $shift = Shift::where('user_id', $user->id)
             ->where('status', 'open')
             ->latest('started_at')
             ->first();
 
+        // Never invent a shift just to close it: that produced zero-float "phantom" shifts
         if (!$shift) {
-            $shift = Shift::getActiveShift($user->id, $branch);
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'You have no open shift to close.'], 422);
+            }
+            return redirect()->route('shifts.open')->with('info', 'You have no open shift to close.');
         }
+
+        $this->sealShift($shift, $request, $validated, $user, $isOwnerOrAdmin);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success'      => true,
+                'message'      => 'Shift concluded successfully with cash rollover updated.',
+                'z_report_url' => route('shifts.zReport', $shift),
+                'shift'        => $shift,
+            ]);
+        }
+
+        return redirect()->route('shifts.zReport', $shift)
+            ->with('success', 'Shift concluded successfully with cash drawer locked.');
+    }
+
+    /**
+     * Owner/manager closes another cashier's open shift, e.g. when the cashier left
+     * without ending it and the next cashier at that branch cannot open the drawer.
+     */
+    public function forceClose(Request $request, Shift $shift)
+    {
+        $user = auth()->user();
+        if (!$user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager'])) {
+            abort(403, 'Only owners or managers can close another cashier\'s shift.');
+        }
+        if ($shift->status !== 'open') {
+            return back()->with('info', "Shift #{$shift->id} is already closed.");
+        }
+
+        $validated = $request->validate([
+            'actual_cash'    => ['required', 'numeric', 'min:0'],
+            'handover_notes' => ['nullable', 'string', 'max:500'],
+        ]);
+        $validated['handover_notes'] = trim('Closed by ' . $user->name . ' on behalf of ' . ($shift->user->name ?? 'cashier') . '. ' . ($validated['handover_notes'] ?? ''));
+
+        $this->sealShift($shift, $request, $validated, $user, false);
+
+        return redirect()->route('shifts.zReport', $shift)
+            ->with('success', "Shift #{$shift->id} closed on behalf of " . ($shift->user->name ?? 'the cashier') . '.');
+    }
+
+    /**
+     * Record the counted cash, variance and optional owner collection, then lock the shift.
+     */
+    private function sealShift(Shift $shift, Request $request, array $validated, $user, bool $isOwnerOrAdmin): void
+    {
         $shift->recalculateTotals();
 
         $actualCash = (float) $validated['actual_cash'];
@@ -394,18 +409,6 @@ class ShiftController extends Controller
         $shift->closed_at               = $now;
         $shift->status                  = 'closed';
         $shift->save();
-
-        if ($request->wantsJson()) {
-            return response()->json([
-                'success'      => true,
-                'message'      => 'Shift concluded successfully with cash rollover updated.',
-                'z_report_url' => route('shifts.zReport', $shift),
-                'shift'        => $shift,
-            ]);
-        }
-
-        return redirect()->route('shifts.zReport', $shift)
-            ->with('success', 'Shift concluded successfully with cash drawer locked.');
     }
 
     /**
@@ -422,13 +425,33 @@ class ShiftController extends Controller
     public function current(Request $request)
     {
         $user = auth()->user();
-        $branchName = $request->get('branch', $user->branch_name ?: 'Main Shop');
 
         $shift = Shift::where('user_id', $user->id)->where('status', 'open')->first();
         if (!$shift) {
-            $shift = Shift::getActiveShift($user->id, $branchName);
+            return response()->json(['message' => 'No open shift.'], 404);
         }
         $shift->recalculateTotals();
+
+        // Blind count: cashiers must count the drawer before seeing what the system expects.
+        // Revenue is hidden too, because expected cash can be worked out from it.
+        if (static::isBlindCount($user)) {
+            return response()->json([
+                'id'                 => $shift->id,
+                'cashier'            => $user->name,
+                'branch'             => $shift->branch_name,
+                'started_at'         => $shift->started_at->format('d M Y, h:i A'),
+                'duration'           => $shift->started_at->diffForHumans(null, true),
+                'opening_float'      => (float) $shift->opening_float,
+                'expected_cash'      => null,
+                'mpesa_total'        => null,
+                'card_total'         => null,
+                'credit_total'       => null,
+                'total_sales_count'  => $shift->total_sales_count,
+                'total_sales_amount' => null,
+                'status'             => $shift->status,
+                'blind_count'        => true,
+            ]);
+        }
 
         return response()->json([
             'id'                 => $shift->id,
@@ -444,7 +467,61 @@ class ShiftController extends Controller
             'total_sales_count'  => $shift->total_sales_count,
             'total_sales_amount' => (float) $shift->total_sales_amount,
             'status'             => $shift->status,
+            'blind_count'        => false,
         ]);
+    }
+
+    /**
+     * The branch a shift is booked to. On a standalone till the machine *is* the branch,
+     * so shifts follow the till (as its sales do), not the cashier's home branch.
+     *
+     * @return array{0:int,1:string}
+     */
+    private function tillBranch(?int $branchId, string $fallbackName): array
+    {
+        if (\App\Services\BranchContext::isStandalone()) {
+            $branch = \App\Models\ProductVariant::resolveBranch(\App\Services\BranchContext::getActiveBranch());
+            return [$branch->id, $branch->name];
+        }
+
+        $branch = $branchId ? Branch::find($branchId) : null;
+        return [$branch?->id ?? $branchId, $branch?->name ?? $fallbackName];
+    }
+
+    /**
+     * The till to open: the one picked on the form, else the one this PC remembers,
+     * else the first till of the branch that is free.
+     */
+    private function chooseRegister(Request $request, $registers): ?Register
+    {
+        if ($registers->isEmpty()) {
+            return null;
+        }
+
+        foreach ([$request->input('register_id'), $request->cookie(Register::DEVICE_COOKIE)] as $candidate) {
+            if ($candidate && ($match = $registers->firstWhere('id', (int) $candidate))) {
+                return $match;
+            }
+        }
+
+        return $registers->first(fn (Register $r) => !$r->openShift()) ?? $registers->first();
+    }
+
+    private function tillBusyMessage(Register $register, Shift $busy): string
+    {
+        $who = $busy->user->name ?? 'another cashier';
+        return "{$register->label()} is already open under {$who} (Shift #{$busy->id}). Pick another till, "
+            . "or they must end their shift first (an owner/manager can close it from Shift Handover & Z-Reports).";
+    }
+
+    /**
+     * Cashiers close their drawer "blind": they enter the counted cash without
+     * seeing the expected figure, so the count cannot be bent to match it.
+     * Owners, admins and managers supervise and see the full breakdown.
+     */
+    public static function isBlindCount($user): bool
+    {
+        return !$user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager']);
     }
 
     /**

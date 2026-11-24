@@ -57,7 +57,7 @@ class PurchaseController extends Controller
         $validated = $request->validate([
             'supplier_name'              => ['required', 'string', 'max:150'],
             'invoice_number'             => ['nullable', 'string', 'max:100'],
-            'branch_name'                => ['required', 'string', 'max:100'],
+            'branch_name'                => ['required', 'string', 'max:100', 'exists:branches,name'],
             'purchase_date'              => ['required', 'date'],
             'status'                     => ['required', 'in:received,pending,ordered,returned'],
             'notes'                      => ['nullable', 'string'],
@@ -69,8 +69,7 @@ class PurchaseController extends Controller
             'items.*.quantity'           => ['required', 'numeric', 'min:1'],
         ]);
 
-        $count = Purchase::count() + 1;
-        $purchaseNumber = 'PO-' . date('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $purchaseNumber = \App\Services\DocumentNumber::make('PO', $validated['branch_name']);
 
         DB::transaction(function () use ($validated, $purchaseNumber) {
             $totalAmount = 0;
@@ -90,8 +89,6 @@ class PurchaseController extends Controller
                 'user_id'         => auth()->id(),
             ]);
 
-            $branch = Branch::where('name', $validated['branch_name'])->first();
-
             foreach ($validated['items'] as $item) {
                 $subtotal = $item['unit_cost'] * $item['quantity'];
                 $variantId = !empty($item['product_variant_id']) ? $item['product_variant_id'] : null;
@@ -109,27 +106,7 @@ class PurchaseController extends Controller
                 if ($validated['status'] === 'received' && $variantId) {
                     $variant = ProductVariant::find($variantId);
                     if ($variant) {
-                        $variant->update(['cost_price' => $item['unit_cost']]);
-
-                        $branchStock = BranchStock::firstOrCreate(
-                            ['branch_id' => $branch?->id, 'product_variant_id' => $variant->id],
-                            ['branch_name' => $validated['branch_name'], 'stock_quantity' => 0]
-                        );
-                        $branchStock->increment('stock_quantity', $item['quantity']);
-                        $variant->update(['stock_quantity' => $variant->branchStocks()->sum('stock_quantity')]);
-
-                        StockMovement::create([
-                            'branch_id'          => $branch?->id,
-                            'branch_name'        => $validated['branch_name'],
-                            'product_variant_id' => $variant->id,
-                            'quantity'           => $item['quantity'],
-                            'balance_after'      => (float) $branchStock->fresh()->stock_quantity,
-                            'movement_type'      => 'purchase_receipt',
-                            'reference_id'       => $purchase->id,
-                            'reference_no'       => $purchase->purchase_number,
-                            'user_id'            => auth()->id(),
-                            'notes'              => "Goods received from supplier: {$purchase->supplier_name}",
-                        ]);
+                        $this->receiveLine($purchase, $variant, (float) $item['quantity'], (float) $item['unit_cost']);
                     }
                 }
             }
@@ -147,50 +124,50 @@ class PurchaseController extends Controller
 
     public function receiveGoods(Purchase $purchase)
     {
-        if ($purchase->status === 'received') {
-            return back()->with('info', "Purchase order {$purchase->purchase_number} has already been received.");
-        }
+        $received = DB::transaction(function () use ($purchase) {
+            // Re-check under a row lock so a double-click cannot receive the goods twice
+            $locked = Purchase::whereKey($purchase->id)->lockForUpdate()->first();
+            if (!$locked || $locked->status === 'received') {
+                return false;
+            }
 
-        $branch = Branch::where('name', $purchase->branch_name)->first();
-
-        DB::transaction(function () use ($purchase, $branch) {
-            foreach ($purchase->items as $item) {
-                if ($item->product_variant_id) {
-                    $variant = ProductVariant::find($item->product_variant_id);
-                    if ($variant) {
-                        $variant->update(['cost_price' => $item->unit_cost]);
-
-                        $branchStock = BranchStock::firstOrCreate(
-                            ['branch_id' => $branch?->id, 'product_variant_id' => $variant->id],
-                            ['branch_name' => $purchase->branch_name, 'stock_quantity' => 0]
-                        );
-                        $branchStock->increment('stock_quantity', $item->quantity);
-                        $variant->update(['stock_quantity' => $variant->branchStocks()->sum('stock_quantity')]);
-
-                        StockMovement::create([
-                            'branch_id'          => $branch?->id,
-                            'branch_name'        => $purchase->branch_name,
-                            'product_variant_id' => $variant->id,
-                            'quantity'           => $item->quantity,
-                            'balance_after'      => (float) $branchStock->fresh()->stock_quantity,
-                            'movement_type'      => 'purchase_receipt',
-                            'reference_id'       => $purchase->id,
-                            'reference_no'       => $purchase->purchase_number,
-                            'user_id'            => auth()->id(),
-                            'notes'              => "Goods received from supplier: {$purchase->supplier_name}",
-                        ]);
-                    }
+            foreach ($locked->items as $item) {
+                if ($item->product_variant_id && ($variant = ProductVariant::find($item->product_variant_id))) {
+                    $this->receiveLine($locked, $variant, (float) $item->quantity, (float) $item->unit_cost);
                 }
             }
 
-            $purchase->update(['status' => 'received']);
+            $locked->update(['status' => 'received']);
+            return true;
         });
+
+        if (!$received) {
+            return back()->with('info', "Purchase order {$purchase->purchase_number} has already been received.");
+        }
 
         return back()->with('success', "Purchase order {$purchase->purchase_number} marked as Received. Inventory updated at {$purchase->branch_name}.");
     }
 
+    private function receiveLine(Purchase $purchase, ProductVariant $variant, float $quantity, float $unitCost): void
+    {
+        $variant->update(['cost_price' => $unitCost]);
+        $variant->adjustStockForBranch(
+            $purchase->branch_name,
+            $quantity,
+            'purchase_receipt',
+            $purchase->id,
+            $purchase->purchase_number,
+            "Goods received from supplier: {$purchase->supplier_name}"
+        );
+    }
+
     public function destroy(Purchase $purchase)
     {
+        if ($purchase->status === 'received') {
+            return redirect()->route('purchases.index')
+                ->with('error', "Purchase order {$purchase->purchase_number} has already been received into stock and cannot be deleted. Record a stock adjustment instead.");
+        }
+
         $purchaseNumber = $purchase->purchase_number;
 
         DB::transaction(function () use ($purchase) {

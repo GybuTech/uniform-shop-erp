@@ -34,9 +34,15 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
             <div class="flex justify-between items-center">
-                <a href="{{ route('products.index') }}" class="text-indigo-600 font-bold hover:underline text-sm">
-                    &larr; Back to Products Catalog
-                </a>
+                <div class="flex items-center gap-4">
+                    <a href="{{ route('products.index') }}" class="text-indigo-600 font-bold hover:underline text-sm">
+                        &larr; Back to Products Catalog
+                    </a>
+                    <a href="{{ route('labels.index', ['product' => $product->id]) }}"
+                       class="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                        Print Barcode Labels
+                    </a>
+                </div>
                 <span class="text-xs text-gray-500 font-semibold bg-white px-3 py-1 rounded border">
                     Total Variants: {{ $variants->total() }}
                 </span>

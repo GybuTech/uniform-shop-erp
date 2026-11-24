@@ -40,6 +40,9 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/settings/business', [SettingsController::class, 'updateBusinessInfo'])->name('settings.business.update');
     Route::post('/settings/branches', [SettingsController::class, 'storeBranch'])->name('settings.branches.store');
     Route::put('/settings/branches/{branch}', [SettingsController::class, 'updateBranch'])->name('settings.branches.update');
+    Route::post('/settings/branches/{branch}/registers', [SettingsController::class, 'storeRegister'])->name('settings.branches.registers.store');
+    Route::post('/settings/branches/{branch}/sync-key', [SettingsController::class, 'generateSyncKey'])->name('settings.branches.sync-key');
+    Route::post('/settings/sync-now', [SettingsController::class, 'syncNow'])->name('settings.sync-now');
     Route::patch('/settings/branches/{branch}/toggle', [SettingsController::class, 'toggleBranch'])->name('settings.branches.toggle');
     Route::delete('/settings/branches/{branch}', [SettingsController::class, 'destroyBranch'])->name('settings.branches.destroy');
     Route::post('/settings/system-time', [SettingsController::class, 'updateSystemTime'])->name('settings.system-time.update');
@@ -49,41 +52,59 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/settings/branch-session', [SettingsController::class, 'switchBranchSession'])->name('settings.branch.session');
     Route::delete('/settings/users/{user}', [SettingsController::class, 'deleteUser'])->name('settings.users.destroy');
 
-    // Roles Management
-    Route::resource('roles', RoleController::class)->except(['show', 'destroy']);
+    // Roles Management (permission matrix editing is restricted)
+    Route::resource('roles', RoleController::class)
+        ->except(['show', 'destroy'])
+        ->middleware('permission:assign-permissions');
 
     // Expenses
-    Route::resource('expenses', ExpenseController::class)->except(['show', 'edit', 'update', 'destroy']);
+    Route::resource('expenses', ExpenseController::class)
+        ->only(['index', 'create', 'store'])
+        ->middleware('permission:view-reports');
 
     // Purchases (Supplier Invoices & Procurements)
-    Route::post('purchases/{purchase}/receive', [PurchaseController::class, 'receiveGoods'])->name('purchases.receive');
-    Route::resource('purchases', PurchaseController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+    Route::post('purchases/{purchase}/receive', [PurchaseController::class, 'receiveGoods'])
+        ->name('purchases.receive')
+        ->middleware(['permission:create-stock-entries', 'shop.only:stock']);
+    Route::get('purchases', [PurchaseController::class, 'index'])->name('purchases.index')->middleware('permission:view-stock-entries');
+    Route::get('purchases/create', [PurchaseController::class, 'create'])->name('purchases.create')->middleware(['permission:create-stock-entries', 'shop.only:stock']);
+    Route::post('purchases', [PurchaseController::class, 'store'])->name('purchases.store')->middleware(['permission:create-stock-entries', 'shop.only:stock']);
+    Route::get('purchases/{purchase}', [PurchaseController::class, 'show'])->name('purchases.show')->middleware('permission:view-stock-entries');
+    Route::delete('purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy')->middleware(['permission:delete-stock-entries', 'shop.only:stock']);
 
     // Sale Returns & Refunds
-    Route::resource('returns', \App\Http\Controllers\SaleReturnController::class)->only(['index', 'create', 'store', 'show']);
+    Route::get('returns', [\App\Http\Controllers\SaleReturnController::class, 'index'])->name('returns.index')->middleware('permission:view-sales');
+    Route::get('returns/create', [\App\Http\Controllers\SaleReturnController::class, 'create'])->name('returns.create')->middleware(['permission:refund-sales', 'shop.only']);
+    Route::post('returns', [\App\Http\Controllers\SaleReturnController::class, 'store'])->name('returns.store')->middleware(['permission:refund-sales', 'shop.only']);
+    Route::get('returns/{saleReturn}', [\App\Http\Controllers\SaleReturnController::class, 'show'])->name('returns.show')->middleware('permission:view-sales');
 
     // Quotations
-    Route::resource('quotations', QuotationController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+    Route::get('quotations', [QuotationController::class, 'index'])->name('quotations.index')->middleware('permission:view-sales');
+    Route::get('quotations/create', [QuotationController::class, 'create'])->name('quotations.create')->middleware(['permission:create-sales', 'shop.only']);
+    Route::post('quotations', [QuotationController::class, 'store'])->name('quotations.store')->middleware(['permission:create-sales', 'shop.only']);
+    Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->name('quotations.show')->middleware('permission:view-sales');
+    Route::delete('quotations/{quotation}', [QuotationController::class, 'destroy'])->name('quotations.destroy')->middleware(['permission:create-sales', 'shop.only']);
 
-    // Stock Transfers
+    // Stock Transfers (between shops through HQ is a later sync phase; for now done at the shop)
     Route::get('/transfers', [StockTransferController::class, 'index'])->name('transfers.index');
-    Route::get('/transfers/create', [StockTransferController::class, 'create'])->name('transfers.create');
-    Route::post('/transfers', [StockTransferController::class, 'store'])->name('transfers.store');
-    Route::post('/transfers/{transfer}/confirm', [StockTransferController::class, 'confirmReceipt'])->name('transfers.confirm');
+    Route::get('/transfers/create', [StockTransferController::class, 'create'])->name('transfers.create')->middleware('shop.only:stock');
+    Route::post('/transfers', [StockTransferController::class, 'store'])->name('transfers.store')->middleware('shop.only:stock');
+    Route::post('/transfers/{transfer}/confirm', [StockTransferController::class, 'confirmReceipt'])->name('transfers.confirm')->middleware('shop.only:stock');
 
     // Stock Adjustments (Exclusively for Owner & System Administrator)
-    Route::get('/adjustments/edit-stock', [StockAdjustmentController::class, 'editStock'])->name('adjustments.edit-stock');
-    Route::post('/adjustments/edit-stock', [StockAdjustmentController::class, 'updateStockDirect'])->name('adjustments.update-stock');
-    Route::put('/adjustments/variants/{variant}/stock', [StockAdjustmentController::class, 'updateSingleStock'])->name('adjustments.variant-stock');
-    Route::resource('adjustments', StockAdjustmentController::class)->only(['index', 'create', 'store', 'show']);
+    Route::get('/adjustments/edit-stock', [StockAdjustmentController::class, 'editStock'])->name('adjustments.edit-stock')->middleware('shop.only:stock');
+    Route::post('/adjustments/edit-stock', [StockAdjustmentController::class, 'updateStockDirect'])->name('adjustments.update-stock')->middleware('shop.only:stock');
+    Route::put('/adjustments/variants/{variant}/stock', [StockAdjustmentController::class, 'updateSingleStock'])->name('adjustments.variant-stock')->middleware('shop.only:stock');
+    Route::get('/adjustments/create', [StockAdjustmentController::class, 'create'])->name('adjustments.create')->middleware('shop.only:stock');
+    Route::post('/adjustments', [StockAdjustmentController::class, 'store'])->name('adjustments.store')->middleware('shop.only:stock');
+    Route::resource('adjustments', StockAdjustmentController::class)->only(['index', 'show']);
 
     // Categories (Per-action permission checks)
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index')->middleware('permission:view-categories');
     Route::get('/categories/create', [CategoryController::class, 'create'])->name('categories.create')->middleware('permission:create-categories');
     Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store')->middleware('permission:create-categories');
     Route::get('/categories/{category}/edit', [CategoryController::class, 'edit'])->name('categories.edit')->middleware('permission:edit-categories');
-    Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update')->middleware('permission:edit-categories');
-    Route::patch('/categories/{category}', [CategoryController::class, 'update']);
+    Route::match(['put', 'patch'], '/categories/{category}', [CategoryController::class, 'update'])->name('categories.update')->middleware('permission:edit-categories');
     Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy')->middleware('permission:delete-categories');
 
     // Products (Per-action permission checks)
@@ -91,8 +112,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/products/create', [ProductController::class, 'create'])->name('products.create')->middleware('permission:create-products');
     Route::post('/products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:create-products');
     Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit')->middleware('permission:edit-products');
-    Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:edit-products');
-    Route::patch('/products/{product}', [ProductController::class, 'update']);
+    Route::match(['put', 'patch'], '/products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:edit-products');
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:delete-products');
     Route::get('/products-template', [ProductController::class, 'downloadCatalogTemplate'])->name('products.template')->middleware('permission:create-products');
     Route::post('/products-import', [ProductController::class, 'importCatalog'])->name('products.import')->middleware('permission:create-products');
@@ -139,26 +159,33 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/products/{product}/variants/create', [ProductVariantController::class, 'create'])->name('products.variants.create')->middleware('permission:create-product-variants');
     Route::post('/products/{product}/variants', [ProductVariantController::class, 'store'])->name('products.variants.store')->middleware('permission:create-product-variants');
     Route::get('/products/{product}/variants/{variant}/edit', [ProductVariantController::class, 'edit'])->name('products.variants.edit')->middleware('permission:edit-product-variants');
-    Route::put('/products/{product}/variants/{variant}', [ProductVariantController::class, 'update'])->name('products.variants.update')->middleware('permission:edit-product-variants');
-    Route::patch('/products/{product}/variants/{variant}', [ProductVariantController::class, 'update']);
+    Route::match(['put', 'patch'], '/products/{product}/variants/{variant}', [ProductVariantController::class, 'update'])->name('products.variants.update')->middleware('permission:edit-product-variants');
     Route::delete('/products/{product}/variants/{variant}', [ProductVariantController::class, 'destroy'])->name('products.variants.destroy')->middleware('permission:delete-product-variants');
 
     // Three Unified Inventory Inward Doorways
     // Doorway 1: Opening Stock Intake
     Route::get('/admin/inventory/opening-stock', [\App\Http\Controllers\InventoryWorkflowController::class, 'openingStockForm'])
         ->name('inventory.opening-stock')
-        ->middleware('permission:create-stock-entries');
+        ->middleware(['permission:create-stock-entries', 'shop.only:stock']);
     Route::post('/admin/inventory/opening-stock', [\App\Http\Controllers\InventoryWorkflowController::class, 'storeOpeningStock'])
         ->name('inventory.opening-stock.store')
-        ->middleware('permission:create-stock-entries');
+        ->middleware(['permission:create-stock-entries', 'shop.only:stock']);
 
     // Doorway 3: Factory Finished Receipts (Workshop Finished Goods)
     Route::get('/admin/inventory/factory-receipts', [\App\Http\Controllers\InventoryWorkflowController::class, 'factoryReceiptForm'])
         ->name('inventory.factory-receipts')
-        ->middleware('permission:create-stock-entries');
+        ->middleware(['permission:create-stock-entries', 'shop.only:stock']);
     Route::post('/admin/inventory/factory-receipts', [\App\Http\Controllers\InventoryWorkflowController::class, 'storeFactoryReceipt'])
         ->name('inventory.factory-receipts.store')
-        ->middleware('permission:create-stock-entries');
+        ->middleware(['permission:create-stock-entries', 'shop.only:stock']);
+
+    // Barcode labels for goods the shop makes or receives (printed at the shop's label printer)
+    Route::get('/labels', [\App\Http\Controllers\LabelController::class, 'index'])
+        ->name('labels.index')
+        ->middleware('permission:view-products');
+    Route::post('/labels/print', [\App\Http\Controllers\LabelController::class, 'print'])
+        ->name('labels.print')
+        ->middleware('permission:view-products');
 
     // Doorway 2: Supplier Purchases Admin Route Alias
     Route::get('/admin/purchases', fn() => redirect()->route('purchases.index'))
@@ -167,17 +194,16 @@ Route::middleware(['auth'])->group(function () {
 
     // Stock Entries (Intake & Recalculating Corrections)
     Route::get('/stock-entries', [StockEntryController::class, 'index'])->name('stock-entries.index')->middleware('permission:view-stock-entries');
-    Route::get('/stock-entries/import', [StockEntryController::class, 'importForm'])->name('stock-entries.import')->middleware('permission:create-stock-entries');
+    Route::get('/stock-entries/import', [StockEntryController::class, 'importForm'])->name('stock-entries.import')->middleware(['permission:create-stock-entries', 'shop.only:stock']);
     Route::get('/stock-entries/template', [StockEntryController::class, 'downloadTemplate'])->name('stock-entries.template')->middleware('permission:create-stock-entries');
-    Route::post('/stock-entries/import', [StockEntryController::class, 'import'])->name('stock-entries.import.store')->middleware('permission:create-stock-entries');
-    Route::post('/stock-entries/reset-all', [StockEntryController::class, 'resetAllStock'])->name('stock-entries.reset')->middleware('permission:create-stock-entries');
-    Route::get('/stock-entries/create', [StockEntryController::class, 'create'])->name('stock-entries.create')->middleware('permission:create-stock-entries');
-    Route::post('/stock-entries', [StockEntryController::class, 'store'])->name('stock-entries.store')->middleware('permission:create-stock-entries');
+    Route::post('/stock-entries/import', [StockEntryController::class, 'import'])->name('stock-entries.import.store')->middleware(['permission:create-stock-entries', 'shop.only:stock']);
+    Route::post('/stock-entries/reset-all', [StockEntryController::class, 'resetAllStock'])->name('stock-entries.reset')->middleware(['permission:create-stock-entries', 'shop.only:stock']);
+    Route::get('/stock-entries/create', [StockEntryController::class, 'create'])->name('stock-entries.create')->middleware(['permission:create-stock-entries', 'shop.only:stock']);
+    Route::post('/stock-entries', [StockEntryController::class, 'store'])->name('stock-entries.store')->middleware(['permission:create-stock-entries', 'shop.only:stock']);
     Route::get('/stock-entries/{stock_entry}', [StockEntryController::class, 'show'])->name('stock-entries.show')->middleware('permission:view-stock-entries');
-    Route::get('/stock-entries/{stock_entry}/edit', [StockEntryController::class, 'edit'])->name('stock-entries.edit')->middleware('permission:edit-stock-entries');
-    Route::put('/stock-entries/{stock_entry}', [StockEntryController::class, 'update'])->name('stock-entries.update')->middleware('permission:edit-stock-entries');
-    Route::patch('/stock-entries/{stock_entry}', [StockEntryController::class, 'update']);
-    Route::delete('/stock-entries/{stock_entry}', [StockEntryController::class, 'destroy'])->name('stock-entries.destroy')->middleware('permission:delete-stock-entries');
+    Route::get('/stock-entries/{stock_entry}/edit', [StockEntryController::class, 'edit'])->name('stock-entries.edit')->middleware(['permission:edit-stock-entries', 'shop.only:stock']);
+    Route::match(['put', 'patch'], '/stock-entries/{stock_entry}', [StockEntryController::class, 'update'])->name('stock-entries.update')->middleware(['permission:edit-stock-entries', 'shop.only:stock']);
+    Route::delete('/stock-entries/{stock_entry}', [StockEntryController::class, 'destroy'])->name('stock-entries.destroy')->middleware(['permission:delete-stock-entries', 'shop.only:stock']);
 
     // Customers
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index')->middleware('permission:view-customers');
@@ -185,10 +211,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store')->middleware('permission:create-customers');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show')->middleware('permission:view-customers');
     Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit')->middleware('permission:edit-customers');
-    Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update')->middleware('permission:edit-customers');
-    Route::patch('/customers/{customer}', [CustomerController::class, 'update']);
+    Route::match(['put', 'patch'], '/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update')->middleware('permission:edit-customers');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy')->middleware('permission:delete-customers');
-    Route::post('/customers/{customer}/payments', [CustomerController::class, 'storePayment'])->name('customers.payments.store')->middleware('permission:create-sales');
+    Route::post('/customers/{customer}/payments', [CustomerController::class, 'storePayment'])->name('customers.payments.store')->middleware(['permission:create-sales', 'shop.only']);
+
+    // Selling and cash drawers happen only at the shop PCs (the online HQ copy is view/manage only)
+    Route::middleware('shop.only')->group(function () {
 
     // POS Terminal
     Route::get('/pos', [PosController::class, 'index'])
@@ -237,10 +265,7 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:create-sales');
 
     // Cashier Shifts & Cash Rollover Continuity
-    Route::get('/shifts', [ShiftController::class, 'index'])
-        ->name('shifts.index')
-        ->middleware('permission:view-sales');
-    Route::get('/shifts/open', [ShiftController::class, 'openForm'])
+    Route::get('/shifts/open',[ShiftController::class, 'openForm'])
         ->name('shifts.open')
         ->middleware('permission:create-sales');
     Route::get('/admin/shifts/open', [ShiftController::class, 'openForm'])
@@ -267,11 +292,23 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/shifts/current', [ShiftController::class, 'current'])
         ->name('shifts.current')
         ->middleware('permission:create-sales');
-    Route::get('/shifts/{shift}/z-report', [ShiftController::class, 'zReport'])
-        ->name('shifts.zReport')
+    Route::post('/shifts/{shift}/force-close', [ShiftController::class, 'forceClose'])
+        ->name('shifts.force-close')
         ->middleware('permission:view-sales');
     Route::post('/shifts/{shift}/collect-cash', [ShiftController::class, 'recordCashCollection'])
         ->name('shifts.collect-cash')
+        ->middleware('permission:view-sales');
+    Route::delete('/sales/{sale}', [PosController::class, 'destroySale'])
+        ->name('sales.destroy')
+        ->middleware('permission:void-sales');
+
+    }); // end shop.only
+
+    Route::get('/shifts', [ShiftController::class, 'index'])
+        ->name('shifts.index')
+        ->middleware('permission:view-sales');
+    Route::get('/shifts/{shift}/z-report', [ShiftController::class, 'zReport'])
+        ->name('shifts.zReport')
         ->middleware('permission:view-sales');
 
     // Sales Log
@@ -281,9 +318,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/sales/{sale}', [PosController::class, 'salesShow'])
         ->name('sales.show')
         ->middleware('permission:view-sales');
-    Route::delete('/sales/{sale}', [PosController::class, 'destroySale'])
-        ->name('sales.destroy')
-        ->middleware('permission:view-sales');
+    Route::get('/sales/{sale}/print', [PosController::class, 'printReceipt'])
+        ->name('sales.print')
+        ->middleware('permission:create-sales|view-sales');
 
     // Four Independent Reports
     Route::get('/reports', [ReportController::class, 'index'])
@@ -307,8 +344,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/users/create', [UserController::class, 'create'])->name('users.create')->middleware('permission:create-users');
     Route::post('/users', [UserController::class, 'store'])->name('users.store')->middleware('permission:create-users');
     Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit')->middleware('permission:edit-users');
-    Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update')->middleware('permission:edit-users');
-    Route::patch('/users/{user}', [UserController::class, 'update']);
+    Route::match(['put', 'patch'], '/users/{user}', [UserController::class, 'update'])->name('users.update')->middleware('permission:edit-users');
     Route::patch('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])
         ->name('users.toggle-status')
         ->middleware('permission:edit-users');
