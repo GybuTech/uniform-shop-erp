@@ -17,6 +17,11 @@ class Product extends Model
         'name',
         'sku_prefix',
         'description',
+        'is_service',
+    ];
+
+    protected $casts = [
+        'is_service' => 'boolean',
     ];
 
     public function category(): BelongsTo

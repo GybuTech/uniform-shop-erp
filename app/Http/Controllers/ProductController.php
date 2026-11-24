@@ -109,7 +109,10 @@ class ProductController extends Controller
             ],
             'category_id' => ['required', 'exists:categories,id'],
             'description' => ['nullable', 'string', 'max:255'],
+            'is_service'  => ['nullable', 'boolean'],
         ]);
+
+        $validated['is_service'] = $request->boolean('is_service');
 
         Product::create($validated);
 
@@ -147,7 +150,10 @@ class ProductController extends Controller
             ],
             'category_id' => ['required', 'exists:categories,id'],
             'description' => ['nullable', 'string', 'max:255'],
+            'is_service'  => ['nullable', 'boolean'],
         ]);
+
+        $validated['is_service'] = $request->boolean('is_service');
 
         $product->update($validated);
 

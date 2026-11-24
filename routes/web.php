@@ -197,6 +197,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/pos/search', [PosController::class, 'search'])
         ->name('pos.search')
         ->middleware('permission:create-sales');
+    Route::post('/pos/verify-pin', [PosController::class, 'verifySupervisorPin'])
+        ->name('pos.verify-pin')
+        ->middleware('permission:create-sales');
     Route::post('/pos', [PosController::class, 'store'])
         ->name('pos.store')
         ->middleware('permission:create-sales');

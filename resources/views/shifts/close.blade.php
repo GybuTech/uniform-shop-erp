@@ -17,7 +17,7 @@
 
     <div class="py-8" x-data="{
         expectedCash: {{ (float) $expectedCash }},
-        actualCash: {{ (float) $expectedCash }},
+        actualCash: '{{ $isOwnerOrAdmin ? (float) $expectedCash : '' }}',
         ownerCollecting: false,
         floatLeft: 0,
         amountCol: 0,
@@ -34,6 +34,7 @@
                     <span class="text-xs text-gray-500">Opened At: <strong class="text-gray-700">{{ $shift->started_at->format('M d, Y h:i A') }}</strong></span>
                 </div>
 
+                @if($isOwnerOrAdmin)
                 <div class="grid grid-cols-3 gap-3 text-center">
                     <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
                         <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Starting Float</span>
@@ -50,6 +51,20 @@
                         <span class="text-base font-black text-indigo-900 font-mono">KES {{ number_format($expectedCash, 2) }}</span>
                     </div>
                 </div>
+                @else
+                {{-- Blind Cash-Up Counting Card for Cashiers --}}
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center space-y-1">
+                    <div class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 mb-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-slate-800">Blind Cash-Up Drawer Verification</h4>
+                    <p class="text-xs font-semibold text-slate-600 max-w-md mx-auto">
+                        Enter the exact physical cash counted in your drawer (Notes and Coins). The system calculates the shift reconciliation variance automatically upon shift seal.
+                    </p>
+                </div>
+                @endif
 
                 <div class="flex justify-between items-center text-xs text-gray-500 px-1 pt-1">
                     <span>Opened At: <strong class="text-gray-700">{{ $shift->started_at->format('M d, Y h:i A') }}</strong></span>
@@ -69,10 +84,12 @@
                             <label class="block text-xs font-bold text-gray-800 uppercase tracking-wider">
                                 Actual Cash Counted in Drawer (KES) *
                             </label>
+                            @if($isOwnerOrAdmin)
                             <span class="text-xs font-bold font-mono"
                                   :class="variance === 0 ? 'text-emerald-600' : (variance > 0 ? 'text-blue-600' : 'text-rose-600')">
                                 Variance: <span x-text="(variance >= 0 ? '+' : '') + variance.toFixed(2)"></span>
                             </span>
+                            @endif
                         </div>
                         <div class="relative">
                             <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 font-bold text-xs">
@@ -80,6 +97,7 @@
                             </span>
                             <input type="number" step="0.01" min="0" name="actual_cash" required
                                    x-model="actualCash"
+                                   placeholder="0.00"
                                    class="w-full pl-12 pr-4 py-3 text-lg font-black font-mono rounded-xl border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
                         </div>
                         <p class="text-[11px] text-gray-400 mt-1">

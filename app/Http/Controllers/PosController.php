@@ -55,6 +55,7 @@ class PosController extends Controller
             'customers',
             'branches',
             'isLockedBranch',
+            'isOwnerOrAdmin',
             'currentBranchName',
             'activeShift',
             'bulkDiscount',
@@ -93,6 +94,7 @@ class PosController extends Controller
                         'colour'              => $exactVariant->colour,
                         'selling_price'       => $exactVariant->selling_price,
                         'stock_quantity'      => (float) ($exactVariant->stock_quantity ?? 0.00),
+                        'is_service'          => (bool) ($exactVariant->product?->is_service ?? false),
                         'other_branches_info' => '',
                         'exact_match'         => true,
                     ]
@@ -105,36 +107,44 @@ class PosController extends Controller
         $variantsQuery = ProductVariant::with(['product.category']);
 
         if (empty($tokens)) {
-            // Initial load or cleared search: show top available shelf inventory (or catalog if 0 stock)
-            $hasInStock = (clone $variantsQuery)->where('stock_quantity', '>', 0)->exists();
-            if ($hasInStock) {
-                $variants = $variantsQuery->where('stock_quantity', '>', 0)
-                    ->orderByDesc('stock_quantity')
-                    ->limit(50)
-                    ->get();
-            } else {
-                $variants = $variantsQuery->orderBy('id', 'desc')
-                    ->limit(50)
+            // When query is empty, immediately return the top 40 in-stock catalog items ordered by product name
+            $variants = (clone $variantsQuery)->where('stock_quantity', '>', 0)
+                ->join('products', 'product_variants.product_id', '=', 'products.id')
+                ->select('product_variants.*')
+                ->orderBy('products.name', 'asc')
+                ->limit(40)
+                ->get();
+
+            // Resilient fallback: if zero stock in shop or service items only, display first 40 catalog items
+            if ($variants->isEmpty()) {
+                $variants = (clone $variantsQuery)
+                    ->join('products', 'product_variants.product_id', '=', 'products.id')
+                    ->select('product_variants.*')
+                    ->orderBy('products.name', 'asc')
+                    ->limit(40)
                     ->get();
             }
         } else {
-            foreach ($tokens as $token) {
-                $variantsQuery->where(function($q) use ($token) {
-                    $q->whereHas('product', function($p) use ($token) {
-                        $p->where('name', 'like', "%{$token}%")
-                          ->orWhere('sku_prefix', 'like', "%{$token}%")
-                          ->orWhereHas('category', function($c) use ($token) {
-                              $c->where('name', 'like', "%{$token}%");
-                          });
-                    })
-                    ->orWhere('size', 'like', "%{$token}%")
-                    ->orWhere('colour', 'like', "%{$token}%")
-                    ->orWhere('brand_name', 'like', "%{$token}%")
-                    ->orWhere('unit_of_measure', 'like', "%{$token}%")
-                    ->orWhere('sku', 'like', "%{$token}%")
-                    ->orWhere('barcode', 'like', "%{$token}%");
-                });
-            }
+            // Grouped multi-token matching across Product Name, SKU Prefix, Category, Size, Colour, SKU, and Barcode
+            $variantsQuery->where(function ($sub) use ($tokens) {
+                foreach ($tokens as $token) {
+                    $sub->where(function ($q) use ($token) {
+                        $q->whereHas('product', function ($p) use ($token) {
+                            $p->where('name', 'like', "%{$token}%")
+                              ->orWhere('sku_prefix', 'like', "%{$token}%")
+                              ->orWhereHas('category', function ($c) use ($token) {
+                                  $c->where('name', 'like', "%{$token}%");
+                              });
+                        })
+                        ->orWhere('size', 'like', "%{$token}%")
+                        ->orWhere('colour', 'like', "%{$token}%")
+                        ->orWhere('brand_name', 'like', "%{$token}%")
+                        ->orWhere('unit_of_measure', 'like', "%{$token}%")
+                        ->orWhere('sku', 'like', "%{$token}%")
+                        ->orWhere('barcode', 'like', "%{$token}%");
+                    });
+                }
+            });
 
             $variants = $variantsQuery->orderByDesc('stock_quantity')
                 ->limit(50)
@@ -154,6 +164,7 @@ class PosController extends Controller
                 'colour'              => $variant->colour,
                 'selling_price'       => $variant->selling_price,
                 'stock_quantity'      => (float) ($variant->stock_quantity ?? 0.00),
+                'is_service'          => (bool) ($variant->product?->is_service ?? false),
                 'other_branches_info' => '',
                 'exact_match'         => false,
             ];
@@ -216,15 +227,17 @@ class PosController extends Controller
                 $saleItems = [];
 
                 foreach ($request->items as $item) {
-                    $variant = ProductVariant::lockForUpdate()->find($item['variant_id']);
+                    $variant = ProductVariant::with('product')->lockForUpdate()->find($item['variant_id']);
 
                     if (!$variant) {
                         throw new \Exception("Product variant no longer exists.");
                     }
 
                     $requestedQty = (float) $item['quantity'];
+                    $isService = (bool) ($variant->product?->is_service ?? false);
 
-                    if ((float)$variant->stock_quantity < $requestedQty) {
+                    // Physical goods require on-hand shelf inventory; Service items skip stock check
+                    if (!$isService && (float)$variant->stock_quantity < $requestedQty) {
                         throw new \Exception("Insufficient stock for {$variant->sku}. Available on shelf: {$variant->stock_quantity}");
                     }
 
@@ -238,6 +251,7 @@ class PosController extends Controller
                         'unit_price'          => $unitPrice,
                         'cost_price'          => (float) ($variant->cost_price ?? 0.00),
                         'line_total'          => $lineTotal,
+                        'is_service'          => $isService,
                     ];
                 }
 
@@ -287,6 +301,7 @@ class PosController extends Controller
                 foreach ($saleItems as $sItem) {
                     $variant = $sItem['variant'];
                     $qty = $sItem['quantity'];
+                    $isService = (bool) ($sItem['is_service'] ?? false);
 
                     SaleItem::create([
                         'sale_id'            => $sale->id,
@@ -299,22 +314,25 @@ class PosController extends Controller
                         'updated_at'         => $now,
                     ]);
 
-                    // Decrement inventory directly on ProductVariant
-                    $variant->decrement('stock_quantity', $qty);
+                    // Service items (alterations, embroidery, delivery fees) skip physical stock reduction
+                    if (!$isService) {
+                        // Decrement inventory directly on ProductVariant
+                        $variant->decrement('stock_quantity', $qty);
 
-                    // Immutable stock movement ledger entry
-                    StockMovement::create([
-                        'branch_id'          => $branch?->id,
-                        'branch_name'        => $branchName,
-                        'product_variant_id' => $variant->id,
-                        'quantity'           => -1 * $qty,
-                        'balance_after'      => (float) $variant->fresh()->stock_quantity,
-                        'movement_type'      => 'sale',
-                        'reference_id'       => $sale->id,
-                        'reference_no'       => $sale->receipt_number,
-                        'user_id'            => auth()->id(),
-                        'notes'              => "POS Sale #{$sale->receipt_number}",
-                    ]);
+                        // Immutable stock movement ledger entry
+                        StockMovement::create([
+                            'branch_id'          => $branch?->id,
+                            'branch_name'        => $branchName,
+                            'product_variant_id' => $variant->id,
+                            'quantity'           => -1 * $qty,
+                            'balance_after'      => (float) $variant->fresh()->stock_quantity,
+                            'movement_type'      => 'sale',
+                            'reference_id'       => $sale->id,
+                            'reference_no'       => $sale->receipt_number,
+                            'user_id'            => auth()->id(),
+                            'notes'              => "POS Sale #{$sale->receipt_number}",
+                        ]);
+                    }
                 }
 
                 $shift->recalculateTotals();
@@ -687,5 +705,35 @@ class PosController extends Controller
             'isCopy'    => $request->boolean('copy'),
             'autoPrint' => !$request->boolean('preview'),
         ]);
+    }
+
+    /**
+     * Fast JSON verification for Supervisor PIN (Voids & High Discounts).
+     * Compares against business_settings 'manager_pin' (default: '1234') or owner/admin session.
+     */
+    public function verifySupervisorPin(Request $request)
+    {
+        $request->validate([
+            'pin' => ['required', 'string'],
+        ]);
+
+        $managerPin = (string) BusinessSetting::get('manager_pin', '1234');
+        $inputPin = trim((string) $request->input('pin'));
+        $user = auth()->user();
+
+        $isPrivilegedUser = $user && $user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager']);
+        $isValid = ($inputPin === $managerPin) || $isPrivilegedUser;
+
+        if ($isValid) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Supervisor authorization granted.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid Supervisor PIN. Action requires authorized manager approval.',
+        ], 403);
     }
 }

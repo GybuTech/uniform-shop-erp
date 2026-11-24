@@ -556,6 +556,7 @@
             </div>
 
             {{-- Automated Shift Summary Grid --}}
+            @if($isOwnerOrAdmin)
             <div class="grid grid-cols-2 gap-2 text-xs">
                 <div class="bg-gray-50 p-2.5 rounded-lg border">
                     <span class="text-[10px] uppercase font-bold text-gray-500 block">Opening Float</span>
@@ -574,6 +575,13 @@
                     <span id="shiftTotalRevenue" class="font-mono font-black text-indigo-700">KES 0.00</span>
                 </div>
             </div>
+            @else
+            {{-- Blind Cash-Up Prompt for Cashiers --}}
+            <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-center space-y-1">
+                <span class="text-[11px] font-black uppercase tracking-wider text-slate-800 block">Blind Cash-Up Drawer Count</span>
+                <p class="text-xs text-slate-600">Enter the exact physical cash counted in your drawer (Notes and Coins).</p>
+            </div>
+            @endif
 
             {{-- Cash Counting Form --}}
             <form id="endShiftForm" onsubmit="submitEndShift(event)" class="space-y-3">
@@ -588,11 +596,13 @@
                     <span class="text-[11px] text-gray-400">Physically count all cash notes and coins before entering.</span>
                 </div>
 
-                {{-- Live Variance Calculation Banner --}}
+                {{-- Live Variance Calculation Banner (Admin / Owner only) --}}
+                @if($isOwnerOrAdmin)
                 <div id="shiftVarianceBox" class="p-3 rounded-xl border text-xs font-bold flex justify-between items-center bg-gray-100 text-gray-700">
                     <span>Cash Drawer Variance:</span>
                     <span id="shiftVarianceAmount" class="font-mono font-black text-sm">KES 0.00</span>
                 </div>
+                @endif
 
                 @if(!$isLockedBranch)
                 {{-- Owner Cash Collection & Set Next Shift Float --}}
@@ -653,16 +663,49 @@
         </div>
     </div>
 
+    {{-- MODAL: Supervisor PIN Approval --}}
+    <div id="supervisorPinModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-100 text-center" onclick="event.stopPropagation()">
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+            <div>
+                <h3 class="font-black text-slate-900 text-base" id="supervisorModalTitle">Supervisor Authorization Required</h3>
+                <p class="text-xs text-slate-500 mt-1" id="supervisorModalSubtitle">Enter the 4-digit Manager PIN to approve this operation.</p>
+            </div>
+
+            <div>
+                <input type="password" maxlength="8" id="supervisorPinInput"
+                       class="w-44 mx-auto text-center tracking-widest text-2xl font-black font-mono rounded-xl border-slate-300 focus:ring-indigo-500 focus:border-indigo-500"
+                       placeholder="••••"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();submitSupervisorPin();}">
+                <p id="supervisorPinError" class="text-rose-600 text-xs font-bold mt-2 hidden"></p>
+            </div>
+
+            <div class="flex space-x-2 pt-2">
+                <button type="button" onclick="closeSupervisorPinModal()" class="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold rounded-xl transition">
+                    Cancel
+                </button>
+                <button type="button" onclick="submitSupervisorPin()" id="supervisorPinSubmitBtn" class="w-1/2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl transition shadow-sm">
+                    Approve
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Dynamic resilient URLs using relative routing (works on any host, port, subfolder, XAMPP or artisan serve)
-        const POS_SEARCH_URL = "{{ route('pos.search', [], false) }}";
-        const POS_PARK_URL = "{{ route('pos.park', [], false) }}";
-        const POS_QUICK_CUSTOMER_URL = "{{ route('pos.quick-customer', [], false) }}";
-        const POS_QUOTATION_URL = "{{ route('pos.quotation', [], false) }}";
-        const POS_RECENT_SALES_URL = "{{ route('pos.recent-sales', [], false) }}";
-        const SHIFTS_CURRENT_URL = "{{ route('shifts.current', [], false) }}";
-        const SHIFTS_CLOSE_URL = "{{ route('shifts.close', [], false) }}";
-        const LOGIN_URL = "{{ route('login', [], false) }}";
+        const POS_SEARCH_URL = "{{ route('pos.search') }}";
+        const POS_VERIFY_PIN_URL = "{{ route('pos.verify-pin') }}";
+        const POS_PARK_URL = "{{ route('pos.park') }}";
+        const POS_QUICK_CUSTOMER_URL = "{{ route('pos.quick-customer') }}";
+        const POS_QUOTATION_URL = "{{ route('pos.quotation') }}";
+        const POS_RECENT_SALES_URL = "{{ route('pos.recent-sales') }}";
+        const SHIFTS_CURRENT_URL = "{{ route('shifts.current') }}";
+        const SHIFTS_CLOSE_URL = "{{ route('shifts.close') }}";
+        const LOGIN_URL = "{{ route('login') }}";
 
         // Main POS State
         let cart = [];
@@ -671,12 +714,81 @@
         let splitCash = 0;
         let splitMpesa = 0;
         let posCatalogVariants = {};
+        let supervisorPendingCallback = null;
 
         const TIER_MULTIPLIERS = {
             retail: 1.00,
             bulk: Math.max(0.01, (100 - {{ (float)$bulkDiscount }}) / 100),
             wholesale: Math.max(0.01, (100 - {{ (float)$wholesaleDiscount }}) / 100)
         };
+
+        // SUPERVISOR PIN APPROVAL WORKFLOW
+        function promptSupervisorApproval(title, subtitle, onApproved) {
+            supervisorPendingCallback = onApproved;
+            document.getElementById('supervisorModalTitle').innerText = title || 'Supervisor Authorization Required';
+            document.getElementById('supervisorModalSubtitle').innerText = subtitle || 'Enter the 4-digit Manager PIN to approve this operation.';
+            const pinInput = document.getElementById('supervisorPinInput');
+            pinInput.value = '';
+            document.getElementById('supervisorPinError').classList.add('hidden');
+            document.getElementById('supervisorPinModal').classList.remove('hidden');
+            setTimeout(() => pinInput.focus(), 80);
+        }
+
+        function closeSupervisorPinModal() {
+            document.getElementById('supervisorPinModal').classList.add('hidden');
+            supervisorPendingCallback = null;
+        }
+
+        function submitSupervisorPin() {
+            const pinInput = document.getElementById('supervisorPinInput');
+            const pin = pinInput.value.trim();
+            const errEl = document.getElementById('supervisorPinError');
+            const submitBtn = document.getElementById('supervisorPinSubmitBtn');
+
+            if (!pin) {
+                errEl.innerText = 'Please enter supervisor PIN.';
+                errEl.classList.remove('hidden');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Verifying...';
+            errEl.classList.add('hidden');
+
+            fetch(POS_VERIFY_PIN_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ pin: pin })
+            })
+            .then(res => res.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Approve';
+
+                if (data.success) {
+                    const callback = supervisorPendingCallback;
+                    closeSupervisorPinModal();
+                    if (typeof callback === 'function') {
+                        callback();
+                    }
+                } else {
+                    errEl.innerText = data.message || 'Invalid Supervisor PIN. Access denied.';
+                    errEl.classList.remove('hidden');
+                    pinInput.select();
+                }
+            })
+            .catch(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Approve';
+                errEl.innerText = 'Network error while verifying PIN.';
+                errEl.classList.remove('hidden');
+            });
+        }
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
@@ -795,7 +907,8 @@
                 v.stock_quantity,
                 v.sku,
                 v.unit_of_measure,
-                v.brand_name
+                v.brand_name,
+                v.is_service || false
             );
         }
 
@@ -815,6 +928,7 @@
                 const displayName = v.formatted_title || v.product_name || 'Product';
                 const effectivePrice = Math.round((parseFloat(v.selling_price || 0) * multiplier) * 100) / 100;
                 const stockQty = parseFloat(v.stock_quantity || 0);
+                const isService = !!v.is_service;
 
                 let attrPill = '';
                 if (v.size && String(v.size).trim() !== '') {
@@ -829,15 +943,23 @@
 
                 const brandPill = v.brand_name ? `<span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold mr-1.5">${v.brand_name}</span>` : '';
 
-                const stockBadge = stockQty <= 0
-                    ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">Out of Stock</span>`
-                    : (stockQty <= 5
-                        ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">Low Stock (${stockQty} left)</span>`
-                        : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${stockQty} ${v.unit_of_measure || 'units'})</span>`);
+                let stockBadge = '';
+                let actionButton = '';
 
-                const actionButton = stockQty <= 0
-                    ? `<span class="inline-block text-xs bg-gray-100 text-gray-400 px-3 py-1 rounded font-bold border cursor-not-allowed">0 Stock</span>`
-                    : `<button type="button" onclick="event.stopPropagation(); addCatalogItemToCart(${v.id})" class="inline-block text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</button>`;
+                if (isService) {
+                    stockBadge = `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">Service / Fee (Zero Stock)</span>`;
+                    actionButton = `<button type="button" onclick="event.stopPropagation(); addCatalogItemToCart(${v.id})" class="inline-block text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</button>`;
+                } else {
+                    stockBadge = stockQty <= 0
+                        ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">Out of Stock</span>`
+                        : (stockQty <= 5
+                            ? `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">Low Stock (${stockQty} left)</span>`
+                            : `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700">In Stock (${stockQty} ${v.unit_of_measure || 'units'})</span>`);
+
+                    actionButton = stockQty <= 0
+                        ? `<span class="inline-block text-xs bg-gray-100 text-gray-400 px-3 py-1 rounded font-bold border cursor-not-allowed">0 Stock</span>`
+                        : `<button type="button" onclick="event.stopPropagation(); addCatalogItemToCart(${v.id})" class="inline-block text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition">+ Add</button>`;
+                }
 
                 return `
                 <div class="flex items-center justify-between p-3 border rounded-xl hover:bg-indigo-50/60 transition cursor-pointer bg-white"
@@ -861,20 +983,20 @@
         }
 
         // 2. CART LOGIC & PRICING TIERS
-        function addToCart(id, name, size, colour, basePrice, stock, sku, unit = 'Piece', brand = '') {
+        function addToCart(id, name, size, colour, basePrice, stock, sku, unit = 'Piece', brand = '', isService = false) {
             const existing = cart.find(item => item.id === id);
             if (existing) {
-                if (existing.qty + 1 > stock) {
+                if (!existing.isService && (existing.qty + 1 > stock)) {
                     alert(`Stock limit reached. Only ${stock} units of ${name} currently in branch inventory.`);
                     return;
                 }
                 existing.qty++;
             } else {
-                if (stock < 1) {
+                if (!isService && stock < 1) {
                     alert(`Notice: ${name} is currently out of stock (0 units on hand).`);
                     return;
                 }
-                cart.push({ id, name, size, colour, basePrice, stock, sku, unit, brand, qty: 1 });
+                cart.push({ id, name, size, colour, basePrice, stock, sku, unit, brand, isService, qty: 1 });
             }
             renderCart();
         }
@@ -894,7 +1016,7 @@
             const step = isCont ? (delta > 0 ? 0.5 : -0.5) : (delta > 0 ? 1 : -1);
             const newQty = Math.round((item.qty + step) * 100) / 100;
 
-            if (newQty > item.stock) {
+            if (!item.isService && newQty > item.stock) {
                 alert(`Cannot exceed stock limit of ${item.stock} units.`);
                 return;
             }
@@ -917,7 +1039,7 @@
                 return;
             }
 
-            if (parsed > item.stock) {
+            if (!item.isService && parsed > item.stock) {
                 alert(`Cannot exceed available stock of ${item.stock} units.`);
                 item.qty = item.stock;
             } else {
@@ -942,7 +1064,30 @@
         }
 
         function onPricingTierChange(tier) {
+            const previousTier = pricingTier;
+
+            // Debian POS Security Rule: Tiers offering discounts exceeding 10% require Supervisor Approval
+            const discountPercent = tier === 'bulk' ? {{ (float) $bulkDiscount }} : (tier === 'wholesale' ? {{ (float) $wholesaleDiscount }} : 0);
+
+            if (discountPercent > 10.0) {
+                promptSupervisorApproval(
+                    'Supervisor Discount Approval',
+                    `Applying ${discountPercent}% discount tier requires manager authorization.`,
+                    () => {
+                        applyTierChange(tier);
+                    }
+                );
+                // Reset select element back to previous tier until approved
+                document.getElementById('pricingTierSelect').value = previousTier;
+                return;
+            }
+
+            applyTierChange(tier);
+        }
+
+        function applyTierChange(tier) {
             pricingTier = tier;
+            document.getElementById('pricingTierSelect').value = tier;
             document.getElementById('formPricingTier').value = tier;
 
             const badgeEl = document.getElementById('bannerTierBadge');
@@ -1530,7 +1675,18 @@
                             <span>${s.items_count} items &bull; <strong class="text-gray-700">${s.payment_method}</strong></span>
                             <span>${s.time_ago}</span>
                         </div>
-                        <div class="pt-1 border-t flex justify-end">
+                        <div class="pt-1 border-t flex justify-end items-center space-x-2">
+                            @hasanyrole('admin|owner|system_administrator')
+                            <button type="button" onclick="promptVoidReceipt(${s.id}, '${s.receipt_number}')"
+                                class="inline-flex items-center px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition">
+                                <span>Void Receipt</span>
+                            </button>
+                            @else
+                            <button type="button" onclick="promptSupervisorVoid(${s.id}, '${s.receipt_number}')"
+                                class="inline-flex items-center px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition">
+                                <span>Void (Supervisor PIN)</span>
+                            </button>
+                            @endhasanyrole
                             <button type="button" onclick="window.open('${s.receipt_url}', '_blank')"
                                 class="inline-flex items-center px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition">
                                 <svg class="w-3.5 h-3.5 mr-1 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1550,6 +1706,45 @@
             document.getElementById('recentSalesDrawer').classList.add('hidden');
         }
 
+        // RECEIPT VOID & INVENTORY RESTORATION WORKFLOW
+        function promptVoidReceipt(saleId, receiptNo) {
+            if (!confirm(`Are you sure you want to VOID and cancel receipt #${receiptNo}? Shelf inventory will be immediately restored.`)) {
+                return;
+            }
+            executeVoidReceipt(saleId);
+        }
+
+        function promptSupervisorVoid(saleId, receiptNo) {
+            promptSupervisorApproval(
+                'Supervisor Void Authorization',
+                `Voiding receipt #${receiptNo} requires supervisor approval. Enter 4-digit PIN:`,
+                () => {
+                    executeVoidReceipt(saleId);
+                }
+            );
+        }
+
+        function executeVoidReceipt(saleId) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/sales/${saleId}`;
+
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = '_token';
+            csrfInput.value = '{{ csrf_token() }}';
+            form.appendChild(csrfInput);
+
+            const methodInput = document.createElement('input');
+            methodInput.type = 'hidden';
+            methodInput.name = '_method';
+            methodInput.value = 'DELETE';
+            form.appendChild(methodInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
         // 8. CHECKOUT FORM VALIDATION
         function validateCheckout() {
             if (cart.length === 0) {
@@ -1558,7 +1753,7 @@
             }
 
             for (let item of cart) {
-                if (item.qty <= 0 || item.qty > item.stock) {
+                if (item.qty <= 0 || (!item.isService && item.qty > item.stock)) {
                     alert(`Invalid quantity for ${item.name}. Available stock: ${item.stock}`);
                     return false;
                 }

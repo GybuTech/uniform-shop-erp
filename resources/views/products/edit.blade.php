@@ -58,6 +58,19 @@
                         <x-input-error :messages="$errors->get('description')" class="mt-2" />
                     </div>
 
+                    <div class="mb-4 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                        <label class="flex items-start space-x-3 cursor-pointer select-none">
+                            <input type="checkbox" name="is_service" value="1" {{ old('is_service', $product->is_service) ? 'checked' : '' }}
+                                   class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-gray-900 block">Intangible Service / Tailoring Fee</span>
+                                <span class="text-[11px] text-gray-500 leading-tight block">
+                                    Check for services such as alterations, embroidery, sewing labor, or delivery fees. POS sales will record the revenue but skip physical stock deduction.
+                                </span>
+                            </div>
+                        </label>
+                    </div>
+
                     <div class="flex items-center gap-4">
                         <x-primary-button>Update Product</x-primary-button>
                         <a href="{{ route('products.index') }}" class="text-gray-600 hover:underline">Cancel</a>
