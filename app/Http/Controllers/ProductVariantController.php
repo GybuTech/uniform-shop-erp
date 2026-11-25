@@ -34,7 +34,7 @@ class ProductVariantController extends Controller
         $activeBranch = \App\Services\BranchContext::getActiveBranch();
         $isAllBranches = \App\Services\BranchContext::isAllBranches();
 
-        $variants = $query->with('branchStocks')->paginate(25)->withQueryString();
+        $variants = $query->paginate(25)->withQueryString();
         $availableSizes = $product->variants()
             ->whereNotNull('size')
             ->where('size', '!=', '')

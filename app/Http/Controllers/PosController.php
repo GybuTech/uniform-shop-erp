@@ -220,6 +220,28 @@ class PosController extends Controller
         }));
     }
 
+    /**
+     * Resolve current store/branch name for single-store offline operation.
+     */
+    protected function sellingBranch(?Request $request = null, bool $isOwnerOrAdmin = false): string
+    {
+        if ($request && $request->filled('branch_name')) {
+            return (string) $request->input('branch_name');
+        }
+
+        $user = auth()->user();
+        if ($user && !empty($user->branch_name)) {
+            return $user->branch_name;
+        }
+
+        $activeBranch = Branch::where('is_active', true)->value('name');
+        if ($activeBranch) {
+            return $activeBranch;
+        }
+
+        return BusinessSetting::get('business_name', 'Main Shop');
+    }
+
     public function store(Request $request)
     {
         $request->validate([
@@ -388,7 +410,11 @@ class PosController extends Controller
             return redirect()->route('pos.receipt')
                 ->with('success', 'Sale completed successfully.');
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('POS Store Error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'payload' => $request->except(['_token'])
+            ]);
             return back()->withErrors(['pos_error' => $e->getMessage()])->withInput();
         }
     }

@@ -196,9 +196,7 @@
                             </td>
                             <td class="px-6 py-4 text-sm">
                                 @php
-                                    $vStock = !empty($activeBranch)
-                                        ? $variant->getStockForBranch($activeBranch)
-                                        : ($variant->branchStocks->isNotEmpty() ? $variant->branchStocks->sum('stock_quantity') : (float)$variant->stock_quantity);
+                                    $vStock = (float) ($variant->stock_quantity ?? 0);
                                 @endphp
                                 <span class="{{ $vStock <= 5 ? 'text-red-600 font-extrabold' : 'text-emerald-700 font-extrabold' }}">
                                     {{ (float) $vStock }} units

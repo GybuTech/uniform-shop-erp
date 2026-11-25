@@ -281,19 +281,8 @@
                                     </td>
                                     <td class="px-4 py-3.5 text-center font-bold">
                                         @php
-    // Compute shelf stock using eager‑loaded relations only.
-    // `variants.branchStocks` is already loaded by the controller.
-    $shelfStock = $product->variants->sum(function ($variant) use ($activeBranch) {
-        // If a branch is selected, look for that branch in the loaded collection.
-        if (!empty($activeBranch) && $variant->relationLoaded('branchStocks')) {
-            $bs = $variant->branchStocks->firstWhere('branch_name', $activeBranch);
-            return $bs ? (float) $bs->stock_quantity : 0.0;
-        }
-        // All branches – sum all branch stocks (or fall back to the variant's own column).
-        $total = $variant->branchStocks->sum('stock_quantity');
-        return $total > 0 ? $total : (float) $variant->stock_quantity;
-    });
-@endphp
+                                            $shelfStock = (float) $product->variants->sum('stock_quantity');
+                                        @endphp
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold {{ $shelfStock <= 5 ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200' }}">
                                             {{ (float) $shelfStock }} pcs
                                         </span>

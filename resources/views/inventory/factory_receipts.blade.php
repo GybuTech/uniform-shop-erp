@@ -181,7 +181,7 @@
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 bg-white">
                                     @forelse($variants as $idx => $v)
-                                        @php $bStock = $v->branchStocks->firstWhere('branch_name', $selectedBranch ?? 'Main Shop')->stock_quantity ?? 0; @endphp
+                                        @php $bStock = (float) ($v->stock_quantity ?? 0); @endphp
                                         <tr class="hover:bg-amber-50/30 transition">
                                             <td class="px-5 py-2.5 font-mono font-bold text-gray-800">{{ $v->sku }}</td>
                                             <td class="px-5 py-2.5 font-bold text-gray-900">

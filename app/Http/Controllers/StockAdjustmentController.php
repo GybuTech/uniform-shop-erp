@@ -265,11 +265,12 @@ class StockAdjustmentController extends Controller
             }
 
             if (!empty($itemsToLog)) {
-                $adjNum = \App\Services\DocumentNumber::make('ADJ', $branchName);
+                $adjBranchName = $validated['branch_name'] ?? 'Main Store';
+                $adjNum = \App\Services\DocumentNumber::make('ADJ', $adjBranchName);
 
                 $adjustment = StockAdjustment::create([
                     'adjustment_number' => $adjNum,
-                    'branch_name'       => 'Main Store',
+                    'branch_name'       => $adjBranchName,
                     'reason'            => $reason,
                     'notes'             => "Bulk direct stock inventory count update for {$updatedCount} items.",
                     'user_id'           => auth()->id(),

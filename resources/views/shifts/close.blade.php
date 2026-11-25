@@ -70,7 +70,6 @@
                     <span>Opened At: <strong class="text-gray-700">{{ $shift->started_at->format('M d, Y h:i A') }}</strong></span>
                     <span>Total Sales: <strong class="text-gray-700">{{ $shift->total_sales_count }} receipts</strong> (KES {{ number_format($shift->total_sales_amount, 2) }})</span>
                 </div>
-                @endif
             </div>
 
             {{-- 2. Concluding & Handover Form (Zero Owner Collection Prompts) --}}

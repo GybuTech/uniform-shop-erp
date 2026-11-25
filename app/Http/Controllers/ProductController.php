@@ -34,7 +34,7 @@ class ProductController extends Controller
         $activeBranch = \App\Services\BranchContext::getActiveBranch();
         $isAllBranches = \App\Services\BranchContext::isAllBranches();
 
-        $query = Product::with(['category', 'variants.branchStocks'])->latest();
+        $query = Product::with(['category', 'variants'])->latest();
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
