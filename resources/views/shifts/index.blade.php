@@ -224,6 +224,18 @@
                                            class="inline-flex items-center px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded text-[11px] font-bold transition">
                                             Z-Report &rarr;
                                         </a>
+                                        @if($isGlobal)
+                                        <form method="POST" action="{{ route('shifts.destroy', $shift) }}"
+                                              class="inline"
+                                              onsubmit="return confirm('Permanently delete Shift #{{ $shift->id }}? Any linked receipts will remain intact in history.')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit"
+                                                    class="inline-flex items-center px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded text-[11px] transition">
+                                                Delete
+                                            </button>
+                                        </form>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty

@@ -47,6 +47,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/settings/branches/{branch}', [SettingsController::class, 'destroyBranch'])->name('settings.branches.destroy');
     Route::post('/settings/system-time', [SettingsController::class, 'updateSystemTime'])->name('settings.system-time.update');
     Route::post('/settings/system-time/reset', [SettingsController::class, 'resetSystemTime'])->name('settings.system-time.reset');
+    Route::post('/settings/handover-reset', [SettingsController::class, 'handoverReset'])->name('settings.handover-reset')->middleware('role:admin|owner|system_administrator');
     Route::post('/settings/switch-account', [SettingsController::class, 'switchAccount'])->name('settings.switch-account');
     Route::post('/branch/switch-context', [SettingsController::class, 'switchBranchContext'])->name('branch.switch-context');
     Route::post('/settings/branch-session', [SettingsController::class, 'switchBranchSession'])->name('settings.branch.session');
@@ -77,6 +78,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('returns/create', [\App\Http\Controllers\SaleReturnController::class, 'create'])->name('returns.create')->middleware(['permission:refund-sales', 'shop.only']);
     Route::post('returns', [\App\Http\Controllers\SaleReturnController::class, 'store'])->name('returns.store')->middleware(['permission:refund-sales', 'shop.only']);
     Route::get('returns/{saleReturn}', [\App\Http\Controllers\SaleReturnController::class, 'show'])->name('returns.show')->middleware('permission:view-sales');
+    Route::delete('returns/{saleReturn}', [\App\Http\Controllers\SaleReturnController::class, 'destroy'])->name('returns.destroy')->middleware('permission:refund-sales');
 
     // Quotations
     Route::get('quotations', [QuotationController::class, 'index'])->name('quotations.index')->middleware('permission:view-sales');
@@ -97,6 +99,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/adjustments/variants/{variant}/stock', [StockAdjustmentController::class, 'updateSingleStock'])->name('adjustments.variant-stock')->middleware('shop.only:stock');
     Route::get('/adjustments/create', [StockAdjustmentController::class, 'create'])->name('adjustments.create')->middleware('shop.only:stock');
     Route::post('/adjustments', [StockAdjustmentController::class, 'store'])->name('adjustments.store')->middleware('shop.only:stock');
+    Route::delete('/adjustments/{adjustment}', [StockAdjustmentController::class, 'destroy'])->name('adjustments.destroy')->middleware('shop.only:stock');
     Route::resource('adjustments', StockAdjustmentController::class)->only(['index', 'show']);
 
     // Categories (Per-action permission checks)
@@ -310,6 +313,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/shifts/{shift}/z-report', [ShiftController::class, 'zReport'])
         ->name('shifts.zReport')
         ->middleware('permission:view-sales');
+    Route::delete('/shifts/{shift}', [ShiftController::class, 'destroy'])
+        ->name('shifts.destroy')
+        ->middleware('role:admin|owner|system_administrator');
 
     // Sales Log
     Route::get('/sales', [PosController::class, 'salesIndex'])

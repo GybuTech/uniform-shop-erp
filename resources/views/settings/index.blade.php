@@ -699,6 +699,70 @@ SYNC_TOKEN={{ session('sync_key_value') }}</pre>
                         </table>
                     </div>
                 </div>
+
+                {{-- Client Store Handover & Factory Clean Reset Card --}}
+                <div class="bg-white p-6 rounded-2xl border border-indigo-200 shadow-sm max-w-4xl space-y-4">
+                    <div class="flex items-center gap-2 text-indigo-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        <h3 class="font-extrabold text-indigo-900 text-lg">Store Handover & Factory Clean Reset</h3>
+                    </div>
+                    <p class="text-xs text-slate-600">
+                        Preparing this computer for deployment on a client's PC? This tool wipes out all test sales, cash receipts, cashier shifts, customer debt logs, purchases, returns, and expenses, handing over a clean, brand-new store environment.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <div class="space-y-1">
+                            <span class="font-bold text-emerald-700 block uppercase tracking-wider text-[10px]">What Is Preserved (Safe):</span>
+                            <ul class="list-disc list-inside text-slate-600 space-y-0.5 text-[11px]">
+                                <li>All Categories, Products, Sizes, & Selling Prices</li>
+                                <li>Administrator Accounts & Security Roles</li>
+                                <li>Store Branding, Receipt Logos, & Business Settings</li>
+                                <li>Registered Customer Accounts (debt reset to KES 0.00)</li>
+                            </ul>
+                        </div>
+                        <div class="space-y-1">
+                            <span class="font-bold text-rose-700 block uppercase tracking-wider text-[10px]">What Is Cleared:</span>
+                            <ul class="list-disc list-inside text-slate-600 space-y-0.5 text-[11px]">
+                                <li>All Sales Receipts & Transaction History</li>
+                                <li>All Cashier Shifts, Drawer Float, & Z-Reports</li>
+                                <li>All Purchases & Supplier Invoices</li>
+                                <li>All Sales Returns & Credit Notes</li>
+                                <li>All Expenses & Stock Movement Audit Logs</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <form method="POST" action="{{ route('settings.handover-reset') }}" class="space-y-4 pt-2">
+                        @csrf
+                        <div class="space-y-2">
+                            <label class="flex items-center space-x-2 text-xs font-bold text-slate-800 cursor-pointer">
+                                <input type="checkbox" name="keep_stock" value="1" checked class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                <span>Keep current product stock quantities (Uncheck to reset all stock counts to 0)</span>
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">
+                                    Supervisor PIN (Default: 1234) or type <span class="text-rose-600 font-mono">RESET</span> *
+                                </label>
+                                <input type="password" name="supervisor_pin" placeholder="Enter PIN (e.g. 1234)"
+                                       class="w-full text-xs rounded-xl border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 font-mono">
+                            </div>
+                            <div>
+                                <button type="submit"
+                                        onclick="return confirm('WARNING: Are you sure you want to wipe all test sales, shifts, purchases, and expenses for client handover? This action is irreversible.')"
+                                        class="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5"
+                                        style="background-color: #dc2626 !important; color: #ffffff !important;">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    <span>Wipe Test Data & Prepare Client Installation</span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
             @endif
 

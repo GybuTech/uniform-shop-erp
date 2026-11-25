@@ -288,5 +288,19 @@ class StockAdjustmentController extends Controller
 
         return back()->with('info', "No stock changes detected. All quantities were already identical.");
     }
+
+    public function destroy(StockAdjustment $adjustment)
+    {
+        $this->checkOwnerOrAdmin();
+
+        $adjNum = $adjustment->adjustment_number;
+        DB::transaction(function () use ($adjustment) {
+            $adjustment->items()->delete();
+            $adjustment->delete();
+        });
+
+        return redirect()->route('adjustments.index')
+            ->with('success', "Stock Adjustment {$adjNum} was deleted.");
+    }
 }
 

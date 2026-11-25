@@ -16,6 +16,17 @@
                 <button type="button" onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition shadow-sm" style="background-color: #4f46e5 !important; color: #ffffff !important;">
                     Print Audit Sheet
                 </button>
+                @hasanyrole('admin|owner|system_administrator')
+                <form method="POST" action="{{ route('adjustments.destroy', $adjustment) }}"
+                      class="inline"
+                      onsubmit="return confirm('Permanently delete Stock Adjustment {{ $adjustment->adjustment_number }}?')">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-sm" style="background-color: #dc2626 !important; color: #ffffff !important;">
+                        Delete
+                    </button>
+                </form>
+                @endhasanyrole
             </div>
         </div>
     </x-slot>

@@ -419,4 +419,38 @@ class SettingsController extends Controller
     {
         return $this->switchBranchContext($request);
     }
+
+    /**
+     * Factory reset transactional test data for client handover.
+     */
+    public function handoverReset(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user->hasAnyRole(['admin', 'owner', 'system_administrator'])) {
+            return redirect()->route('settings.index')->with('error', 'Only store owners or administrators can perform client handover reset.');
+        }
+
+        $supervisorPin = trim($request->input('supervisor_pin', ''));
+        $confirmText = strtoupper(trim($request->input('confirm_text', '')));
+        $validPin = BusinessSetting::get('manager_pin', '1234');
+
+        if ($supervisorPin !== $validPin && $confirmText !== 'RESET') {
+            return redirect()->route('settings.index')
+                ->with('error', 'Invalid Supervisor PIN or confirmation. You must enter your PIN or type RESET.');
+        }
+
+        $keepStock = $request->boolean('keep_stock', true);
+
+        \Artisan::call('pos:handover', [
+            '--force'      => true,
+            '--keep-stock' => $keepStock,
+        ]);
+
+        \Artisan::call('view:clear');
+        \Artisan::call('cache:clear');
+
+        $stockMsg = $keepStock ? 'Catalog stock quantities were preserved.' : 'Catalog stock quantities were reset to 0.';
+        return redirect()->route('settings.index')
+            ->with('success', "Client Store Handover Reset completed! All test transactions, shifts, expenses, and invoices have been wiped clean. {$stockMsg}");
+    }
 }

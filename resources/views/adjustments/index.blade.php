@@ -52,6 +52,7 @@
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Total Items</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Logged By</th>
+                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Action</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
@@ -65,6 +66,20 @@
                             <td class="px-6 py-4 text-sm text-gray-700 font-bold">{{ $adjustment->items->count() }} line items</td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $adjustment->created_at->format('M d, Y H:i') }}</td>
                             <td class="px-6 py-4 text-sm text-gray-600">{{ $adjustment->user->name ?? 'Staff' }}</td>
+                            <td class="px-6 py-4 text-sm text-right whitespace-nowrap space-x-2">
+                                <a href="{{ route('adjustments.show', $adjustment) }}" class="text-indigo-600 hover:text-indigo-900 font-bold text-xs">View →</a>
+                                @hasanyrole('admin|owner|system_administrator')
+                                <form method="POST" action="{{ route('adjustments.destroy', $adjustment) }}"
+                                      class="inline"
+                                      onsubmit="return confirm('Permanently delete Stock Adjustment {{ $adjustment->adjustment_number }}?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="inline-flex items-center px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded text-xs transition">
+                                        Delete
+                                    </button>
+                                </form>
+                                @endhasanyrole
+                            </td>
                         </tr>
                         @empty
                         <tr>

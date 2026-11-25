@@ -46,6 +46,8 @@ class WipeClientDummyData extends Command
                 'sale_returns',
                 'sale_items',
                 'sales',
+                'purchase_items',
+                'purchases',
                 'customer_payments',
                 'parked_sales',
                 'quotations',
@@ -53,9 +55,12 @@ class WipeClientDummyData extends Command
                 'expenses',
                 'stock_entry_items',
                 'stock_entries',
+                'stock_adjustment_items',
                 'stock_adjustments',
+                'stock_transfer_items',
                 'stock_transfers',
                 'stock_movements',
+                'sync_outboxes',
             ];
 
             foreach ($tablesToClear as $table) {
@@ -63,6 +68,15 @@ class WipeClientDummyData extends Command
                     DB::table($table)->truncate();
                     $this->line("  ✓ Cleared table: <fg=green>{$table}</>");
                 }
+            }
+
+            // Reset customer balances to 0.00
+            if (Schema::hasTable('customers')) {
+                DB::table('customers')->update([
+                    'current_balance'     => 0.00,
+                    'outstanding_balance' => 0.00,
+                ]);
+                $this->line("  ✓ Reset customer credit and debt balances to KES 0.00.");
             }
 
             // Zero out stock quantities unless --keep-stock is specified
@@ -78,6 +92,13 @@ class WipeClientDummyData extends Command
                 }
             } else {
                 $this->line("  ✓ Kept existing product stock quantities as requested (--keep-stock).");
+            }
+
+            // Re-open an initial fresh shift for the default store
+            $adminUser = \App\Models\User::first();
+            if ($adminUser) {
+                \App\Models\Shift::getActiveShift($adminUser->id, 'Main Shop', 0.00);
+                $this->line("  ✓ Initialized fresh cashier register shift #1 (ready for live counter sales).");
             }
 
             Schema::enableForeignKeyConstraints();

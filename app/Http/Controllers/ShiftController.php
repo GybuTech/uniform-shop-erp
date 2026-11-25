@@ -582,4 +582,29 @@ class ShiftController extends Controller
         return redirect()->back()
             ->with('success', "Cash collection recorded for {$shift->branch_name}. KES " . number_format($amountCollected, 2) . " collected; KES " . number_format($floatLeft, 2) . " left in shop as opening float for the next shift.");
     }
+
+    public function destroy(Request $request, Shift $shift)
+    {
+        $user = auth()->user();
+        if (!$user->hasAnyRole(['admin', 'owner', 'system_administrator'])) {
+            return redirect()->route('shifts.index')->with('error', 'Only administrators or store owners can delete shift records.');
+        }
+
+        $shiftId = $shift->id;
+
+        \DB::transaction(function () use ($shift) {
+            \App\Models\Sale::where('shift_id', $shift->id)->update(['shift_id' => null]);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('sale_returns', 'shift_id')) {
+                \App\Models\SaleReturn::where('shift_id', $shift->id)->update(['shift_id' => null]);
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('customer_payments', 'shift_id')) {
+                \App\Models\CustomerPayment::where('shift_id', $shift->id)->update(['shift_id' => null]);
+            }
+
+            $shift->delete();
+        });
+
+        return redirect()->route('shifts.index')
+            ->with('success', "Shift #{$shiftId} and its drawer record were deleted.");
+    }
 }

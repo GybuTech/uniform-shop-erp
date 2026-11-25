@@ -10,7 +10,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6">
+    <div class="py-6" x-data="{ deleteModalOpen: false, deleteAction: '', deletePo: '', deleteAmount: '', isReceived: false, revertStock: '0' }">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
             @if(session('success'))
@@ -83,8 +83,15 @@
                             </td>
                             <td class="px-6 py-4 text-sm font-extrabold text-gray-900">KES {{ number_format($purchase->total_amount, 2) }}</td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $purchase->purchase_date ? $purchase->purchase_date->format('M d, Y') : $purchase->created_at->format('M d, Y') }}</td>
-                            <td class="px-6 py-4 text-sm text-right">
-                                <a href="{{ route('purchases.show', $purchase) }}" class="text-indigo-600 hover:text-indigo-900 font-bold">View Invoice →</a>
+                            <td class="px-6 py-4 text-sm text-right whitespace-nowrap space-x-2">
+                                <a href="{{ route('purchases.show', $purchase) }}" class="text-indigo-600 hover:text-indigo-900 font-bold text-xs">View →</a>
+                                @hasanyrole('admin|owner|system_administrator|manager')
+                                <button type="button"
+                                        @click="deleteAction = '{{ route('purchases.destroy', $purchase) }}'; deletePo = '{{ $purchase->purchase_number }}'; deleteAmount = '{{ number_format($purchase->total_amount, 2) }}'; isReceived = {{ $purchase->status === 'received' ? 'true' : 'false' }}; revertStock = '0'; deleteModalOpen = true;"
+                                        class="inline-flex items-center px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded text-xs transition">
+                                    Delete
+                                </button>
+                                @endhasanyrole
                             </td>
                         </tr>
                         @empty
@@ -97,6 +104,63 @@
                 <div class="px-6 py-4">
                     {{ $purchases->links() }}
                 </div>
+            </div>
+        </div>
+
+        <!-- Delete Purchase Modal with Inventory Choice -->
+        <div x-show="deleteModalOpen" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
+            <div @click.away="deleteModalOpen = false" class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <div>
+                        <h3 class="font-extrabold text-base text-gray-900">Delete Purchase Order</h3>
+                        <p class="text-xs text-gray-500 font-mono mt-0.5" x-text="'PO #' + deletePo + ' (KES ' + deleteAmount + ')'"></p>
+                    </div>
+                    <button @click="deleteModalOpen = false" class="text-gray-400 hover:text-gray-600 font-bold text-lg">&times;</button>
+                </div>
+
+                <form :action="deleteAction" method="POST" class="space-y-4">
+                    @csrf
+                    @method('DELETE')
+
+                    <template x-if="isReceived">
+                        <div class="space-y-2">
+                            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs">
+                                <strong>Note:</strong> This purchase order was marked as <strong>Received</strong>. Choose how you want to handle the inventory:
+                            </div>
+
+                            <label class="flex items-start p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition">
+                                <input type="radio" name="revert_stock" value="0" x-model="revertStock" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                                <div class="ml-3">
+                                    <span class="block text-xs font-extrabold text-gray-900">Maintain Stock As-Is (Recommended)</span>
+                                    <span class="block text-[11px] text-gray-600">Deletes the supplier invoice without altering current shelf inventory quantities.</span>
+                                </div>
+                            </label>
+
+                            <label class="flex items-start p-3 bg-rose-50 border border-rose-200 rounded-xl cursor-pointer hover:bg-rose-100 transition">
+                                <input type="radio" name="revert_stock" value="1" x-model="revertStock" class="mt-0.5 text-rose-600 focus:ring-rose-500">
+                                <div class="ml-3">
+                                    <span class="block text-xs font-extrabold text-rose-900">Revert Stock (-Qty)</span>
+                                    <span class="block text-[11px] text-rose-700">Deducts the received items from your available inventory shelves.</span>
+                                </div>
+                            </label>
+                        </div>
+                    </template>
+
+                    <template x-if="!isReceived">
+                        <p class="text-xs text-gray-600">
+                            Are you sure you want to permanently delete this pending purchase order? This action cannot be undone.
+                        </p>
+                    </template>
+
+                    <div class="pt-2 flex items-center justify-end space-x-2">
+                        <button type="button" @click="deleteModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
+                            Delete Purchase Order
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

@@ -57,4 +57,18 @@ class ExpenseController extends Controller
         return redirect()->route('expenses.index')
             ->with('success', "Expense {$expenseNumber} recorded successfully.");
     }
+
+    public function destroy(Expense $expense)
+    {
+        $user = auth()->user();
+        if (!$user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager'])) {
+            return redirect()->route('expenses.index')->with('error', 'Unauthorized to delete expenses.');
+        }
+
+        $num = $expense->expense_number ?: ('#' . $expense->id);
+        $expense->delete();
+
+        return redirect()->route('expenses.index')
+            ->with('success', "Expense voucher {$num} deleted.");
+    }
 }

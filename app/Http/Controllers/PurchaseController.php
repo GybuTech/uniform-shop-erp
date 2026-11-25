@@ -161,21 +161,46 @@ class PurchaseController extends Controller
         );
     }
 
-    public function destroy(Purchase $purchase)
+    public function destroy(Request $request, Purchase $purchase)
     {
-        if ($purchase->status === 'received') {
-            return redirect()->route('purchases.index')
-                ->with('error', "Purchase order {$purchase->purchase_number} has already been received into stock and cannot be deleted. Record a stock adjustment instead.");
+        $user = auth()->user();
+        if (!$user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager'])) {
+            return redirect()->route('purchases.index')->with('error', 'Unauthorized to delete purchase orders.');
         }
 
         $purchaseNumber = $purchase->purchase_number;
+        $revertStock = $request->boolean('revert_stock', false);
 
-        DB::transaction(function () use ($purchase) {
+        DB::transaction(function () use ($purchase, $revertStock) {
+            if ($purchase->status === 'received' && $revertStock) {
+                foreach ($purchase->items as $item) {
+                    $variant = $item->productVariant ?: ProductVariant::find($item->product_variant_id);
+                    if ($variant) {
+                        $qty = (float) ($item->quantity_received ?: $item->quantity);
+                        $variant->decrement('stock_quantity', $qty);
+
+                        try {
+                            StockMovement::create([
+                                'product_variant_id' => $variant->id,
+                                'quantity'           => -$qty,
+                                'balance_after'      => (float) $variant->fresh()->stock_quantity,
+                                'movement_type'      => 'adjustment_loss',
+                                'reference_id'       => $purchase->id,
+                                'reference_no'       => $purchase->purchase_number,
+                                'user_id'            => auth()->id(),
+                                'notes'              => "Delete Purchase Order #{$purchase->purchase_number} inventory revert",
+                            ]);
+                        } catch (\Throwable) {}
+                    }
+                }
+            }
+
             $purchase->items()->delete();
             $purchase->delete();
         });
 
+        $stockMsg = $revertStock ? 'and received inventory was deducted from shelves' : 'and inventory levels were kept as-is';
         return redirect()->route('purchases.index')
-            ->with('success', "Purchase order {$purchaseNumber} deleted.");
+            ->with('success', "Purchase order {$purchaseNumber} was deleted {$stockMsg}.");
     }
 }

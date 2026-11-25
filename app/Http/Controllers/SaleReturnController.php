@@ -202,4 +202,60 @@ class SaleReturnController extends Controller
         $saleReturn->load(['sale.customer', 'user', 'items.productVariant.product']);
         return view('returns.show', compact('saleReturn'));
     }
+
+    public function destroy(Request $request, SaleReturn $saleReturn)
+    {
+        $user = auth()->user();
+        if (!$user->hasAnyRole(['admin', 'owner', 'system_administrator', 'manager'])) {
+            return redirect()->route('returns.index')->with('error', 'Unauthorized to delete sales return records.');
+        }
+
+        $returnNumber = $saleReturn->return_number;
+        $revertStock = $request->boolean('revert_stock', false);
+
+        DB::transaction(function () use ($saleReturn, $revertStock) {
+            if ($revertStock) {
+                foreach ($saleReturn->items as $item) {
+                    $variant = $item->productVariant ?: ProductVariant::find($item->product_variant_id);
+                    if ($variant) {
+                        $qty = (float) $item->quantity;
+                        $variant->decrement('stock_quantity', $qty);
+
+                        try {
+                            StockMovement::create([
+                                'product_variant_id' => $variant->id,
+                                'quantity'           => -$qty,
+                                'balance_after'      => (float) $variant->fresh()->stock_quantity,
+                                'movement_type'      => 'adjustment_loss',
+                                'reference_id'       => $saleReturn->id,
+                                'reference_no'       => $saleReturn->return_number,
+                                'user_id'            => auth()->id(),
+                                'notes'              => "Delete Return Note #{$saleReturn->return_number} inventory revert",
+                            ]);
+                        } catch (\Throwable) {}
+                    }
+                }
+            }
+
+            // If store credit was issued to a registered customer, reverse the credit balance
+            if ($saleReturn->refund_method === 'store_credit' && $saleReturn->sale?->customer) {
+                $saleReturn->sale->customer->increment('outstanding_balance', (float) $saleReturn->refund_total);
+            }
+
+            $shiftId = $saleReturn->shift_id;
+            $saleReturn->items()->delete();
+            $saleReturn->delete();
+
+            if ($shiftId) {
+                $shift = Shift::find($shiftId);
+                if ($shift && method_exists($shift, 'recalculateTotals')) {
+                    $shift->recalculateTotals();
+                }
+            }
+        });
+
+        $stockMsg = $revertStock ? 'and returned inventory was deducted back from shelves' : 'and inventory levels were kept as-is';
+        return redirect()->route('returns.index')
+            ->with('success', "Return Docket #{$returnNumber} was deleted {$stockMsg}.");
+    }
 }

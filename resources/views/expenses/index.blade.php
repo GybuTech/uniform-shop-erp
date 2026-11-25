@@ -52,6 +52,7 @@
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Amount</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Recorded By</th>
+                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Action</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
@@ -63,6 +64,19 @@
                             <td class="px-6 py-4 text-sm font-extrabold text-red-600">KES {{ number_format($expense->amount, 2) }}</td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ \Carbon\Carbon::parse($expense->expense_date)->format('M d, Y') }}</td>
                             <td class="px-6 py-4 text-sm text-gray-600">{{ $expense->user->name ?? 'Staff' }}</td>
+                            <td class="px-6 py-4 text-sm text-right">
+                                @hasanyrole('admin|owner|system_administrator|manager')
+                                <form method="POST" action="{{ route('expenses.destroy', $expense) }}"
+                                      class="inline"
+                                      onsubmit="return confirm('Permanently delete expense {{ $expense->expense_number }}?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="inline-flex items-center px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded text-xs transition">
+                                        Delete
+                                    </button>
+                                </form>
+                                @endhasanyrole
+                            </td>
                         </tr>
                         @empty
                         <tr>

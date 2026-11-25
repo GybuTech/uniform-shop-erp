@@ -741,38 +741,42 @@ class PosController extends Controller
         $invoiceNo = $sale->invoice_no ?: $sale->receipt_number;
 
         if (\App\Models\SaleReturn::where('sale_id', $sale->id)->exists()) {
-            return redirect()->route('sales.index')
-                ->with('error', "Receipt #{$invoiceNo} has processed returns and cannot be voided. Please handle item returns via the Returns module.");
+            if ($request->boolean('cascade_returns')) {
+                foreach ($sale->returns as $ret) {
+                    $ret->items()->delete();
+                    $ret->delete();
+                }
+            } else {
+                return redirect()->route('sales.index')
+                    ->with('error', "Receipt #{$invoiceNo} has processed returns. Please delete the returns first or confirm deleting linked returns.");
+            }
         }
 
-        // A sale with processed returns has already had part of its stock restored and
-        // part of its value refunded. Voiding it would restock those items a second time.
-        if (\App\Models\SaleReturn::where('sale_id', $sale->id)->exists()) {
-            return redirect()->route('sales.index')
-                ->with('error', "Receipt #{$receiptNumber} has processed returns and cannot be voided. Use the Returns module for the remaining items.");
-        }
+        $restoreStock = $request->boolean('restore_stock', true);
 
-        DB::transaction(function () use ($sale) {
-            // Restore physical stock for non-service items
-            foreach ($sale->items as $item) {
-                $variant = $item->productVariant ?: ProductVariant::withTrashed()->find($item->product_variant_id);
-                $isService = (bool) ($variant?->product?->is_service ?? false);
+        DB::transaction(function () use ($sale, $restoreStock) {
+            // Restore physical stock for non-service items if requested
+            if ($restoreStock) {
+                foreach ($sale->items as $item) {
+                    $variant = $item->productVariant ?: ProductVariant::withTrashed()->find($item->product_variant_id);
+                    $isService = (bool) ($variant?->product?->is_service ?? false);
 
-                if ($variant && !$isService) {
-                    $variant->increment('stock_quantity', (float) $item->quantity);
+                    if ($variant && !$isService) {
+                        $variant->increment('stock_quantity', (float) $item->quantity);
 
-                    try {
-                        StockMovement::create([
-                            'product_variant_id' => $variant->id,
-                            'quantity'           => (float) $item->quantity,
-                            'balance_after'      => (float) $variant->fresh()->stock_quantity,
-                            'movement_type'      => 'adjustment_gain',
-                            'reference_id'       => $sale->id,
-                            'reference_no'       => $sale->receipt_number,
-                            'user_id'            => auth()->id(),
-                            'notes'              => "Void Receipt #{$sale->receipt_number} inventory return",
-                        ]);
-                    } catch (\Throwable) {}
+                        try {
+                            StockMovement::create([
+                                'product_variant_id' => $variant->id,
+                                'quantity'           => (float) $item->quantity,
+                                'balance_after'      => (float) $variant->fresh()->stock_quantity,
+                                'movement_type'      => 'adjustment_gain',
+                                'reference_id'       => $sale->id,
+                                'reference_no'       => $sale->receipt_number,
+                                'user_id'            => auth()->id(),
+                                'notes'              => "Void Receipt #{$sale->receipt_number} inventory return",
+                            ]);
+                        } catch (\Throwable) {}
+                    }
                 }
             }
 
@@ -791,8 +795,9 @@ class PosController extends Controller
             }
         });
 
+        $stockMessage = $restoreStock ? "inventory returned to shelves" : "inventory maintained as-is";
         return redirect()->route('sales.index')
-            ->with('success', "Receipt #{$invoiceNo} was successfully voided and inventory returned to shelves.");
+            ->with('success', "Receipt #{$invoiceNo} was successfully voided and {$stockMessage}.");
     }
 
     public function thermalReceipt(Sale $sale, Request $request)

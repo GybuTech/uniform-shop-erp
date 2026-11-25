@@ -1,4 +1,5 @@
 <x-app-layout>
+    <div x-data="{ voidModalOpen: false, restoreStock: '1' }">
     <x-slot name="header">
         <div class="flex justify-between items-center print:hidden">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
@@ -6,17 +7,11 @@
             </h2>
             <div class="flex items-center space-x-2">
                 @hasanyrole('admin|owner|system_administrator')
-                <form method="POST" action="{{ route('sales.destroy', $sale) }}"
-                      class="inline"
-                      onsubmit="return confirm('VOID Receipt #{{ $sale->receipt_number }}? This will reverse all stock and cannot be undone.')">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" title="Void & Delete Receipt"
-                            class="inline-flex items-center space-x-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        <span>Void</span>
-                    </button>
-                </form>
+                <button type="button" @click="voidModalOpen = true" title="Void & Delete Receipt"
+                        class="inline-flex items-center space-x-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    <span>Void</span>
+                </button>
                 @endhasanyrole
                 <button onclick="window.print()" class="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-medium text-sm">
                     Print
@@ -120,5 +115,53 @@
             <p class="font-bold text-gray-700">Thank you for your business!</p>
             <p>{{ \App\Models\BusinessSetting::get('receipt_footer_note', 'Goods once sold are returnable within 7 days with valid receipt.') }}</p>
         </div>
+    </div>
+
+    <!-- Void Receipt Modal with Inventory Choice -->
+    <div x-show="voidModalOpen" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
+        <div @click.away="voidModalOpen = false" class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <div>
+                    <h3 class="font-extrabold text-base text-gray-900">Void & Delete Receipt</h3>
+                    <p class="text-xs text-gray-500 font-mono mt-0.5">Receipt: #{{ $sale->receipt_number }} (KES {{ number_format($sale->total_amount, 2) }})</p>
+                </div>
+                <button @click="voidModalOpen = false" class="text-gray-400 hover:text-gray-600 font-bold text-lg">&times;</button>
+            </div>
+
+            <form action="{{ route('sales.destroy', $sale) }}" method="POST" class="space-y-4">
+                @csrf
+                @method('DELETE')
+
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-700">Choose Inventory Action *</label>
+                    
+                    <label class="flex items-start p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl cursor-pointer hover:bg-emerald-50 transition">
+                        <input type="radio" name="restore_stock" value="1" x-model="restoreStock" class="mt-0.5 text-emerald-600 focus:ring-emerald-500">
+                        <div class="ml-3">
+                            <span class="block text-xs font-extrabold text-emerald-950">Return Products to Stock (+Qty)</span>
+                            <span class="block text-[11px] text-emerald-700">Re-adds the sold items back to your available inventory shelves.</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start p-3 bg-amber-50/60 border border-amber-200 rounded-xl cursor-pointer hover:bg-amber-50 transition">
+                        <input type="radio" name="restore_stock" value="0" x-model="restoreStock" class="mt-0.5 text-amber-600 focus:ring-amber-500">
+                        <div class="ml-3">
+                            <span class="block text-xs font-extrabold text-amber-950">Maintain Stock As-Is (No Inventory Change)</span>
+                            <span class="block text-[11px] text-amber-700">Deletes the sales record and receipt without altering any shelf quantities.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="pt-2 flex items-center justify-end space-x-2">
+                    <button type="button" @click="voidModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
+                        Confirm Void & Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     </div>
 </x-app-layout>

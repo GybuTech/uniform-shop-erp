@@ -1,4 +1,5 @@
 <x-app-layout>
+    <div x-data="{ deleteModalOpen: false, revertStock: '0' }">
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <div>
@@ -16,6 +17,11 @@
                 <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-sm" style="background-color: #4f46e5 !important; color: #ffffff !important;">
                     Print Credit Note
                 </button>
+                @hasanyrole('admin|owner|system_administrator|manager')
+                <button type="button" @click="deleteModalOpen = true" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shadow-sm" style="background-color: #dc2626 !important; color: #ffffff !important;">
+                    Delete Note
+                </button>
+                @endhasanyrole
             </div>
         </div>
     </x-slot>
@@ -96,5 +102,55 @@
 
             </div>
         </div>
+    </div>
+
+    <!-- Delete Sales Return Modal with Inventory Choice -->
+    <div x-show="deleteModalOpen" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
+        <div @click.away="deleteModalOpen = false" class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <div>
+                    <h3 class="font-extrabold text-base text-gray-900">Delete Sales Return Note</h3>
+                    <p class="text-xs text-gray-500 font-mono mt-0.5">Return #{{ $saleReturn->return_number }} (KES {{ number_format($saleReturn->refund_total, 2) }})</p>
+                </div>
+                <button @click="deleteModalOpen = false" class="text-gray-400 hover:text-gray-600 font-bold text-lg">&times;</button>
+            </div>
+
+            <form action="{{ route('returns.destroy', $saleReturn) }}" method="POST" class="space-y-4">
+                @csrf
+                @method('DELETE')
+
+                <div class="space-y-2">
+                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs">
+                        <strong>Inventory & Financial Choice:</strong> Choose how you want to handle the items previously returned:
+                    </div>
+
+                    <label class="flex items-start p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition">
+                        <input type="radio" name="revert_stock" value="0" x-model="revertStock" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                        <div class="ml-3">
+                            <span class="block text-xs font-extrabold text-gray-900">Maintain Stock As-Is (Recommended)</span>
+                            <span class="block text-[11px] text-gray-600">Deletes the return docket without altering any shelf inventory quantities.</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start p-3 bg-rose-50 border border-rose-200 rounded-xl cursor-pointer hover:bg-rose-100 transition">
+                        <input type="radio" name="revert_stock" value="1" x-model="revertStock" class="mt-0.5 text-rose-600 focus:ring-rose-500">
+                        <div class="ml-3">
+                            <span class="block text-xs font-extrabold text-rose-900">Revert Stock (-Qty)</span>
+                            <span class="block text-[11px] text-rose-700">Deducts the previously returned items back off the shelves.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="pt-2 flex items-center justify-end space-x-2">
+                    <button type="button" @click="deleteModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
+                        Delete Return Note
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     </div>
 </x-app-layout>

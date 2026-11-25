@@ -14,7 +14,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6">
+    <div class="py-6" x-data="{ voidModalOpen: false, voidAction: '', voidReceipt: '', voidAmount: '', restoreStock: '1' }">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
 
             <!-- Search, Branch Filter & DataTable Controls Bar -->
@@ -165,16 +165,11 @@
                                             <span>Receipt</span>
                                         </a>
                                         @hasanyrole('admin|owner|system_administrator')
-                                        <form method="POST" action="{{ route('sales.destroy', $sale) }}"
-                                              class="inline"
-                                              onsubmit="return confirm('VOID & delete receipt #{{ $sale->receipt_number }}? Stock will be restored.')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" title="Void Receipt"
-                                                    class="inline-flex items-center justify-center w-7 h-7 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                            </button>
-                                        </form>
+                                        <button type="button" title="Void Receipt"
+                                                @click="voidAction = '{{ route('sales.destroy', $sale) }}'; voidReceipt = '{{ $sale->receipt_number }}'; voidAmount = '{{ number_format($sale->total_amount, 2) }}'; voidModalOpen = true;"
+                                                class="inline-flex items-center justify-center w-7 h-7 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        </button>
                                         @endhasanyrole
                                     </div>
                                  </td>
@@ -191,6 +186,53 @@
                 <div class="px-5 py-3.5 border-t border-slate-100 bg-slate-50/50">
                     {{ $sales->appends(request()->query())->links() }}
                 </div>
+            </div>
+        </div>
+
+        <!-- Void Receipt Modal with Inventory Choice -->
+        <div x-show="voidModalOpen" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
+            <div @click.away="voidModalOpen = false" class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <div>
+                        <h3 class="font-extrabold text-base text-gray-900">Void & Delete Receipt</h3>
+                        <p class="text-xs text-gray-500 font-mono mt-0.5" x-text="'Receipt: ' + voidReceipt + ' (KES ' + voidAmount + ')'"></p>
+                    </div>
+                    <button @click="voidModalOpen = false" class="text-gray-400 hover:text-gray-600 font-bold text-lg">&times;</button>
+                </div>
+
+                <form :action="voidAction" method="POST" class="space-y-4">
+                    @csrf
+                    @method('DELETE')
+
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-700">Choose Inventory Action *</label>
+                        
+                        <label class="flex items-start p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl cursor-pointer hover:bg-emerald-50 transition">
+                            <input type="radio" name="restore_stock" value="1" x-model="restoreStock" class="mt-0.5 text-emerald-600 focus:ring-emerald-500">
+                            <div class="ml-3">
+                                <span class="block text-xs font-extrabold text-emerald-950">Return Products to Stock (+Qty)</span>
+                                <span class="block text-[11px] text-emerald-700">Re-adds the sold items back to your available inventory shelves.</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-start p-3 bg-amber-50/60 border border-amber-200 rounded-xl cursor-pointer hover:bg-amber-50 transition">
+                            <input type="radio" name="restore_stock" value="0" x-model="restoreStock" class="mt-0.5 text-amber-600 focus:ring-amber-500">
+                            <div class="ml-3">
+                                <span class="block text-xs font-extrabold text-amber-950">Maintain Stock As-Is (No Inventory Change)</span>
+                                <span class="block text-[11px] text-amber-700">Deletes the sales record and receipt without altering any shelf quantities.</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="pt-2 flex items-center justify-end space-x-2">
+                        <button type="button" @click="voidModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition">
+                            Confirm Void & Delete
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
