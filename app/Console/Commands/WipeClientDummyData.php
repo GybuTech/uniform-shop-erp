@@ -97,8 +97,9 @@ class WipeClientDummyData extends Command
             // Re-open an initial fresh shift for the default store
             $adminUser = \App\Models\User::first();
             if ($adminUser) {
-                \App\Models\Shift::getActiveShift($adminUser->id, 'Main Shop', 0.00);
-                $this->line("  ✓ Initialized fresh cashier register shift #1 (ready for live counter sales).");
+                $initialBranch = \App\Services\BranchContext::getActiveBranch() ?: 'Main Shop';
+                \App\Models\Shift::getActiveShift($adminUser->id, $initialBranch, 0.00);
+                $this->line("  ✓ Initialized fresh cashier register shift #1 at {$initialBranch} (ready for live counter sales).");
             }
 
             Schema::enableForeignKeyConstraints();
