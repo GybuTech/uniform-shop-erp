@@ -16,7 +16,7 @@
                 <button onclick="window.print()" class="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-medium text-sm">
                     Print
                 </button>
-                <a href="{{ route('pos.index') }}" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm">
+                <a href="{{ route('pos.index') }}" onclick="sessionStorage.setItem('pos_cart_cleared', '1')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm">
                     + New Sale
                 </a>
             </div>

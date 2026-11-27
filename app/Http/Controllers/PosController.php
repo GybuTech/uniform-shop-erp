@@ -30,7 +30,7 @@ class PosController extends Controller
         $isOwnerOrAdmin = $user->hasAnyRole(['admin', 'owner', 'system_administrator']);
         $branches = Branch::where('is_active', true)->orderBy('name')->get();
 
-        $currentBranchName = $user->branch_name ?: ($branches->first()?->name ?? 'Main Store');
+        $currentBranchName = \App\Services\BranchContext::getActiveBranch();
         $isLockedBranch = !$isOwnerOrAdmin;
 
         $customers = Customer::orderBy('first_name')->get();
@@ -39,6 +39,11 @@ class PosController extends Controller
         $activeShift = Shift::where('user_id', $user->id)
             ->where('status', 'open')
             ->first();
+
+        // If admin/owner does not have an active shift, check if another user has an active shift open on this store terminal
+        if (!$activeShift && $isOwnerOrAdmin) {
+            $activeShift = Shift::where('status', 'open')->latest('started_at')->first();
+        }
 
         if (!$activeShift) {
             return redirect()->route('shifts.open', ['branch' => $currentBranchName])
@@ -229,17 +234,7 @@ class PosController extends Controller
             return (string) $request->input('branch_name');
         }
 
-        $user = auth()->user();
-        if ($user && !empty($user->branch_name)) {
-            return $user->branch_name;
-        }
-
-        $activeBranch = Branch::where('is_active', true)->value('name');
-        if ($activeBranch) {
-            return $activeBranch;
-        }
-
-        return BusinessSetting::get('business_name', 'Main Shop');
+        return \App\Services\BranchContext::getActiveBranch() ?: BusinessSetting::get('business_name', 'Main Shop');
     }
 
     public function store(Request $request)

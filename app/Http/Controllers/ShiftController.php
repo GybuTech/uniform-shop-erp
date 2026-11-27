@@ -106,7 +106,7 @@ class ShiftController extends Controller
             }
         }
 
-        [$branchId, $branchName] = $this->tillBranch($branchId, $user->branch_name ?: 'Main Shop');
+        [$branchId, $branchName] = $this->tillBranch($branchId, \App\Services\BranchContext::getActiveBranch() ?: ($user->branch_name ?: 'Main Shop'));
         $branch = Branch::find($branchId);
 
         // If cashier already has an active open shift, proceed straight to POS
@@ -195,7 +195,7 @@ class ShiftController extends Controller
             }
         }
 
-        [$branchId, $branchName] = $this->tillBranch($branchId, $request->input('branch_name') ?: ($user->branch_name ?: 'Main Shop'));
+        [$branchId, $branchName] = $this->tillBranch($branchId, $request->input('branch_name') ?: (\App\Services\BranchContext::getActiveBranch() ?: 'Main Shop'));
 
         // Check if an open shift already exists for this user
         $existingShift = Shift::where('user_id', $user->id)

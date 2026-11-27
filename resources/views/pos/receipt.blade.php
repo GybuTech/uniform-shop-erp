@@ -7,7 +7,7 @@
                    class="bg-indigo-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm transition text-sm">
                     {{ ($isReprint ?? false) ? 'Reprint Thermal Receipt (Copy)' : 'Print Thermal Receipt (80mm)' }}
                 </a>
-                <a href="{{ route('pos.index') }}" class="bg-green-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm transition text-sm">
+                <a href="{{ route('pos.index') }}" onclick="sessionStorage.setItem('pos_cart_cleared', '1')" class="bg-green-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm transition text-sm">
                     + New Sale
                 </a>
                 @can('refund-sales')

@@ -1787,7 +1787,11 @@
             }
             const form = document.getElementById('checkoutForm');
             if (form) {
+                sessionStorage.setItem('pos_cart_cleared', '1');
                 form.submit();
+                setTimeout(() => {
+                    resetPosCartReadyForSale();
+                }, 50);
                 return true;
             }
             return false;
@@ -2143,6 +2147,38 @@
                 closeParkedSalesModal();
                 closeEndShiftModal();
                 return;
+            }
+        });
+
+        function resetPosCartReadyForSale() {
+            cart = [];
+            splitCash = 0;
+            splitMpesa = 0;
+            const formItems = document.getElementById('formItemsContainer');
+            if (formItems) formItems.innerHTML = '';
+            const refInp = document.getElementById('paymentReferenceInput');
+            if (refInp) refInp.value = '';
+            const custSelect = document.getElementById('customerSelect');
+            if (custSelect) custSelect.value = '';
+            const cashAmountInp = document.getElementById('cashAmountInput');
+            if (cashAmountInp) cashAmountInp.value = '';
+            const mpesaAmountInp = document.getElementById('mpesaAmountInput');
+            if (mpesaAmountInp) mpesaAmountInp.value = '';
+            renderCart();
+        }
+
+        // On initial page load or restore from browser back/forward cache (bfcache)
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted || sessionStorage.getItem('pos_cart_cleared') === '1') {
+                sessionStorage.removeItem('pos_cart_cleared');
+                resetPosCartReadyForSale();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (sessionStorage.getItem('pos_cart_cleared') === '1') {
+                sessionStorage.removeItem('pos_cart_cleared');
+                resetPosCartReadyForSale();
             }
         });
     </script>
