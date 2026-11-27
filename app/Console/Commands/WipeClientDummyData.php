@@ -36,8 +36,6 @@ class WipeClientDummyData extends Command
 
         $this->info('Starting Client Store Handover Reset...');
 
-        DB::beginTransaction();
-
         try {
             Schema::disableForeignKeyConstraints();
 
@@ -70,12 +68,18 @@ class WipeClientDummyData extends Command
                 }
             }
 
-            // Reset customer balances to 0.00
+            // Reset customer balances if stored in columns (debt is dynamically zeroed via sales truncate)
             if (Schema::hasTable('customers')) {
-                DB::table('customers')->update([
-                    'current_balance'     => 0.00,
-                    'outstanding_balance' => 0.00,
-                ]);
+                $customerUpdates = [];
+                if (Schema::hasColumn('customers', 'current_balance')) {
+                    $customerUpdates['current_balance'] = 0.00;
+                }
+                if (Schema::hasColumn('customers', 'outstanding_balance')) {
+                    $customerUpdates['outstanding_balance'] = 0.00;
+                }
+                if (!empty($customerUpdates)) {
+                    DB::table('customers')->update($customerUpdates);
+                }
                 $this->line("  ✓ Reset customer credit and debt balances to KES 0.00.");
             }
 
@@ -104,8 +108,6 @@ class WipeClientDummyData extends Command
 
             Schema::enableForeignKeyConstraints();
 
-            DB::commit();
-
             $this->newLine();
             $this->info('====================================================');
             $this->info('  CLIENT CLEAN HANDOVER COMPLETED SUCCESSFULLY!    ');
@@ -120,7 +122,6 @@ class WipeClientDummyData extends Command
             return 0;
         } catch (\Throwable $e) {
             Schema::enableForeignKeyConstraints();
-            DB::rollBack();
             $this->error('Failed to wipe demo data: ' . $e->getMessage());
             return 1;
         }
